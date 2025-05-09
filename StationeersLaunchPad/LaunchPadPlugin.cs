@@ -1,4 +1,3 @@
-
 using System.Reflection;
 using System.Threading.Tasks;
 using Assets.Scripts;
@@ -19,7 +18,7 @@ namespace StationeersLaunchPad
   {
     public const string pluginGuid = "stationeers.launchpad";
     public const string pluginName = "StationeersLaunchPad";
-    public const string pluginVersion = "0.1.1";
+    public const string pluginVersion = "0.1.5";
 
     void Awake()
     {
@@ -32,7 +31,14 @@ namespace StationeersLaunchPad
         configDescription: new ConfigDescription(
           "Automatically load after the configured wait time on startup. Can be stopped by clicking the loading window at the bottom"
         )
-      );
+       );
+       LaunchPadConfig.AutoUpdateOnStart = this.Config.Bind<bool>(
+         new ConfigDefinition("Startup", "AutoUpdateOnStart"),
+         defaultValue: true,
+         configDescription: new ConfigDescription(
+           "Automatically update mod loader on startup."
+         )
+       );
       LaunchPadConfig.AutoLoadWaitTime = this.Config.Bind<int>(
         new ConfigDefinition("Startup", "AutoLoadWaitTime"),
         defaultValue: 3,
