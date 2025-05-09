@@ -22,7 +22,7 @@ Main workflow logic of loading mod configuration and mods.
 IMGui mod configuration window.
 
 ### [LaunchPadUpdater.cs](LaunchPadUpdater.cs)
-Main class for handling automatic plguin updating.
+Main class for handling automatic plugin updating.
 
 ### [ModLoader.cs](ModLoader.cs)
 Contains the workflow for loading enabled mods into the game, currently just a simple linear load.
