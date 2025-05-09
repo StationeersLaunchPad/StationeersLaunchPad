@@ -26,6 +26,7 @@ A simple mod loader for Stationeers that allows you to edit mod configuration at
 - Install mods into `%HOME%/documents/my games/stationeers/mods` or download them from steam workshop.
 - Start game. Mods will automatically load
 - If you want to reorder or enable/disable mods, click the loading window at the bottom when the game first opens
+- Mod will auto be updated unless otherwise chosen in configuration.
 
 ## Dedicated Server
 
