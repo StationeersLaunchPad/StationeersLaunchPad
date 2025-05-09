@@ -34,6 +34,7 @@ namespace StationeersLaunchPad
 
             if (result.result != UnityWebRequest.Result.Success)
             {
+                request.Dispose();
                 Logger.Global.LogError($"Failed to send web request! result: {result.result}, error: {result.error}");
                 return;
             }
@@ -42,6 +43,7 @@ namespace StationeersLaunchPad
             var matches = versionRegex.Matches(text);
             if (matches.Count == 0)
             {
+                request.Dispose();
                 Logger.Global.LogError($"Failed to find version regex matches.");
                 return;
             }
@@ -51,14 +53,16 @@ namespace StationeersLaunchPad
 
             if (latestVersion <= currentVersion)
             {
+                request.Dispose();
                 Logger.Global.Log($"Plugin is up-to-date.");
                 return;
             }
 
-            Logger.Global.Log($"Plugin is NOT up-to-date.");
+            Logger.Global.LogWarning($"Plugin is NOT up-to-date.");
             var downloadMatches = GameManager.IsBatchMode ? downloadRegexServer.Matches(text) : downloadRegexClient.Matches(text);
             if (downloadMatches.Count == 0)
             {
+                request.Dispose();
                 Logger.Global.LogError($"Failed to find download regex matches.");
                 return;
             }
@@ -69,6 +73,8 @@ namespace StationeersLaunchPad
 
             if (downloadResult.result != UnityWebRequest.Result.Success)
             {
+                downloadRequest.Dispose();
+                request.Dispose();
                 Logger.Global.LogError($"Failed to send web request to download! result: {result.result}, error: {result.error}");
                 return;
             }
@@ -88,6 +94,8 @@ namespace StationeersLaunchPad
             Logger.Global.Log($"Extracted file contents to {extractionPath}!");
             if (!Directory.Exists(extractionPath))
             {
+                downloadRequest.Dispose();
+                request.Dispose();
                 Logger.Global.LogError($"Failed to exteract zip file");
                 return;
             }
