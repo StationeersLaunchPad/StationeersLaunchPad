@@ -130,6 +130,7 @@ namespace StationeersLaunchPad
       switch (LaunchPadConfig.LoadState)
       {
         case LoadState.Initializing:
+        case LoadState.Updating:
         case LoadState.Configuring:
           {
             ConfigChanged = false;
