@@ -23,13 +23,16 @@ namespace StationeersLaunchPad
   public enum LoadState
   {
     Initializing,
+    Updating,
     Configuring,
     ModsLoading,
     ModsLoaded,
     GameRunning
   }
+
   public static class LaunchPadConfig
   {
+    public static ConfigEntry<bool> AutoUpdateOnStart;
     public static ConfigEntry<bool> AutoLoadOnStart;
     public static ConfigEntry<int> AutoLoadWaitTime;
     public static ConfigEntry<bool> AutoSort;
@@ -39,17 +42,28 @@ namespace StationeersLaunchPad
     public static List<ModInfo> Mods = new();
     public static HashSet<string> GameAssemblies = new();
     public static LoadState LoadState = LoadState.Initializing;
+    public static bool AutoUpdate = false;
     public static bool AutoLoad = true;
+    public static bool HasUpdated = false;
     public static Stopwatch AutoStopwatch = new();
 
     public static async void Run()
     {
+      AutoUpdate = AutoUpdateOnStart.Value;
       AutoLoad = AutoLoadOnStart.Value;
-
+      
       await Load();
 
-      while (LoadState < LoadState.Configuring)
+      while (LoadState < LoadState.Updating)
         await UniTask.Yield();
+
+      if (HasUpdated)
+      {
+        Mods = new();
+        LoadState = LoadState.ModsLoaded;
+        AutoLoad = false;
+        return;
+      }
 
       AutoStopwatch.Restart();
 
@@ -76,6 +90,7 @@ namespace StationeersLaunchPad
       {
         LoadState = LoadState.Initializing;
 
+        Logger.Global.Log("Initializing...");
         await UniTask.Run(() => Initialize());
 
         Logger.Global.Log("Listing Local Mods");
@@ -99,6 +114,14 @@ namespace StationeersLaunchPad
         SortByDeps();
 
         Logger.Global.Log("Mod Config Initialized");
+
+        if (AutoUpdate)
+        {
+          LoadState = LoadState.Updating;
+
+          Logger.Global.Log("Checking Version");
+          await UniTask.Run(() => LaunchPadUpdater.CheckVersion());
+        }
 
         LoadState = LoadState.Configuring;
       }
