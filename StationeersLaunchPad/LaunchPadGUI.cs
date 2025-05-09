@@ -65,6 +65,7 @@ namespace StationeersLaunchPad
       Text("LaunchPad " + (LaunchPadConfig.LoadState switch
       {
         LoadState.Initializing => "Initializing",
+        LoadState.Updating => "Updating",
         LoadState.Configuring => $"Loading mods in {autoTime}",
         LoadState.ModsLoading => "Loading mods",
         LoadState.ModsLoaded => $"Starting game in {autoTime}",
