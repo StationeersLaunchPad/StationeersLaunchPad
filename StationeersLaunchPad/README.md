@@ -13,13 +13,16 @@ The loading is currently done one mod at a time (`LinearLoadStrategy` in `ModLoa
 ## Code Organization
 
 ### [LaunchPadPlugin.cs](LaunchPadPlugin.cs)
-Bepinex plugin entrypoint to the mod loader
+Bepinex plugin entrypoint to the mod loader.
 
 ### [LaunchPadConfig.cs](LaunchPadConfig.cs)
-Main workflow logic of loading mod configuration and mods
+Main workflow logic of loading mod configuration and mods.
 
 ### [LaunchPadGUI.cs](LaunchPadGUI.cs)
-IMGui mod configuration window
+IMGui mod configuration window.
+
+### [LaunchPadUpdater.cs](LaunchPadUpdater.cs)
+Main class for handling automatic plguin updating.
 
 ### [ModLoader.cs](ModLoader.cs)
 Contains the workflow for loading enabled mods into the game, currently just a simple linear load.
