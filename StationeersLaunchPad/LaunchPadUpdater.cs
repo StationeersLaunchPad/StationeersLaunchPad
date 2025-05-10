@@ -136,7 +136,7 @@ namespace StationeersLaunchPad
                 if (File.Exists(path))
                     File.Delete(path);
 
-                Logger.Global.Log($"Copying backing up DLL to {path}!");
+                Logger.Global.Log($"Copying backup DLL to {path}!");
                 File.Copy(backupPath, path);
                 Logger.Global.Log($"Deleting DLL at {backupPath}!");
                 File.Delete(backupPath);
