@@ -101,12 +101,12 @@ namespace StationeersLaunchPad
                         if (!File.Exists(path))
                             continue;
 
-                        if (File.Exists(backupFileName)) {
-                            File.Delete(backupFileName);
-                        }
+                        var backupPath = Path.Combine(pluginPath, backupFileName);
+                        if (File.Exists(backupPath))
+                            File.Delete(backupPath);
 
-                        Logger.Global.Log($"Backing up DLL to {path}!");
-                        File.Copy(path, backupFileName);
+                        Logger.Global.Log($"Backing up DLL to {backupPath}!");
+                        File.Copy(path, backupPath);
                         Logger.Global.Log($"Deleting DLL at {path}!");
                         File.Delete(path);
 
@@ -120,6 +120,29 @@ namespace StationeersLaunchPad
                     Logger.Global.LogError($"Mod loader has been updated to version {latestVersion}, please restart your game!");
                 }
             }
+        }
+
+        public static async UniTask RevertUpdate() {
+            var pluginPath = Path.Combine(Paths.PluginPath, "StationeersLaunchPad");
+            foreach (var file in LaunchPadUpdater.Assemblies) {
+                var fileName = $"{file}.dll";
+                var backupFileName = $"{file}.dll.bak";
+      
+                var backupPath = Path.Combine(pluginPath, backupFileName);
+                if (!File.Exists(backupPath))
+                    continue;
+
+                var path = Path.Combine(pluginPath, fileName);
+                if (File.Exists(path))
+                    File.Delete(path);
+
+                Logger.Global.Log($"Copying backing up DLL to {path}!");
+                File.Copy(backupPath, path);
+                Logger.Global.Log($"Deleting DLL at {backupPath}!");
+                File.Delete(backupPath);
+            }
+
+            Logger.Global.LogWarning($"Mod loader has reverted update changes due to an error.");
         }
     }
 }

@@ -128,6 +128,7 @@ namespace StationeersLaunchPad
           {
             Logger.Global.LogError("Error occurred during updating.");
             Logger.Global.LogException(ex);
+            await UniTask.Run(() => LaunchPadUpdater.RevertUpdate());
           }
         }
 
