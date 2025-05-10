@@ -57,7 +57,7 @@ namespace StationeersLaunchPad
       while (LoadState < LoadState.Updating)
         await UniTask.Yield();
 
-      if (HasUpdated)
+      if (HasUpdated && !GameManager.IsBatchMode)
       {
         Mods = new();
         LoadState = LoadState.ModsLoaded;
@@ -120,18 +120,35 @@ namespace StationeersLaunchPad
           LoadState = LoadState.Updating;
 
           Logger.Global.Log("Checking Version");
-          await UniTask.Run(() => LaunchPadUpdater.CheckVersion());
+          try
+          {
+            await UniTask.Run(() => LaunchPadUpdater.CheckVersion());
+          }
+          catch (Exception ex)
+          {
+            Logger.Global.LogError("Error occurred during updating.");
+            Logger.Global.LogException(ex);
+          }
         }
 
         LoadState = LoadState.Configuring;
       }
       catch (Exception ex)
       {
-        Logger.Global.LogError("Error occurred during initialization. Mods will not be loaded");
-        Logger.Global.LogException(ex);
-        Mods = new();
-        LoadState = LoadState.ModsLoaded;
-        AutoLoad = false;
+        if (!GameManager.IsBatchMode)
+        {
+         Logger.Global.LogError("Error occurred during initialization. Mods will not be loaded.");
+         Logger.Global.LogException(ex);
+
+         Mods = new();
+         LoadState = LoadState.ModsLoaded;
+         AutoLoad = false;
+        }
+        else
+        {
+          Logger.Global.LogError("Error occurred during initialization.");
+          Logger.Global.LogException(ex);
+        }
       }
     }
 

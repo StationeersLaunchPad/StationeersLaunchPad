@@ -5,7 +5,7 @@
     <TargetFramework>net48</TargetFramework>
     <LangVersion>9.0</LangVersion>
     <OutputPath>$(SolutionDir)bin\$(Configuration)</OutputPath>
-    <StationeersDirectory>$(MSBuildProgramFiles32)\Steam\steamapps\common\Stationeers\</StationeersDirectory>
+    <StationeersDirectory>D:\SteamLibrary\steamapps\common\Stationeers\</StationeersDirectory>
     <UserDir>$(HOMEDRIVE)$(HOMEPATH)</UserDir>
     <MyStationeersDir>$(UserDir)\Documents\My Games\Stationeers\</MyStationeersDir>
     <PluginPath>$(StationeersDirectory)Bepinex\plugins\StationeersLaunchPad</PluginPath>
