@@ -57,13 +57,12 @@ namespace StationeersLaunchPad
                     Logger.Global.LogError($"Failed to find download regex matches.");
                     return;
                 }
+
                 using (var downloadRequest = UnityWebRequest.Get(downloadMatches[0].Groups[1].Value)) {
                     Logger.Global.Log($"Requesting download file...");
                     var downloadResult = await downloadRequest.SendWebRequest();
 
                     if (downloadResult.result != UnityWebRequest.Result.Success) {
-                        downloadRequest.Dispose();
-                        request.Dispose();
                         Logger.Global.LogError($"Failed to send web request to download! result: {result.result}, error: {result.error}");
                         return;
                     }
@@ -82,8 +81,6 @@ namespace StationeersLaunchPad
 
                     Logger.Global.Log($"Extracted file contents to {extractionPath}!");
                     if (!Directory.Exists(extractionPath)) {
-                        downloadRequest.Dispose();
-                        request.Dispose();
                         Logger.Global.LogError($"Failed to exteract zip file");
                         return;
                     }
