@@ -34,7 +34,7 @@ namespace StationeersLaunchPad
        );
        LaunchPadConfig.AutoUpdateOnStart = this.Config.Bind<bool>(
          new ConfigDefinition("Startup", "AutoUpdateOnStart"),
-         defaultValue: true,
+         defaultValue: !GameManager.IsBatchMode, // Default to false on DS
          configDescription: new ConfigDescription(
            "Automatically update mod loader on startup."
          )
