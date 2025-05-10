@@ -9,11 +9,9 @@ using System.IO.Compression;
 using System.Text.RegularExpressions;
 using UnityEngine.Networking;
 
-namespace StationeersLaunchPad
-{
+namespace StationeersLaunchPad {
     // similar to jixxed's updater
-    public static class LaunchPadUpdater
-    {
+    public static class LaunchPadUpdater {
         public static List<string> Assemblies = new List<string>()
         {
             "RG.ImGui",
@@ -73,7 +71,22 @@ namespace StationeersLaunchPad
 
                     var tempPath = Path.GetTempPath();
                     var extractionPath = Path.Combine(tempPath, "StationeersLaunchPad");
+                    if (Directory.Exists(extractionPath)) {
+                        foreach (var file in Directory.GetFiles(extractionPath)) {
+                            var path = Path.Combine(extractionPath, file);
+
+                            if (File.Exists(path)) {
+                                File.Delete(path);
+                            }
+                        }
+                        Directory.Delete(extractionPath);
+                    }
+
                     var zipFilePath = Path.Combine(tempPath, "SLP.zip");
+                    if (File.Exists(zipFilePath)) {
+                        File.Delete(zipFilePath);
+                    }
+
                     Logger.Global.Log($"Writing file to {zipFilePath}...");
                     File.WriteAllBytes(zipFilePath, downloadResult.downloadHandler.data);
 
@@ -127,7 +140,7 @@ namespace StationeersLaunchPad
             foreach (var file in LaunchPadUpdater.Assemblies) {
                 var fileName = $"{file}.dll";
                 var backupFileName = $"{file}.dll.bak";
-      
+
                 var backupPath = Path.Combine(pluginPath, backupFileName);
                 if (!File.Exists(backupPath))
                     continue;

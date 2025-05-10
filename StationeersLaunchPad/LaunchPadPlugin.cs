@@ -1,161 +1,164 @@
+using System.Reflection;
+using System.Threading.Tasks;
 using Assets.Scripts;
+using Assets.Scripts.Networking.Transports;
+using Assets.Scripts.Serialization;
 using BepInEx;
-using BepInEx.Bootstrap;
+using BepInEx.Configuration;
 using Cysharp.Threading.Tasks;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.IO.Compression;
-using System.Text.RegularExpressions;
-using UnityEngine.Networking;
+using HarmonyLib;
+using Steamworks;
+using UnityEngine;
+using UnityEngine.LowLevel;
 
-namespace StationeersLaunchPad {
-    // similar to jixxed's updater
-    public static class LaunchPadUpdater {
-        public static List<string> Assemblies = new List<string>()
-        {
-            "RG.ImGui",
-            "StationeersMods.Interface",
-            "StationeersMods.Shared",
-            "StationeersLaunchPad",
-        };
+namespace StationeersLaunchPad
+{
+  [BepInPlugin(pluginGuid, pluginName, pluginVersion)]
+  public class LaunchPadPlugin : BaseUnityPlugin
+  {
+    public const string pluginGuid = "stationeers.launchpad";
+    public const string pluginName = "StationeersLaunchPad";
+    public const string pluginVersion = "0.1.5";
 
-        private static Regex versionRegex = new Regex(@"""tag_name""\:\s""([V\d.]*)""", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-        private static Regex downloadRegexClient = new Regex(@"""browser_download_url""\:\s""([^""]*StationeersLaunchPad-v.+\.zip)""", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-        private static Regex downloadRegexServer = new Regex(@"""browser_download_url""\:\s""([^""]*StationeersLaunchPad-server-v.+\.zip)""", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    void Awake()
+    {
+      if (Harmony.HasAnyPatches(pluginGuid))
+        return;
 
-        public static async UniTask CheckVersion() {
-            using (var request = UnityWebRequest.Get("https://api.github.com/repos/StationeersLaunchPad/StationeersLaunchPad/releases/latest")) {
-                request.timeout = 10; // 10 seconds because we are only fetching a json file
+      LaunchPadConfig.AutoLoadOnStart = this.Config.Bind<bool>(
+        new ConfigDefinition("Startup", "AutoLoadOnStart"),
+        defaultValue: true,
+        configDescription: new ConfigDescription(
+          "Automatically load after the configured wait time on startup. Can be stopped by clicking the loading window at the bottom"
+        )
+       );
+       LaunchPadConfig.AutoUpdateOnStart = this.Config.Bind<bool>(
+         new ConfigDefinition("Startup", "AutoUpdateOnStart"),
+         defaultValue: !GameManager.IsBatchMode, // Default to false on DS
+         configDescription: new ConfigDescription(
+           "Automatically update mod loader on startup."
+         )
+       );
+      LaunchPadConfig.AutoLoadWaitTime = this.Config.Bind<int>(
+        new ConfigDefinition("Startup", "AutoLoadWaitTime"),
+        defaultValue: 3,
+        configDescription: new ConfigDescription(
+          "How many seconds to wait before loading mods, then loading the game",
+          new AcceptableValueRange<int>(3, 30)
+        )
+      );
+      LaunchPadConfig.AutoSort = this.Config.Bind<bool>(
+        new ConfigDefinition("Startup", "AutoSort"),
+        defaultValue: true,
+        configDescription: new ConfigDescription(
+          "Automatically sort based on LoadBefore/LoadAfter tags in mod data"
+        )
+      );
+      LaunchPadConfig.SortedConfig = new SortedConfigFile(this.Config);
 
-                Logger.Global.Log($"Requesting version...");
-                var result = await request.SendWebRequest();
+      var harmony = new Harmony(pluginGuid);
+      harmony.PatchAll();
 
-                if (result.result != UnityWebRequest.Result.Success) {
-                    Logger.Global.LogError($"Failed to send web request! result: {result.result}, error: {result.error}");
-                    return;
-                }
+      var unityLogger = Debug.unityLogger as UnityEngine.Logger;
+      unityLogger.logHandler = new LogWrapper(unityLogger.logHandler);
 
-                var text = result.downloadHandler.text;
-                var matches = versionRegex.Matches(text);
-                if (matches.Count == 0) {
-                    Logger.Global.LogError($"Failed to find version regex matches.");
-                    return;
-                }
+      var playerLoop = PlayerLoop.GetCurrentPlayerLoop();
+      PlayerLoopHelper.Initialize(ref playerLoop);
 
-                var latestVersion = new Version(matches[0].Groups[1].Value.TrimStart('V', 'v'));
-                var currentVersion = new Version(LaunchPadPlugin.pluginVersion.TrimStart('V', 'v'));
-
-                if (latestVersion <= currentVersion) {
-                    Logger.Global.Log($"Plugin is up-to-date.");
-                    return;
-                }
-
-                Logger.Global.LogWarning($"Plugin is NOT up-to-date.");
-                var downloadMatches = GameManager.IsBatchMode ? downloadRegexServer.Matches(text) : downloadRegexClient.Matches(text);
-                if (downloadMatches.Count == 0) {
-                    Logger.Global.LogError($"Failed to find download regex matches.");
-                    return;
-                }
-
-                using (var downloadRequest = UnityWebRequest.Get(downloadMatches[0].Groups[1].Value)) {
-                    downloadRequest.timeout = 45; // max of 45 seconds to download the zip file
-
-                    Logger.Global.Log($"Requesting download file...");
-                    var downloadResult = await downloadRequest.SendWebRequest();
-
-                    if (downloadResult.result != UnityWebRequest.Result.Success) {
-                        Logger.Global.LogError($"Failed to send web request to download! result: {result.result}, error: {result.error}");
-                        return;
-                    }
-
-                    var tempPath = Path.GetTempPath();
-                    var extractionPath = Path.Combine(tempPath, "StationeersLaunchPad");
-                    if (Directory.Exists(extractionPath)) {
-                        foreach (var file in Directory.GetFiles(extractionPath)) {
-                            var path = Path.Combine(extractionPath, file);
-
-                            if (File.Exists(path)) {
-                                File.Delete(path);
-                            }
-                        }
-                        Directory.Delete(extractionPath);
-                    }
-
-                    var zipFilePath = Path.Combine(tempPath, "SLP.zip");
-                    if (File.Exists(zipFilePath)) {
-                        File.Delete(zipFilePath);
-                    }
-
-                    Logger.Global.Log($"Writing file to {zipFilePath}...");
-                    File.WriteAllBytes(zipFilePath, downloadResult.downloadHandler.data);
-
-                    using (var zipFile = ZipFile.Open(zipFilePath, ZipArchiveMode.Read)) {
-                        Logger.Global.Log($"Extracting file contents to {extractionPath}...");
-                        zipFile.ExtractToDirectory(tempPath);
-                    }
-                    File.Delete(zipFilePath);
-
-                    Logger.Global.Log($"Extracted file contents to {extractionPath}!");
-                    if (!Directory.Exists(extractionPath)) {
-                        Logger.Global.LogError($"Failed to exteract zip file");
-                        return;
-                    }
-
-                    var pluginPath = Path.Combine(Paths.PluginPath, "StationeersLaunchPad");
-                    foreach (var file in LaunchPadUpdater.Assemblies) {
-                        var fileName = $"{file}.dll";
-                        var backupFileName = $"{file}.dll.bak";
-                        var newPath = Path.Combine(extractionPath, fileName);
-                        if (!File.Exists(newPath))
-                            continue;
-
-                        var path = Path.Combine(pluginPath, fileName);
-                        if (!File.Exists(path))
-                            continue;
-
-                        var backupPath = Path.Combine(pluginPath, backupFileName);
-                        if (File.Exists(backupPath))
-                            File.Delete(backupPath);
-
-                        Logger.Global.Log($"Backing up DLL to {backupPath}!");
-                        File.Move(path, backupPath);
-                        Logger.Global.Log($"Deleting DLL at {path}!");
-                        File.Delete(path);
-
-                        Logger.Global.Log($"Moving new DLL to {newPath}!");
-                        File.Move(newPath, path);
-                        //File.Delete(newPath);
-                    }
-                    Directory.Delete(extractionPath);
-
-                    LaunchPadConfig.HasUpdated = true;
-                    Logger.Global.LogError($"Mod loader has been updated to version {latestVersion}, please restart your game!");
-                }
-            }
-        }
-
-        public static async UniTask RevertUpdate() {
-            var pluginPath = Path.Combine(Paths.PluginPath, "StationeersLaunchPad");
-            foreach (var file in LaunchPadUpdater.Assemblies) {
-                var fileName = $"{file}.dll";
-                var backupFileName = $"{file}.dll.bak";
-
-                var backupPath = Path.Combine(pluginPath, backupFileName);
-                if (!File.Exists(backupPath))
-                    continue;
-
-                var path = Path.Combine(pluginPath, fileName);
-                if (File.Exists(path))
-                    File.Delete(path);
-
-                Logger.Global.Log($"Moving backup DLL to {path}!");
-                File.Move(backupPath, path);
-                //Logger.Global.Log($"Deleting DLL at {backupPath}!");
-                //File.Delete(backupPath);
-            }
-
-            Logger.Global.LogWarning($"Mod loader has reverted update changes due to an error.");
-        }
+      LaunchPadConfig.Run();
     }
+  }
+
+  [HarmonyPatch]
+  static class LaunchPadPatches
+  {
+    [HarmonyPatch(typeof(SplashBehaviour), "Awake"), HarmonyPrefix]
+    static bool SplashAwake(SplashBehaviour __instance)
+    {
+      LaunchPadConfig.SplashBehaviour = __instance;
+      Application.targetFrameRate = 60;
+      typeof(SplashBehaviour).GetProperty("IsActive").SetValue(null, true);
+      return false;
+    }
+
+    [HarmonyPatch(typeof(SplashBehaviour), nameof(SplashBehaviour.Draw)), HarmonyPrefix]
+    static bool SplashDraw()
+    {
+      if (LaunchPadGUI.IsActive)
+      {
+        LaunchPadGUI.DrawPreload();
+        return false;
+      }
+      return true;
+    }
+
+    [HarmonyPatch(typeof(WorldManager), "LoadDataFiles"), HarmonyPostfix]
+    static void LoadDataFiles()
+    {
+      // Some global menus (printer recipe selection, hash generator selection) load strings
+      // before mod xml files are loaded in. This forces a reload of all those strings.
+      Localization.OnLanguageChanged.Invoke();
+    }
+
+    [HarmonyPatch(typeof(SteamUGC), nameof(SteamUGC.DeleteFileAsync)), HarmonyPrefix]
+    static bool DeleteFileAsync(ref Task<bool> __result)
+    {
+      // don't remove workshop items when the owner unsubscribes
+      __result = Task.Run(() => true);
+      return false;
+    }
+
+    // we patch PublishMod to add the changelog, but its done in 2 steps.
+    // first we prefix patch PublishMod to save the changelog
+    // then we prefix patch Workshop_PublishItemAsync to add the saved changelog
+    // we check the directory path of the mod matches just to be sure something weird didnt happen
+    static string SavedChangeLog = "";
+    static string SavedPath = "";
+    [HarmonyPatch(typeof(WorkshopMenu), "PublishMod"), HarmonyPrefix]
+    static void PublishMod(WorkshopModListItem ____selectedModItem)
+    {
+      var mod = ____selectedModItem.Data;
+      var about = XmlSerialization.Deserialize<ModAbout>(mod.AboutXmlPath, "ModMetadata");
+      SavedChangeLog = about.ChangeLog;
+      SavedPath = mod.DirectoryPath;
+    }
+    [HarmonyPatch(typeof(SteamTransport), nameof(SteamTransport.Workshop_PublishItemAsync)), HarmonyPrefix]
+    static void Workshop_PublishItemAsync(SteamTransport.WorkShopItemDetail detail)
+    {
+      if (detail.Path == SavedPath)
+        detail.ChangeNote = SavedChangeLog;
+    }
+
+    [HarmonyPatch(typeof(WorkshopMenu), "SelectMod"), HarmonyPostfix]
+    static void WorkshopMenuSelectMod(WorkshopMenu __instance, WorkshopModListItem modItem)
+    {
+      var modInfo = LaunchPadConfig.Mods.Find(mod => mod.Path == modItem?.Data?.DirectoryPath);
+      var inGameDesc = modInfo?.About?.InGameDescription?.Value;
+      if (!string.IsNullOrEmpty(inGameDesc))
+        __instance.DescriptionText.text = inGameDesc;
+    }
+
+    private static FieldInfo workshopMenuSelectedField;
+
+    [HarmonyPatch(typeof(OrbitalSimulation), nameof(OrbitalSimulation.Draw)), HarmonyPrefix]
+    static void WorkshopMenuDrawConfig()
+    {
+      if (!WorkshopMenu.Instance.isActiveAndEnabled)
+        return;
+
+      if (workshopMenuSelectedField == null)
+        workshopMenuSelectedField = typeof(WorkshopMenu).GetField("_selectedModItem", BindingFlags.Instance | BindingFlags.NonPublic);
+
+      var modData = ((WorkshopModListItem)workshopMenuSelectedField.GetValue(WorkshopMenu.Instance)).Data;
+      LaunchPadGUI.DrawMenuConfig(modData);
+    }
+
+    [HarmonyPatch(typeof(SteamClient), nameof(SteamClient.Init)), HarmonyPrefix]
+    static bool SteamClient_Init(uint appid, bool asyncCallbacks)
+    {
+      // If its already initialized, just skip instead of erroring
+      // We initialize this before the game does, but we still want the game to think it initialized itself
+      return !SteamClient.IsValid;
+    }
+  }
 }
