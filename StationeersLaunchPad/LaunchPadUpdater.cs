@@ -106,13 +106,13 @@ namespace StationeersLaunchPad
                             File.Delete(backupPath);
 
                         Logger.Global.Log($"Backing up DLL to {backupPath}!");
-                        File.Copy(path, backupPath);
+                        File.Move(path, backupPath);
                         Logger.Global.Log($"Deleting DLL at {path}!");
                         File.Delete(path);
 
-                        Logger.Global.Log($"Copying new DLL to {newPath}!");
-                        File.Copy(newPath, path);
-                        File.Delete(newPath);
+                        Logger.Global.Log($"Moving new DLL to {newPath}!");
+                        File.Move(newPath, path);
+                        //File.Delete(newPath);
                     }
                     Directory.Delete(extractionPath);
 
@@ -136,10 +136,10 @@ namespace StationeersLaunchPad
                 if (File.Exists(path))
                     File.Delete(path);
 
-                Logger.Global.Log($"Copying backup DLL to {path}!");
-                File.Copy(backupPath, path);
-                Logger.Global.Log($"Deleting DLL at {backupPath}!");
-                File.Delete(backupPath);
+                Logger.Global.Log($"Moving backup DLL to {path}!");
+                File.Move(backupPath, path);
+                //Logger.Global.Log($"Deleting DLL at {backupPath}!");
+                //File.Delete(backupPath);
             }
 
             Logger.Global.LogWarning($"Mod loader has reverted update changes due to an error.");
