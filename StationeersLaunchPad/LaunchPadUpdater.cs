@@ -73,7 +73,22 @@ namespace StationeersLaunchPad
 
                     var tempPath = Path.GetTempPath();
                     var extractionPath = Path.Combine(tempPath, "StationeersLaunchPad");
+                    if (Directory.Exists(extractionPath)) {
+                        foreach (var file in Directory.GetFiles(extractionPath)) {
+                            var path = Path.Combine(extractionPath, file);
+
+                            if (File.Exists(path)) {
+                                File.Delete(path);
+                            }
+                        }
+                        Directory.Delete(extractionPath);
+                    }
+
                     var zipFilePath = Path.Combine(tempPath, "SLP.zip");
+                    if (File.Exists(zipFilePath)) {
+                        File.Delete(zipFilePath);
+                    }
+
                     Logger.Global.Log($"Writing file to {zipFilePath}...");
                     File.WriteAllBytes(zipFilePath, downloadResult.downloadHandler.data);
 
