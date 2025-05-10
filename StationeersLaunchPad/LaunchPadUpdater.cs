@@ -28,6 +28,8 @@ namespace StationeersLaunchPad
 
         public static async UniTask CheckVersion() {
             using (var request = UnityWebRequest.Get("https://api.github.com/repos/StationeersLaunchPad/StationeersLaunchPad/releases/latest")) {
+                request.timeout = 10; // 10 seconds because we are only fetching a json file
+
                 Logger.Global.Log($"Requesting version...");
                 var result = await request.SendWebRequest();
 
@@ -59,6 +61,8 @@ namespace StationeersLaunchPad
                 }
 
                 using (var downloadRequest = UnityWebRequest.Get(downloadMatches[0].Groups[1].Value)) {
+                    downloadRequest.timeout = 45; // max of 45 seconds to download the zip file
+
                     Logger.Global.Log($"Requesting download file...");
                     var downloadResult = await downloadRequest.SendWebRequest();
 
