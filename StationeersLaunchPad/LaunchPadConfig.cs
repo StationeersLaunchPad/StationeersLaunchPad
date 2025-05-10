@@ -59,10 +59,7 @@ namespace StationeersLaunchPad
 
       if (HasUpdated && !GameManager.IsBatchMode)
       {
-        Mods = new();
-        LoadState = LoadState.ModsLoaded;
         AutoLoad = false;
-        return;
       }
 
       AutoStopwatch.Restart();
