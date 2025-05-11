@@ -111,7 +111,6 @@ namespace StationeersLaunchPad {
     [XmlElement]
     public string Description;
 
-    [XmlElement(IsNullable = true)]
     [XmlIgnore]
     private string _inGameDescription;
 
