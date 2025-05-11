@@ -1,13 +1,15 @@
-using System.Reflection;
-using System.Threading.Tasks;
 using Assets.Scripts;
 using Assets.Scripts.Networking.Transports;
 using Assets.Scripts.Serialization;
+using Assets.Scripts.UI;
 using BepInEx;
 using BepInEx.Configuration;
 using Cysharp.Threading.Tasks;
 using HarmonyLib;
 using Steamworks;
+using System.Reflection;
+using System.Threading.Tasks;
+using TMPro;
 using UnityEngine;
 using UnityEngine.LowLevel;
 
@@ -18,7 +20,7 @@ namespace StationeersLaunchPad
   {
     public const string pluginGuid = "stationeers.launchpad";
     public const string pluginName = "StationeersLaunchPad";
-    public const string pluginVersion = "0.1.6";
+    public const string pluginVersion = "0.1.7";
 
     void Awake()
     {
@@ -32,13 +34,13 @@ namespace StationeersLaunchPad
           "Automatically load after the configured wait time on startup. Can be stopped by clicking the loading window at the bottom"
         )
        );
-       LaunchPadConfig.AutoUpdateOnStart = this.Config.Bind<bool>(
-         new ConfigDefinition("Startup", "AutoUpdateOnStart"),
-         defaultValue: !GameManager.IsBatchMode, // Default to false on DS
-         configDescription: new ConfigDescription(
-           "Automatically update mod loader on startup."
-         )
-       );
+      LaunchPadConfig.AutoUpdateOnStart = this.Config.Bind<bool>(
+        new ConfigDefinition("Startup", "AutoUpdateOnStart"),
+        defaultValue: !GameManager.IsBatchMode, // Default to false on DS
+        configDescription: new ConfigDescription(
+          "Automatically update mod loader on startup."
+        )
+      );
       LaunchPadConfig.AutoLoadWaitTime = this.Config.Bind<int>(
         new ConfigDefinition("Startup", "AutoLoadWaitTime"),
         defaultValue: 3,
@@ -78,6 +80,7 @@ namespace StationeersLaunchPad
       LaunchPadConfig.SplashBehaviour = __instance;
       Application.targetFrameRate = 60;
       typeof(SplashBehaviour).GetProperty("IsActive").SetValue(null, true);
+
       return false;
     }
 
@@ -85,11 +88,9 @@ namespace StationeersLaunchPad
     static bool SplashDraw()
     {
       if (LaunchPadGUI.IsActive)
-      {
         LaunchPadGUI.DrawPreload();
-        return false;
-      }
-      return true;
+
+      return !LaunchPadGUI.IsActive;
     }
 
     [HarmonyPatch(typeof(WorldManager), "LoadDataFiles"), HarmonyPostfix]
@@ -117,29 +118,64 @@ namespace StationeersLaunchPad
     [HarmonyPatch(typeof(WorkshopMenu), "PublishMod"), HarmonyPrefix]
     static void PublishMod(WorkshopModListItem ____selectedModItem)
     {
-      var mod = ____selectedModItem.Data;
+      var mod = ____selectedModItem?.Data;
+      if (mod == null)
+        return;
+
       var about = XmlSerialization.Deserialize<ModAbout>(mod.AboutXmlPath, "ModMetadata");
+      if (about == null)
+        return;
+
       SavedChangeLog = about.ChangeLog;
       SavedPath = mod.DirectoryPath;
     }
+
     [HarmonyPatch(typeof(SteamTransport), nameof(SteamTransport.Workshop_PublishItemAsync)), HarmonyPrefix]
     static void Workshop_PublishItemAsync(SteamTransport.WorkShopItemDetail detail)
     {
-      if (detail.Path == SavedPath)
+      if (detail != null && detail.Path == SavedPath)
         detail.ChangeNote = SavedChangeLog;
     }
 
     [HarmonyPatch(typeof(WorkshopMenu), "SelectMod"), HarmonyPostfix]
     static void WorkshopMenuSelectMod(WorkshopMenu __instance, WorkshopModListItem modItem)
     {
-      var modInfo = LaunchPadConfig.Mods.Find(mod => mod.Path == modItem?.Data?.DirectoryPath);
-      var inGameDesc = modInfo?.About?.InGameDescription?.Value;
-      if (!string.IsNullOrEmpty(inGameDesc))
-        __instance.DescriptionText.text = inGameDesc;
+      if (modItem == null)
+        return;
+
+      var modData = modItem.Data;
+      if (modData == null)
+        return;
+
+      var modInfo = LaunchPadConfig.Mods.Find((mod) => mod.Path == modData.DirectoryPath);
+      if (modInfo == null)
+        return;
+
+      var modValid = modInfo.IsWorkshopValid();
+      if (!modValid.Item1 && modValid.Item2 != string.Empty) {
+        AlertPanel.Instance.ShowAlert(modValid.Item2, AlertState.Alert);
+        __instance.SelectedModButtonRight?.SetActive(false);
+        return;
+      }
+
+      var modAbout = modInfo.About;
+      if (modAbout == null)
+        return;
+
+      var publishButton = __instance.SelectedModButtonRight?.GetComponentInChildren<TextMeshProUGUI>();
+      if (modInfo.Source == ModSource.Local && modAbout.WorkshopHandle == 0)
+        publishButton.SetText("Publish");
+      else if (modInfo.Source == ModSource.Workshop)
+        publishButton.SetText("Unsubscribe");
+      else
+        publishButton.SetText("Update");
+
+      var modIGDescription = modAbout.InGameDescription?.Value;
+      if (!string.IsNullOrEmpty(modIGDescription))
+        __instance.DescriptionText.text = modIGDescription;
     }
 
     private static FieldInfo workshopMenuSelectedField;
-
     [HarmonyPatch(typeof(OrbitalSimulation), nameof(OrbitalSimulation.Draw)), HarmonyPrefix]
     static void WorkshopMenuDrawConfig()
     {
