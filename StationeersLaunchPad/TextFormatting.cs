@@ -69,7 +69,8 @@ namespace StationeersLaunchPad
       }
 
       var ignoreWs = false;
-      var literalWs = false;
+      var codeBlocks = 0;
+      var noParse = false;
 
       Consume(text, ref index);
       while (index < text.Length)
@@ -81,14 +82,14 @@ namespace StationeersLaunchPad
           case ElementType.Whitespace:
             if (ignoreWs)
               break;
-            if (literalWs)
+            if (codeBlocks > 0)
               appendRange(el.Full);
             else
               res.Append(' ');
             break;
           case ElementType.Newline:
             res.AppendLine();
-            if (!literalWs)
+            if (codeBlocks == 0)
               ignoreWs = true;
             break;
           case ElementType.Text:
@@ -96,6 +97,12 @@ namespace StationeersLaunchPad
             appendRange(el.Full);
             break;
           case ElementType.OpenTag:
+            // skip all open tags in noparse
+            if (noParse)
+            {
+              appendRange(el.Full);
+              break;
+            }
             // simple and ignored tags
             if (
               tryOpenTag(el.TagName, "b", "<b>", "</b>") ||
@@ -108,17 +115,47 @@ namespace StationeersLaunchPad
               tryOpenTag(el.TagName, "h3", "<size=133%><color=#5aa9d6>", "</color></size>")
             )
               break;
-            if (rangeIs(el.TagName, "url"))
+            else if (rangeIs(el.TagName, "url"))
             {
               res.Append($"<link=\"{rangeString(el.TagValue)}\"><color=#ebebeb><u>");
               openTag(el.TagName, "</u></color></link>");
               break;
             }
+            else if (rangeIs(el.TagName, "code"))
+            {
+              if (codeBlocks > 0)
+              {
+                // TMP doesn't like nested mspace
+                res.Append("<line-indent=24px><br>");
+                openTag(el.TagName, "</line-indent><br>");
+              }
+              else
+              {
+                res.Append("<line-indent=24px><br><mspace=0.75em>");
+                openTag(el.TagName, "</mspace></line-indent><br>");
+              }
+              codeBlocks++;
+              break;
+            }
+            else if (rangeIs(el.TagName, "noparse"))
+            {
+              noParse = true;
+              break;
+            }
             appendRange(el.Full);
             break;
           case ElementType.CloseTag:
-            if (!closeTag(el.TagName))
+            if (noParse)
+            {
+              if (rangeIs(el.TagName, "noparse"))
+                noParse = false;
+              else
+                appendRange(el.Full);
+            }
+            else if (!closeTag(el.TagName))
               appendRange(el.Full);
+            else if (rangeIs(el.TagName, "code"))
+              codeBlocks--;
             break;
         }
 
