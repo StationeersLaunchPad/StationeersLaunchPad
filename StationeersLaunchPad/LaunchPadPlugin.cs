@@ -11,6 +11,7 @@ using System.Reflection;
 using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.LowLevel;
 
 namespace StationeersLaunchPad
@@ -152,7 +153,8 @@ namespace StationeersLaunchPad
         return;
 
       var modValid = modInfo.IsWorkshopValid();
-      if (!modValid.Item1 && modValid.Item2 != string.Empty) {
+      if (!modValid.Item1 && modValid.Item2 != string.Empty)
+      {
         AlertPanel.Instance.ShowAlert(modValid.Item2, AlertState.Alert);
         __instance.SelectedModButtonRight?.SetActive(false);
         return;
@@ -173,6 +175,28 @@ namespace StationeersLaunchPad
       var modIGDescription = modAbout.InGameDescription?.Value;
       if (!string.IsNullOrEmpty(modIGDescription))
         __instance.DescriptionText.text = modIGDescription;
+      else
+        __instance.DescriptionText.text = TextFormatting.SteamToTMP(modAbout.Description);
+    }
+
+    [HarmonyPatch(typeof(WorkshopMenu), nameof(WorkshopMenu.ManagerAwake)), HarmonyPostfix]
+    static void WorkshopMenuAwake(WorkshopMenu __instance)
+    {
+      var handler = __instance.DescriptionText.gameObject.AddComponent<WorkshopMenuLinkHandler>();
+      handler.DescriptionText = __instance.DescriptionText;
+    }
+    private class WorkshopMenuLinkHandler : MonoBehaviour, IPointerClickHandler
+    {
+      public TextMeshProUGUI DescriptionText;
+      public void OnPointerClick(PointerEventData eventData)
+      {
+        var linkIndex = TMP_TextUtilities.FindIntersectingLink(this.DescriptionText, eventData.position, null);
+        if (linkIndex != -1)
+        {
+          var linkInfo = this.DescriptionText.textInfo.linkInfo[linkIndex];
+          Application.OpenURL(linkInfo.GetLinkID());
+        }
+      }
     }
 
     private static FieldInfo workshopMenuSelectedField;
