@@ -178,25 +178,69 @@ namespace StationeersLaunchPad
         config = XmlSerialization.Deserialize<ModConfig>(path);
       config.CreateCoreMod();
 
-      var modsByPath = new Dictionary<string, ModInfo>();
+      var modsByPath = new Dictionary<string, ModInfo>(StringComparer.OrdinalIgnoreCase);
       foreach (var mod in Mods)
       {
-        modsByPath[mod.Path] = mod;
+        if (mod == null)
+        {
+          Logger.Global.LogWarning("Found Null mod in mods list.");
+          continue;
+        }
+
+        //Speical case for core path
+        if (mod.Source == ModSource.Core && string.IsNullOrEmpty(mod.Path))
+        {
+          modsByPath["Core"] = mod;
+          continue;
+        }
+
+        if (string.IsNullOrEmpty(mod.Path))
+        {
+          Logger.Global.LogWarning($"Mod has empty path: {mod.GetType().Name}");
+          continue;
+        }
+        var normalizedPath = NormalizePath(mod.Path);
+        modsByPath[normalizedPath] = mod;
       }
 
       var localBasePath = SteamTransport.WorkshopType.Mod.GetLocalDirInfo().FullName;
-
       var newMods = new List<ModInfo>();
+
       foreach (var modcfg in config.Mods)
       {
+        if (modcfg == null)
+        {
+          Logger.Global.LogWarning("Skipping null modcfg in config.");
+          continue;
+        }
+
+        if (modcfg is CoreModData && string.IsNullOrEmpty(modcfg.DirectoryPath))
+        {
+          if (modsByPath.TryGetValue("Core", out var coreMod))
+          {
+            coreMod.Enabled = modcfg.Enabled;
+            newMods.Add(coreMod);
+            modsByPath.Remove("Core");
+          }
+          continue;
+        }
+
         var modPath = (string)modcfg.DirectoryPath;
-        if (modcfg is not CoreModData && !Path.IsPathRooted(modPath))
+        if (!Path.IsPathRooted(modPath))
           modPath = Path.Combine(localBasePath, modPath);
-        if (modsByPath.TryGetValue(modPath, out var mod))
+
+        var normalizedModPath = NormalizePath(modPath);
+        if (string.IsNullOrEmpty(normalizedModPath))
+        {
+          Logger.Global.LogWarning($"Invalid path in mod config: {modcfg.GetType().Name}");
+          continue;
+        }
+
+        if (modsByPath.TryGetValue(normalizedModPath, out var mod))
         {
           mod.Enabled = modcfg.Enabled;
           newMods.Add(mod);
-          modsByPath.Remove(modPath);
+          modsByPath.Remove(normalizedModPath);
         }
         else if (modcfg.Enabled)
         {
@@ -211,6 +255,11 @@ namespace StationeersLaunchPad
       }
       Mods = newMods;
       SaveConfig();
+    }
+
+    private static string NormalizePath(string path)
+    {
+      return path?.Replace("\\", "/").Trim().ToLowerInvariant() ?? string.Empty;
     }
 
     private static void LoadLocalItems()

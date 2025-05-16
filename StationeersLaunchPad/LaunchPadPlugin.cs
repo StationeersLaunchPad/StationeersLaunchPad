@@ -209,7 +209,14 @@ namespace StationeersLaunchPad
       if (workshopMenuSelectedField == null)
         workshopMenuSelectedField = typeof(WorkshopMenu).GetField("_selectedModItem", BindingFlags.Instance | BindingFlags.NonPublic);
 
-      var modData = ((WorkshopModListItem)workshopMenuSelectedField.GetValue(WorkshopMenu.Instance)).Data;
+      var selectedModItem = workshopMenuSelectedField.GetValue(WorkshopMenu.Instance) as WorkshopModListItem;
+      if (selectedModItem == null)
+        return;
+
+      var modData = selectedModItem.Data;
+      if (modData == null)
+        return;
+
       LaunchPadGUI.DrawMenuConfig(modData);
     }
 
