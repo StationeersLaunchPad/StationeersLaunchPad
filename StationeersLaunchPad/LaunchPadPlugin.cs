@@ -91,7 +91,10 @@ namespace StationeersLaunchPad
       if (LaunchPadGUI.IsActive)
         LaunchPadGUI.DrawPreload();
 
-      return !LaunchPadGUI.IsActive;
+      if (LaunchPadAlertGUI.IsActive)
+        LaunchPadAlertGUI.DrawAlert();
+
+      return !LaunchPadGUI.IsActive && !LaunchPadAlertGUI.IsActive;
     }
 
     [HarmonyPatch(typeof(WorldManager), "LoadDataFiles"), HarmonyPostfix]
