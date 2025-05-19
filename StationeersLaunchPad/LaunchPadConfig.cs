@@ -1,22 +1,22 @@
-
+using Assets.Scripts;
+using Assets.Scripts.Networking.Transports;
+using Assets.Scripts.Serialization;
+using Assets.Scripts.Util;
+using BepInEx.Configuration;
+using Cysharp.Threading.Tasks;
+using Mono.Cecil;
+using Steamworks;
+using Steamworks.Ugc;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Reflection;
-using Cysharp.Threading.Tasks;
-using Assets.Scripts;
-using Assets.Scripts.Networking.Transports;
-using Assets.Scripts.Serialization;
-using Mono.Cecil;
-using Steamworks;
-using Steamworks.Ugc;
-using System.IO.Compression;
 using System.Xml.Serialization;
-using Assets.Scripts.Util;
-using BepInEx.Configuration;
+using UnityEngine;
 
 namespace StationeersLaunchPad
 {
@@ -60,6 +60,22 @@ namespace StationeersLaunchPad
       if (HasUpdated && !GameManager.IsBatchMode)
       {
         AutoLoad = false;
+
+        LaunchPadAlertGUI.Show("Restart Recommended", "StationeersLaunchPad has been updated, it is recommended to restart the game.",
+          new Dictionary<string, Func<bool>>() {
+            { "Continue Loading", () => {
+              AutoLoad = true;
+
+              return true;
+            }},
+            { "Exit Game", () => {
+              Application.Quit();
+
+              return false;
+            }},
+            { "Close", () => true}
+          }
+        );
       }
 
       AutoStopwatch.Restart();
