@@ -1,9 +1,7 @@
 ﻿using Assets.Scripts;
 using ImGuiNET;
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 using UI.ImGuiUi;
 using UnityEngine;
 

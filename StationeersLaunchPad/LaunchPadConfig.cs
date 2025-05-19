@@ -128,21 +128,19 @@ namespace StationeersLaunchPad
 
         Logger.Global.Log("Mod Config Initialized");
 
-        if (AutoUpdate)
-        {
-          LoadState = LoadState.Updating;
+       
+        LoadState = LoadState.Updating;
 
-          Logger.Global.Log("Checking Version");
-          try
-          {
-            await UniTask.Run(() => LaunchPadUpdater.CheckVersion());
-          }
-          catch (Exception ex)
-          {
-            Logger.Global.LogError("Error occurred during updating.");
-            Logger.Global.LogException(ex);
-            await UniTask.Run(() => LaunchPadUpdater.RevertUpdate());
-          }
+        Logger.Global.Log("Checking Version");
+        try
+        {
+          await UniTask.Run(() => LaunchPadUpdater.CheckVersion());
+        }
+        catch (Exception ex)
+        {
+          Logger.Global.LogError("Error occurred during updating.");
+          Logger.Global.LogException(ex);
+          await UniTask.Run(() => LaunchPadUpdater.RevertUpdate());
         }
 
         LoadState = LoadState.Configuring;
