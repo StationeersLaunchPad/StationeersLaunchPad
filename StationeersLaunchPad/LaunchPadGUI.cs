@@ -540,21 +540,21 @@ namespace StationeersLaunchPad
 
     // These are helpers to always use TextUnformatted so it doesn't interpret
     // format strings and crash the game by reading garbage on the stack
-    private static void Text(string text)
+    internal static void Text(string text)
     {
       ImGui.TextUnformatted(text);
     }
-    private static void TextColored(Vector4 color, string text)
+    internal static void TextColored(Vector4 color, string text)
     {
       ImGui.PushStyleColor(ImGuiCol.Text, color);
       ImGui.TextUnformatted(text);
       ImGui.PopStyleColor(1);
     }
-    private static void TextDisabled(string text)
+    internal static void TextDisabled(string text)
     {
       TextColored(TextDisabledColor, text);
     }
-    private static void TextRight(string text, Vector4? color = null, float padding = 2)
+    internal static void TextRight(string text, Vector4? color = null, float padding = 2)
     {
       var maxCorner = ImGui.GetContentRegionMax();
       var width = ImGui.CalcTextSize(text).x;
@@ -563,7 +563,7 @@ namespace StationeersLaunchPad
       ImGui.GetWindowDrawList().AddRectFilled(minCorner, maxCorner, ImGui.ColorConvertFloat4ToU32(new Vector4(0, 0, 0, 1)));
       TextColored(color ?? TextColor, text);
     }
-    private static void TooltipText(string text, float wrapWidth = float.MaxValue)
+    internal static void TooltipText(string text, float wrapWidth = float.MaxValue)
     {
       ImGui.BeginTooltip();
       ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + wrapWidth);
@@ -571,7 +571,7 @@ namespace StationeersLaunchPad
       ImGui.PopTextWrapPos();
       ImGui.EndTooltip();
     }
-    private static void ItemTooltip(string text, float wrapWidth = float.MaxValue, ImGuiHoveredFlags hoverFlags = ImGuiHoveredFlags.None)
+    internal static void ItemTooltip(string text, float wrapWidth = float.MaxValue, ImGuiHoveredFlags hoverFlags = ImGuiHoveredFlags.None)
     {
       if (ImGui.IsItemHovered(hoverFlags))
         TooltipText(text, wrapWidth);
@@ -583,7 +583,7 @@ namespace StationeersLaunchPad
     private static Vector4 Red = new Vector4(1, 0, 0, 1);
     private static Vector4 Yellow = new Vector4(0.7f, 0.7f, 0, 1);
     private static Vector4[] _colors;
-    private static void PushDefaultStyle()
+    internal static void PushDefaultStyle()
     {
       if (_colors == null)
       {
@@ -609,7 +609,7 @@ namespace StationeersLaunchPad
       ImGui.PushStyleVar(ImGuiStyleVar.Alpha, 1);
     }
 
-    private static void PopDefaultStyle()
+    internal static void PopDefaultStyle()
     {
       ImGui.PopStyleVar(4);
       ImGui.PopStyleColor((int)ImGuiCol.COUNT);
