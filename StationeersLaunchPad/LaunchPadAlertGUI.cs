@@ -3,6 +3,7 @@ using Cysharp.Threading.Tasks;
 using ImGuiNET;
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using UI.ImGuiUi;
 using UnityEngine;
@@ -12,6 +13,8 @@ namespace StationeersLaunchPad {
     public static bool IsActive;
     public static string Title;
     public static string Description;
+    public static Vector2 Size = new Vector2(600, 200);
+    public static Vector2 DefaultSize = new Vector2(600, 200);
 
     public static List<(string, Func<bool>)> Buttons;
 
@@ -22,20 +25,22 @@ namespace StationeersLaunchPad {
       DrawAlert();
     }
 
-    public static async UniTask Show(string title, string description, params (string, Func<bool>)[] buttons) {
+    public static async UniTask Show(string title, string description, Vector2 size, params (string, Func<bool>)[] buttons) {
       IsActive = buttons != null;
       Title = title;
       Description = description;
+      Size = size;
 
       Buttons = buttons?.ToList();
 
       await WaitUntilClose();
     }
 
-    public static async UniTask Show(string title, string description, List<(string, Func<bool>)> buttons) {
+    public static async UniTask Show(string title, string description, Vector2 size, List<(string, Func<bool>)> buttons) {
       IsActive = buttons != null;
       Title = title;
       Description = description;
+      Size = size;
 
       Buttons = buttons?.ToList();
 
@@ -50,27 +55,27 @@ namespace StationeersLaunchPad {
       IsActive = false;
       Title = string.Empty;
       Description = string.Empty;
+      Size = DefaultSize;
 
       Buttons?.Clear();
     }
 
     internal static void DrawAlert() {
-      var size = new Vector2(600, 200);
       var screenSize = ImguiHelper.ScreenSize;
-      var center = (screenSize / 2) - (size / 2);
-      var buttonSize = new Vector2(size.x / Buttons.Count, 35);
+      var center = (screenSize / 2) - (Size / 2);
+      var buttonSize = new Vector2(Size.x / Buttons.Count, 35);
       var buttonPadding = new Vector2(5, 0);
 
       LaunchPadGUI.PushDefaultStyle();
 
-      ImGui.SetNextWindowSize(size);
+      ImGui.SetNextWindowSize(Size);
       ImGui.SetNextWindowPos(center);
       ImGui.SetNextWindowFocus();
       ImGui.Begin($"{Title}##popup", ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoSavedSettings);
 
       ImGui.TextWrapped(Description);
 
-      ImGui.SetCursorPosY(size.y - (buttonSize.y + 10));
+      ImGui.SetCursorPosY(Size.y - (buttonSize.y + 10));
       ImGui.Separator();
 
       ImGui.SetCursorPosX(5);
