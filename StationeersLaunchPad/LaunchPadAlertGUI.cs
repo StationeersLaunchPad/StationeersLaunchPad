@@ -2,6 +2,7 @@
 using ImGuiNET;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UI.ImGuiUi;
 using UnityEngine;
 
@@ -11,7 +12,7 @@ namespace StationeersLaunchPad {
     public static string Title;
     public static string Description;
 
-    public static Dictionary<string, Func<bool>> Buttons = new();
+    public static List<(string, Func<bool>)> Buttons;
 
     public static void DrawPreload() {
       if (GameManager.IsBatchMode)
@@ -20,13 +21,20 @@ namespace StationeersLaunchPad {
       DrawAlert();
     }
 
-    public static void Show(string title, string description, Dictionary<string, Func<bool>> buttons) {
-      IsActive = true;
+    public static void Show(string title, string description, params (string, Func<bool>)[] buttons) {
+      IsActive = buttons != null;
       Title = title;
       Description = description;
 
-      if (buttons != null)
-        Buttons = buttons;
+      Buttons = buttons?.ToList();
+    }
+
+    public static void Show(string title, string description, List<(string, Func<bool>)> buttons) {
+      IsActive = buttons != null;
+      Title = title;
+      Description = description;
+
+      Buttons = buttons?.ToList();
     }
 
     public static void Close() {
@@ -34,7 +42,7 @@ namespace StationeersLaunchPad {
       Title = string.Empty;
       Description = string.Empty;
 
-      Buttons.Clear();
+      Buttons?.Clear();
     }
 
     internal static void DrawAlert() {
@@ -58,8 +66,8 @@ namespace StationeersLaunchPad {
 
       ImGui.SetCursorPosX(5);
       foreach (var button in Buttons) {
-        var text = button.Key;
-        var clicked = button.Value;
+        var text = button.Item1;
+        var clicked = button.Item2;
 
         if (ImGui.Button(text, buttonSize - buttonPadding)) {
           if (clicked?.Invoke() == true) {
