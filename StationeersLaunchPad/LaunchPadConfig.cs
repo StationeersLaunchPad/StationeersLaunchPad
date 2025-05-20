@@ -2,6 +2,7 @@ using Assets.Scripts;
 using Assets.Scripts.Networking.Transports;
 using Assets.Scripts.Serialization;
 using Assets.Scripts.Util;
+using BepInEx;
 using BepInEx.Configuration;
 using Cysharp.Threading.Tasks;
 using Mono.Cecil;
@@ -57,7 +58,7 @@ namespace StationeersLaunchPad
       while (LoadState < LoadState.Updating)
         await UniTask.Yield();
 
-      if (HasUpdated && !GameManager.IsBatchMode)
+      //if (HasUpdated && !GameManager.IsBatchMode)
       {
         AutoLoad = false;
 
@@ -69,7 +70,18 @@ namespace StationeersLaunchPad
 
             return true;
           }),
-          ("Exit Game", () => {
+          ("Restart Game", () => {
+            var startInfo = new ProcessStartInfo();
+            startInfo.FileName = Paths.ExecutablePath;
+            startInfo.WorkingDirectory = Paths.GameRootPath;
+            startInfo.UseShellExecute = false;
+
+            // remove environment variables that new process will inherit
+            startInfo.Environment.Remove("DOORSTOP_INITIALIZED");
+            startInfo.Environment.Remove("DOORSTOP_DISABLE");
+
+            Process.Start(startInfo);
+
             Application.Quit();
 
             return false;
