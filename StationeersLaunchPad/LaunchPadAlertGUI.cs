@@ -14,7 +14,7 @@ namespace StationeersLaunchPad {
     public static string Title;
     public static string Description;
     public static Vector2 Size = new Vector2(600, 200);
-    public static Vector2 DefaultSize = new Vector2(600, 200);
+    public static Vector2 DefaultSize => new Vector2(600, 200);
 
     public static List<(string, Func<bool>)> Buttons;
 
