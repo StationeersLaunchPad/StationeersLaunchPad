@@ -57,8 +57,7 @@ namespace StationeersLaunchPad
       while (LoadState < LoadState.Updating)
         await UniTask.Yield();
 
-      //if (HasUpdated && !GameManager.IsBatchMode)
-      if (true)
+      if (HasUpdated && !GameManager.IsBatchMode)
       {
         AutoLoad = false;
 
