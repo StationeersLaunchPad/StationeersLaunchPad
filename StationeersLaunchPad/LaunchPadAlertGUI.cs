@@ -57,7 +57,8 @@ namespace StationeersLaunchPad {
     }
 
     public static async UniTask WaitUntilClose() {
-      await UniTask.WaitUntil(() => !IsActive);
+      while (IsActive)
+        await UniTask.Yield();
     }
 
     public static void Close() {
