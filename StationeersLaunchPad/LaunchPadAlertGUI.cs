@@ -13,10 +13,13 @@ namespace StationeersLaunchPad {
     public static bool IsActive;
     public static string Title;
     public static string Description;
+
     public static Vector2 DefaultSize => new Vector2(600, 200);
     public static Vector2 Size = DefaultSize;
+    public static Vector2 ButtonSize => new Vector2(Size.x / Buttons?.Count ?? 1, 35);
 
     public static Vector2 ScreenCenter = ImguiHelper.ScreenSize / 2;
+    public static Vector2 Center => Position - (Size / 2);
     public static Vector2 Position = ScreenCenter;
     public static Vector2 DefaultPosition => ScreenCenter;
 
@@ -68,20 +71,16 @@ namespace StationeersLaunchPad {
     }
 
     internal static void DrawAlert() {
-      var center = Position - (Size / 2);
-      var buttonSize = new Vector2(Size.x / Buttons.Count, 35);
-      var buttonPadding = new Vector2(5, 0);
-
       LaunchPadGUI.PushDefaultStyle();
 
       ImGui.SetNextWindowSize(Size);
-      ImGui.SetNextWindowPos(center);
+      ImGui.SetNextWindowPos(Center);
       ImGui.SetNextWindowFocus();
       ImGui.Begin($"{Title}##popup", ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoSavedSettings);
 
       ImGui.TextWrapped(Description);
 
-      ImGui.SetCursorPosY(Size.y - (buttonSize.y + 10));
+      ImGui.SetCursorPosY(Size.y - (ButtonSize.y + 10));
       ImGui.Separator();
 
       ImGui.SetCursorPosX(5);
@@ -89,7 +88,7 @@ namespace StationeersLaunchPad {
         var text = button.Item1;
         var clicked = button.Item2;
 
-        if (ImGui.Button(text, buttonSize - buttonPadding)) {
+        if (ImGui.Button(text, ButtonSize - new Vector2(5, 0))) {
           if (clicked?.Invoke() == true) {
             Close();
           }
