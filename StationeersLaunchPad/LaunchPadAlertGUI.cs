@@ -13,8 +13,8 @@ namespace StationeersLaunchPad {
     public static bool IsActive;
     public static string Title;
     public static string Description;
-    public static Vector2 Size = new Vector2(600, 200);
     public static Vector2 DefaultSize => new Vector2(600, 200);
+    public static Vector2 Size = DefaultSize;
 
     public static Vector2 ScreenCenter = ImguiHelper.ScreenSize / 2;
     public static Vector2 Position = ScreenCenter;
