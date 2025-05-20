@@ -16,6 +16,10 @@ namespace StationeersLaunchPad {
     public static Vector2 Size = new Vector2(600, 200);
     public static Vector2 DefaultSize => new Vector2(600, 200);
 
+    public static Vector2 ScreenCenter = ImguiHelper.ScreenSize / 2;
+    public static Vector2 Position = ScreenCenter;
+    public static Vector2 DefaultPosition => ScreenCenter;
+
     public static List<(string, Func<bool>)> Buttons;
 
     public static void DrawPreload() {
@@ -25,22 +29,24 @@ namespace StationeersLaunchPad {
       DrawAlert();
     }
 
-    public static async UniTask Show(string title, string description, Vector2 size, params (string, Func<bool>)[] buttons) {
+    public static async UniTask Show(string title, string description, Vector2 size, Vector2 position, params (string, Func<bool>)[] buttons) {
       IsActive = buttons != null;
       Title = title;
       Description = description;
       Size = size;
+      Position = position;
 
       Buttons = buttons?.ToList();
 
       await WaitUntilClose();
     }
 
-    public static async UniTask Show(string title, string description, Vector2 size, List<(string, Func<bool>)> buttons) {
+    public static async UniTask Show(string title, string description, Vector2 size, Vector2 position, List<(string, Func<bool>)> buttons) {
       IsActive = buttons != null;
       Title = title;
       Description = description;
       Size = size;
+      Position = position;
 
       Buttons = buttons?.ToList();
 
@@ -56,13 +62,13 @@ namespace StationeersLaunchPad {
       Title = string.Empty;
       Description = string.Empty;
       Size = DefaultSize;
+      Position = DefaultPosition;
 
       Buttons?.Clear();
     }
 
     internal static void DrawAlert() {
-      var screenSize = ImguiHelper.ScreenSize;
-      var center = (screenSize / 2) - (Size / 2);
+      var center = Position - (Size / 2);
       var buttonSize = new Vector2(Size.x / Buttons.Count, 35);
       var buttonPadding = new Vector2(5, 0);
 

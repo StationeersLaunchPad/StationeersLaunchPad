@@ -56,7 +56,9 @@ namespace StationeersLaunchPad {
         Logger.Global.LogWarning($"Plugin is NOT up-to-date.");
 
         if (!LaunchPadConfig.AutoUpdate) {
-          await LaunchPadAlertGUI.Show("Update Available", "An update is available, would you like to automatically download and update?", LaunchPadAlertGUI.DefaultSize,
+          await LaunchPadAlertGUI.Show("Update Available", "An update is available, would you like to automatically download and update?",
+            LaunchPadAlertGUI.DefaultSize,
+            LaunchPadAlertGUI.DefaultPosition,
             ("Yes", () => {
               AllowUpdate = true;
               return true;

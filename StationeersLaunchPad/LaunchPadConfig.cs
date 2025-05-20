@@ -57,11 +57,14 @@ namespace StationeersLaunchPad
       while (LoadState < LoadState.Updating)
         await UniTask.Yield();
 
-      if (HasUpdated && !GameManager.IsBatchMode)
+      //if (HasUpdated && !GameManager.IsBatchMode)
+      if (true)
       {
         AutoLoad = false;
 
-        await LaunchPadAlertGUI.Show("Restart Recommended", "StationeersLaunchPad has been updated, it is recommended to restart the game.", LaunchPadAlertGUI.DefaultSize,
+        await LaunchPadAlertGUI.Show("Restart Recommended", "StationeersLaunchPad has been updated, it is recommended to restart the game.", 
+          LaunchPadAlertGUI.DefaultSize,
+          LaunchPadAlertGUI.DefaultPosition,
          ("Continue Loading", () => {
             AutoLoad = true;
 
