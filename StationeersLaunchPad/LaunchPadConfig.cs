@@ -62,19 +62,17 @@ namespace StationeersLaunchPad
         AutoLoad = false;
 
         LaunchPadAlertGUI.Show("Restart Recommended", "StationeersLaunchPad has been updated, it is recommended to restart the game.",
-          new Dictionary<string, Func<bool>>() {
-            { "Continue Loading", () => {
-              AutoLoad = true;
+          ("Continue Loading", () => {
+            AutoLoad = true;
 
-              return true;
-            }},
-            { "Exit Game", () => {
-              Application.Quit();
+            return true;
+          }),
+          ("Exit Game", () => {
+            Application.Quit();
 
-              return false;
-            }},
-            { "Close", () => true}
-          }
+            return false;
+          }),
+          ("Close", () => true)
         );
       }
 
