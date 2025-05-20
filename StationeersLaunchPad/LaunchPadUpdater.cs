@@ -57,23 +57,20 @@ namespace StationeersLaunchPad {
 
         if (!LaunchPadConfig.AutoUpdate) {
           LaunchPadAlertGUI.Show("Update Available", "An update is available, would you like to automatically download and update?",
-            new Dictionary<string, Func<bool>>() {
-              { "Yes", () => {
-                AllowUpdate = true;
-
-                return true;
-              }},
-              { "Open GitHub", () => {
-                Application.OpenURL("https://github.com/StationeersLaunchPad/StationeersLaunchPad/releases/tag/latest");
-
-                return true;
-              }},
-              { "No", () => {
-                AllowUpdate = false;
-
-                return true;
-              }}
-            });
+            ("Yes", () => {
+              AllowUpdate = true;
+              return true;
+            }),
+            ("Open GitHub", () => {
+              AllowUpdate = false;
+              Application.OpenURL("https://github.com/StationeersLaunchPad/StationeersLaunchPad/releases/tag/latest");
+              return true;
+            }),
+            ("No", () => {
+              AllowUpdate = false;
+              return true;
+            })
+          );
 
           await UniTask.WaitUntil(() => !LaunchPadAlertGUI.IsActive);
 
