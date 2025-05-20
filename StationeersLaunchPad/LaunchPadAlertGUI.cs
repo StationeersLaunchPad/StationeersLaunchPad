@@ -1,4 +1,5 @@
 ﻿using Assets.Scripts;
+using Cysharp.Threading.Tasks;
 using ImGuiNET;
 using System;
 using System.Collections.Generic;
@@ -21,20 +22,28 @@ namespace StationeersLaunchPad {
       DrawAlert();
     }
 
-    public static void Show(string title, string description, params (string, Func<bool>)[] buttons) {
+    public static async UniTask Show(string title, string description, params (string, Func<bool>)[] buttons) {
       IsActive = buttons != null;
       Title = title;
       Description = description;
 
       Buttons = buttons?.ToList();
+
+      await WaitUntilClose();
     }
 
-    public static void Show(string title, string description, List<(string, Func<bool>)> buttons) {
+    public static async UniTask Show(string title, string description, List<(string, Func<bool>)> buttons) {
       IsActive = buttons != null;
       Title = title;
       Description = description;
 
       Buttons = buttons?.ToList();
+
+      await WaitUntilClose();
+    }
+
+    public static async UniTask WaitUntilClose() {
+      await UniTask.WaitUntil(() => !IsActive);
     }
 
     public static void Close() {
