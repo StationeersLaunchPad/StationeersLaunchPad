@@ -63,31 +63,31 @@ namespace StationeersLaunchPad {
       return false;
     }
 
-    public Tuple<bool, string> IsWorkshopValid() {
+    public (bool, string) IsWorkshopValid() {
       // if its core its fine, if its on the workshop in the first place its probably fine too
       if (this.Source != ModSource.Local)
-        return Tuple.Create(true, string.Empty);
+        return (true, string.Empty);
 
       if (this.About == null)
-        return Tuple.Create(false, "Mod has invalid/no about data.");
+        return (false, "Mod has invalid/no about data.");
 
       if (this.About.Name?.Length > ModInfo.MOD_NAME_SIZE_LIMIT)
-        return Tuple.Create(false, $"Mod name is larger than {ModInfo.MOD_NAME_SIZE_LIMIT} characters, current size is {this.About.Name?.Length} characters.");
+        return (false, $"Mod name is larger than {ModInfo.MOD_NAME_SIZE_LIMIT} characters, current size is {this.About.Name?.Length} characters.");
 
       if (this.About.Description?.Length > ModInfo.MOD_DESCRIPTION_SIZE_LIMIT)
-        return Tuple.Create(false, $"Mod description is larger than {ModInfo.MOD_DESCRIPTION_SIZE_LIMIT} characters, current size is {this.About.Description?.Length} characters.");
+        return (false, $"Mod description is larger than {ModInfo.MOD_DESCRIPTION_SIZE_LIMIT} characters, current size is {this.About.Description?.Length} characters.");
 
       if (this.About.ChangeLog?.Length > ModInfo.MOD_CHANGELOG_SIZE_LIMIT)
-        return Tuple.Create(false, $"Mod changelog is larger than {ModInfo.MOD_CHANGELOG_SIZE_LIMIT} characters, current size is {this.About.ChangeLog?.Length} characters.");
+        return (false, $"Mod changelog is larger than {ModInfo.MOD_CHANGELOG_SIZE_LIMIT} characters, current size is {this.About.ChangeLog?.Length} characters.");
 
       if (!File.Exists(this.ThumbnailPath))
-        return Tuple.Create(false, $"Mod does not have a thumb.png in the About folder.");
+        return (false, $"Mod does not have a thumb.png in the About folder.");
 
       var thumbnailInfo = new FileInfo(this.ThumbnailPath);
       if (thumbnailInfo?.Length > ModInfo.MOD_THUMBNAIL_SIZE_LIMIT)
-        return Tuple.Create(false, $"Mod thumbnail size is larger than {ModInfo.MOD_THUMBNAIL_SIZE_LIMIT / 1024} kilobytes, current size is {thumbnailInfo?.Length / 1024} kilobytes.");
+        return (false, $"Mod thumbnail size is larger than {ModInfo.MOD_THUMBNAIL_SIZE_LIMIT / 1024} kilobytes, current size is {thumbnailInfo?.Length / 1024} kilobytes.");
 
-      return Tuple.Create(true, string.Empty);
+      return (true, string.Empty);
     }
   }
 
