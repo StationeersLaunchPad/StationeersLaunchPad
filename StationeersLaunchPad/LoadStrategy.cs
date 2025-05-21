@@ -21,10 +21,10 @@ namespace StationeersLaunchPad {
 
   public enum LoadStrategyMode
   {
-    // load each mod synchronously
+    // load each mod in serial
     Serial,
 
-    // load each mod asynchronously
+    // load each mod in parallel
     Parallel,
   }
 
@@ -95,7 +95,6 @@ namespace StationeersLaunchPad {
         try
         {
           await mod.LoadAssembliesSerial();
-
           mod.LoadedAssemblies = true;
         }
         catch (Exception ex)
@@ -117,7 +116,6 @@ namespace StationeersLaunchPad {
         try
         {
           await mod.ResolveAssembliesSerial();
-
           mod.ResolvedAssemblies = true;
         }
         catch (Exception ex)
@@ -139,7 +137,6 @@ namespace StationeersLaunchPad {
         try
         {
           await mod.LoadAssetsSerial();
-
           mod.LoadedAssets = true;
         }
         catch (Exception ex)
@@ -160,11 +157,10 @@ namespace StationeersLaunchPad {
         try
         {
           await mod.FindEntrypoints();
-#if DEBUG
-          await mod.PrintEntrypoints();
-#endif
-          await mod.LoadEntrypoints();
+          if (LaunchPadConfig.Debug)
+            mod.PrintEntrypoints();
 
+          mod.LoadEntrypoints();
           mod.LoadedEntryPoints = true;
         }
         catch (Exception ex)
@@ -193,7 +189,6 @@ namespace StationeersLaunchPad {
         try
         {
           await mod.LoadAssembliesParallel();
-
           mod.LoadedAssemblies = true;
         }
         catch (Exception ex)
@@ -215,7 +210,6 @@ namespace StationeersLaunchPad {
         try
         {
           await mod.ResolveAssembliesParallel();
-
           mod.ResolvedAssemblies = true;
         }
         catch (Exception ex)
@@ -236,7 +230,6 @@ namespace StationeersLaunchPad {
         try
         {
           await mod.LoadAssetsSerial();
-
           mod.LoadedAssets = true;
         }
         catch (Exception ex)
@@ -257,11 +250,10 @@ namespace StationeersLaunchPad {
         try
         {
           await mod.FindEntrypoints();
-#if DEBUG
-          await mod.PrintEntrypoints();
-#endif
-          await mod.LoadEntrypoints();
+          if (LaunchPadConfig.Debug)
+            mod.PrintEntrypoints();
 
+          mod.LoadEntrypoints();
           mod.LoadedEntryPoints = true;
         }
         catch (Exception ex)
