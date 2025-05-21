@@ -33,6 +33,7 @@ namespace StationeersLaunchPad
 
   public static class LaunchPadConfig
   {
+    public static ConfigEntry<bool> DebugMode;
     public static ConfigEntry<bool> AutoUpdateOnStart;
     public static ConfigEntry<bool> AutoLoadOnStart;
     public static ConfigEntry<bool> AutoSortOnStart;
@@ -49,6 +50,7 @@ namespace StationeersLaunchPad
     public static LoadStrategyType LoadStrategyType = LoadStrategyType.Linear;
     public static LoadStrategyMode LoadStrategyMode = LoadStrategyMode.Serial;
 
+    public static bool Debug = false;
     public static bool AutoSort = true;
     public static bool AutoUpdate = false;
     public static bool AutoLoad = true;
@@ -59,6 +61,7 @@ namespace StationeersLaunchPad
 
     public static async void Run()
     {
+      Debug = DebugMode.Value;
       AutoSort = AutoSortOnStart.Value;
       AutoUpdate = AutoUpdateOnStart.Value;
       AutoLoad = AutoLoadOnStart.Value;
@@ -592,25 +595,13 @@ namespace StationeersLaunchPad
       ElapsedStopwatch.Restart();
       LoadState = LoadState.ModsLoading;
 
-      switch (LoadStrategyType) {
-        default:
-        case LoadStrategyType.Linear: {
-          switch (LoadStrategyMode) {
-            default:
-            case LoadStrategyMode.Serial: {
-              var loadStrategy = new LoadStrategyLinearSerial();
-              await loadStrategy.LoadMods();
-            }
-            break;
-            case LoadStrategyMode.Parallel: {
-              var loadStrategy = new LoadStrategyLinearParallel();
-              await loadStrategy.LoadMods();
-            }
-            break;
-          }
-        }
-        break;
-      }
+      LoadStrategy loadStrategy = (LoadStrategyType, LoadStrategyMode) switch
+      {
+        (LoadStrategyType.Linear, LoadStrategyMode.Serial) => new LoadStrategyLinearSerial(),
+        (LoadStrategyType.Linear, LoadStrategyMode.Parallel) => new LoadStrategyLinearParallel(),
+        _ => throw new Exception($"invalid load strategy ({LoadStrategyType}, {LoadStrategyMode})")
+      };
+      await loadStrategy.LoadMods();
 
       ElapsedStopwatch.Stop();
       Logger.Global.LogWarning($"Took {ElapsedStopwatch.Elapsed.ToString(@"m\:ss\.fff")} to load mods.");
