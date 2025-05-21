@@ -6,6 +6,7 @@ using System.Reflection;
 using BepInEx;
 using BepInEx.Configuration;
 using Cysharp.Threading.Tasks;
+using Cysharp.Threading.Tasks.CompilerServices;
 using HarmonyLib;
 using StationeersMods.Interface;
 using StationeersMods.Shared;
@@ -72,9 +73,12 @@ namespace StationeersLaunchPad
     }
 
 
-    private async UniTask ResolveAssembliesSingle(Assembly assembly)
+    private UniTask ResolveAssembliesSingle(Assembly assembly)
     {
-      assembly.GetTypes();
+      return UniTask.RunOnThreadPool(() =>
+      {
+        assembly.GetTypes();
+      });
     }
 
     public async UniTask ResolveAssembliesSerial()
@@ -135,83 +139,77 @@ namespace StationeersLaunchPad
       });
     }
 
-    public async UniTask PrintEntrypoints()
+    public void PrintEntrypoints()
     {
       // getting prefab names fails on a thread in the debug player, so just print all the entrypoints after we finish
       foreach (var type in this.SMEntryTypes)
-        this.Logger.Log($"- StationeersMods Entry {type.FullName}");
+        this.Logger.LogDebug($"- StationeersMods Entry {type.FullName}");
       foreach (var prefab in this.EntryPrefabs)
-        this.Logger.Log($"- Prefab Entry {prefab.name}");
+        this.Logger.LogDebug($"- Prefab Entry {prefab.name}");
       foreach (var type in this.BepInExEntryTypes)
-        this.Logger.Log($"- BepInEx Entry {type.FullName}");
+        this.Logger.LogDebug($"- BepInEx Entry {type.FullName}");
       foreach (var (type, method) in this.DefaultEntryTypes)
-        this.Logger.Log($"- Default Entry {type.FullName}");
+        this.Logger.LogDebug($"- Default Entry {type.FullName}");
     }
 
 
-    public async UniTask LoadEntrypoints()
+    public void LoadEntrypoints()
     {
-      //await UniTask.RunOnThreadPool(async () =>
+      this.Logger.LogDebug("Loading Entrypoints");
+
+      // StationeersMods tagged ModBehaviour/StartupClass/StartupPrefab
+      var modBehaviours = new List<ModBehaviour>();
+      if (this.SMEntryTypes.Count > 0)
       {
+        var gameObj = new GameObject();
+        GameObject.DontDestroyOnLoad(gameObj);
+        foreach (var type in this.SMEntryTypes)
+          gameObj.AddComponent(type);
+        modBehaviours.AddRange(gameObj.GetComponents<ModBehaviour>());
+      }
 
-        this.Logger.LogDebug("Loading Entrypoints");
+      foreach (var prefab in this.EntryPrefabs)
+      {
+        var gameObj = GameObject.Instantiate(prefab);
+        GameObject.DontDestroyOnLoad(gameObj);
+        modBehaviours.AddRange(gameObj.GetComponents<ModBehaviour>());
+      }
 
-        // StationeersMods tagged ModBehaviour/StartupClass/StartupPrefab
-        var modBehaviours = new List<ModBehaviour>();
-
-        if (this.SMEntryTypes.Count > 0)
+      foreach (var modBehaviour in modBehaviours)
+      {
+        modBehaviour.contentHandler = this.ContentHandler;
+        modBehaviour.OnLoaded(this.ContentHandler);
+        if (modBehaviour.Config != null)
         {
-          var gameObj = new GameObject();
-          GameObject.DontDestroyOnLoad(gameObj);
-          foreach (var type in this.SMEntryTypes)
-            gameObj.AddComponent(type);
-          modBehaviours.AddRange(gameObj.GetComponents<ModBehaviour>());
+          modBehaviour.Config.SettingChanged += (_, _) => this.DirtyConfig();
+          this.ConfigFiles.Add(modBehaviour.Config);
         }
+      }
 
-        foreach (var prefab in this.EntryPrefabs)
+      foreach (var type in this.BepInExEntryTypes)
+      {
+        var gameObj = new GameObject();
+        GameObject.DontDestroyOnLoad(gameObj);
+        var component = gameObj.AddComponent(type);
+        if (component is BaseUnityPlugin plugin && plugin.Config != null)
         {
-          var gameObj = GameObject.Instantiate(prefab);
-          GameObject.DontDestroyOnLoad(gameObj);
-          modBehaviours.AddRange(gameObj.GetComponents<ModBehaviour>());
+          plugin.Config.SettingChanged += (_, _) => this.DirtyConfig();
+          this.ConfigFiles.Add(plugin.Config);
         }
+      }
 
-        foreach (var modBehaviour in modBehaviours)
-        {
-          modBehaviour.contentHandler = this.ContentHandler;
-          modBehaviour.OnLoaded(this.ContentHandler);
-          if (modBehaviour.Config != null)
-          {
-            modBehaviour.Config.SettingChanged += (_, _) => this.DirtyConfig();
-            this.ConfigFiles.Add(modBehaviour.Config);
-          }
-        }
+      foreach (var (type, method) in this.DefaultEntryTypes)
+      {
+        var gameObj = new GameObject();
+        GameObject.DontDestroyOnLoad(gameObj);
+        var component = gameObj.AddComponent(type);
+        method.Invoke(component, new object[] { this.Prefabs });
+      }
 
-        foreach (var type in this.BepInExEntryTypes)
-        {
-          var gameObj = new GameObject();
-          GameObject.DontDestroyOnLoad(gameObj);
-          var component = gameObj.AddComponent(type);
-          if (component is BaseUnityPlugin plugin && plugin.Config != null)
-          {
-            plugin.Config.SettingChanged += (_, _) => this.DirtyConfig();
-            this.ConfigFiles.Add(plugin.Config);
-          }
-        }
+      this.ConfigFiles.Sort((a, b) => a.ConfigFilePath.CompareTo(b.ConfigFilePath));
 
-        foreach (var (type, method) in this.DefaultEntryTypes)
-        {
-          var gameObj = new GameObject();
-          GameObject.DontDestroyOnLoad(gameObj);
-          var component = gameObj.AddComponent(type);
-          method.Invoke(component, new object[] { this.Prefabs });
-        }
-
-        this.ConfigFiles.Sort((a, b) => a.ConfigFilePath.CompareTo(b.ConfigFilePath));
-
-        this.Logger.LogDebug("Loaded Entrypoints");
-
-        this.LoadFinished = true;
-      }//);
+      this.Logger.LogDebug("Loaded Entrypoints");
+      this.LoadFinished = true;
     }
 
     private UniTask<AssetBundle> LoadAssetBundle(string path)
@@ -227,10 +225,9 @@ namespace StationeersLaunchPad
       this.Logger.LogDebug($"Loading AssetBundle {name} Prefabs");
       var assets = await ModLoader.LoadAllBundleAssets(bundle);
 
-#if DEBUG
-      foreach (var asset in assets)
-        this.Logger.LogDebug($"- Asset {asset.name}");
-#endif
+     if (LaunchPadConfig.Debug)
+        foreach (var asset in assets)
+          this.Logger.LogDebug($"- Asset {asset.name}");
 
       return assets;
     }
