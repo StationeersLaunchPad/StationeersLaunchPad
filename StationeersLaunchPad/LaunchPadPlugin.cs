@@ -27,7 +27,13 @@ namespace StationeersLaunchPad
     {
       if (Harmony.HasAnyPatches(pluginGuid))
         return;
-
+       LaunchPadConfig.DebugMode = this.Config.Bind(
+        new ConfigDefinition("Startup", "DebugMode"),
+        false,
+        new ConfigDescription(
+          "If you run into issues with loading mods, or anything else, please enable this for more verbosity in error reports"
+        )
+       );
       LaunchPadConfig.AutoLoadOnStart = this.Config.Bind(
         new ConfigDefinition("Startup", "AutoLoadOnStart"),
         true,
@@ -61,14 +67,14 @@ namespace StationeersLaunchPad
         new ConfigDefinition("Mod Loading", "LoadStrategyType"),
         LoadStrategyType.Linear,
         new ConfigDescription(
-          "Which type of mod loading to use."
+          "Linear type loads mods one by one in sequential order. More types of mod loading will be added later."
         )
       );
       LaunchPadConfig.StrategyMode = this.Config.Bind(
         new ConfigDefinition("Mod Loading", "LoadStrategyMode"),
         LoadStrategyMode.Serial,
          new ConfigDescription(
-          "What mode of mod loading to use."
+          "Parallel mode loads faster for a large number of mods, but may fail in extremely rare cases. Switch to serial mode if running into loading issues."
         )
       );
       LaunchPadConfig.SortedConfig = new SortedConfigFile(this.Config);
