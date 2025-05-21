@@ -28,33 +28,47 @@ namespace StationeersLaunchPad
       if (Harmony.HasAnyPatches(pluginGuid))
         return;
 
-      LaunchPadConfig.AutoLoadOnStart = this.Config.Bind<bool>(
+      LaunchPadConfig.AutoLoadOnStart = this.Config.Bind(
         new ConfigDefinition("Startup", "AutoLoadOnStart"),
-        defaultValue: true,
-        configDescription: new ConfigDescription(
+        true,
+        new ConfigDescription(
           "Automatically load after the configured wait time on startup. Can be stopped by clicking the loading window at the bottom"
         )
        );
-      LaunchPadConfig.AutoUpdateOnStart = this.Config.Bind<bool>(
+      LaunchPadConfig.AutoUpdateOnStart = this.Config.Bind(
         new ConfigDefinition("Startup", "AutoUpdateOnStart"),
-        defaultValue: !GameManager.IsBatchMode, // Default to false on DS
-        configDescription: new ConfigDescription(
+        !GameManager.IsBatchMode, // Default to false on DS
+        new ConfigDescription(
           "Automatically update mod loader on startup."
         )
       );
-      LaunchPadConfig.AutoLoadWaitTime = this.Config.Bind<int>(
+      LaunchPadConfig.AutoLoadWaitTime = this.Config.Bind(
         new ConfigDefinition("Startup", "AutoLoadWaitTime"),
-        defaultValue: 3,
-        configDescription: new ConfigDescription(
+        3,
+        new ConfigDescription(
           "How many seconds to wait before loading mods, then loading the game",
           new AcceptableValueRange<int>(3, 30)
         )
       );
-      LaunchPadConfig.AutoSort = this.Config.Bind<bool>(
+      LaunchPadConfig.AutoSortOnStart = this.Config.Bind(
         new ConfigDefinition("Startup", "AutoSort"),
-        defaultValue: true,
-        configDescription: new ConfigDescription(
+        true,
+        new ConfigDescription(
           "Automatically sort based on LoadBefore/LoadAfter tags in mod data"
+        )
+      );
+      LaunchPadConfig.StrategyType = this.Config.Bind(
+        new ConfigDefinition("Mod Loading", "LoadStrategyType"),
+        LoadStrategyType.Linear,
+        new ConfigDescription(
+          "Which type of mod loading to use."
+        )
+      );
+      LaunchPadConfig.StrategyMode = this.Config.Bind(
+        new ConfigDefinition("Mod Loading", "LoadStrategyMode"),
+        LoadStrategyMode.Serial,
+         new ConfigDescription(
+          "What mode of mod loading to use."
         )
       );
       LaunchPadConfig.SortedConfig = new SortedConfigFile(this.Config);
