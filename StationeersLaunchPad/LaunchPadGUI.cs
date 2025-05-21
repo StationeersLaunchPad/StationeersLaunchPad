@@ -141,7 +141,7 @@ namespace StationeersLaunchPad
             }
             else
             {
-              if (DrawConfigEntry(LaunchPadConfig.AutoSort))
+              if (DrawConfigEntry(LaunchPadConfig.AutoSortOnStart))
                 ConfigChanged = true;
             }
             ImGui.Separator();
@@ -150,7 +150,7 @@ namespace StationeersLaunchPad
 
             if (ConfigChanged)
             {
-              if (LaunchPadConfig.AutoSort.Value)
+              if (LaunchPadConfig.AutoSort)
                 LaunchPadConfig.SortByDeps();
               LaunchPadConfig.SaveConfig();
             }
