@@ -87,7 +87,7 @@ namespace StationeersLaunchPad
         foreach (var type in assembly.GetTypes())
         {
           var attr = type.GetCustomAttribute<StationeersMod>();
-          if (attr != null && typeof(ModBehaviour).IsAssignableFrom(type))
+          if (attr != null && typeof(ModBehaviour).IsAssignableFrom(type) && !result.Contains(type))
             result.Add(type);
         }
       }
@@ -101,7 +101,7 @@ namespace StationeersLaunchPad
       {
         foreach (var type in assembly.GetTypes())
         {
-          if (typeof(ModBehaviour).IsAssignableFrom(type))
+          if (typeof(ModBehaviour).IsAssignableFrom(type) && !result.Contains(type))
             result.Add(type);
         }
       }
@@ -119,21 +119,21 @@ namespace StationeersLaunchPad
         foreach (var assembly in assemblies)
         {
           var type = assembly.GetType(startupClass);
-          if (type != null)
+          if (type != null && !result.Contains(type))
             result.Add(type);
         }
       }
       return result;
     }
 
-    public static List<Type> FindBepinexEntrypoints(List<Assembly> assemblies)
+    public static List<Type> FindBepInExEntrypoints(List<Assembly> assemblies)
     {
       var result = new List<Type>();
       foreach (var assembly in assemblies)
       {
         foreach (var type in assembly.GetTypes())
         {
-          if (typeof(BaseUnityPlugin).IsAssignableFrom(type) && !typeof(ModBehaviour).IsAssignableFrom(type))
+          if (typeof(BaseUnityPlugin).IsAssignableFrom(type) && !typeof(ModBehaviour).IsAssignableFrom(type) && !result.Contains(type))
             result.Add(type);
         }
       }
@@ -152,83 +152,11 @@ namespace StationeersLaunchPad
           continue;
 
         var defMethod = defType.GetMethod(DEFAULT_METHOD, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, new Type[] { typeof(List<GameObject>) }, null);
-        if (defMethod == null)
+        if (defMethod == null || result.Contains((defType, defMethod)))
           continue;
         result.Add((defType, defMethod));
       }
       return result;
-    }
-  }
-
-  public abstract class LoadStrategy
-  {
-    public abstract UniTask Load();
-  }
-
-  public class LinearLoadStrategy : LoadStrategy
-  {
-    public override async UniTask Load()
-    {
-      // load in 3 steps:
-      // - load all assemblies in order without resolving types
-      // - resolve types in assemblies
-      // - load asset bundles, find and load entry points
-      // each step is done in the order the mods are configured
-      // if a mod fails to load, the following steps will be skipped for that mod
-
-      var enabledMods = LaunchPadConfig.Mods.Where(mod => mod.Enabled && mod.Source != ModSource.Core).ToList();
-
-      static void modFailed(LoadedMod mod, Exception ex)
-      {
-        mod.Logger.LogException(ex);
-        mod.LoadFailed = true;
-        LaunchPadConfig.AutoLoad = false;
-      }
-
-      foreach (var modInfo in enabledMods)
-      {
-        var mod = new LoadedMod(modInfo);
-        modInfo.Loaded = mod;
-        ModLoader.LoadedMods.Add(mod);
-
-        try
-        {
-          await mod.LoadAssembliesSerial();
-        }
-        catch (Exception ex)
-        {
-          modFailed(mod, ex);
-        }
-      }
-      foreach (var modInfo in enabledMods)
-      {
-        var mod = modInfo.Loaded;
-        if (mod.LoadFailed) continue;
-        try
-        {
-          mod.ResolveAssemblies();
-        }
-        catch (Exception ex)
-        {
-          modFailed(mod, ex);
-        }
-      }
-      foreach (var modInfo in enabledMods)
-      {
-        var mod = modInfo.Loaded;
-        if (mod.LoadFailed) continue;
-        try
-        {
-          await mod.LoadAssetsSerial();
-          await mod.FindEntrypoints();
-          mod.PrintEntrypoints();
-          mod.LoadEntrypoints();
-        }
-        catch (Exception ex)
-        {
-          modFailed(mod, ex);
-        }
-      }
     }
   }
 }
