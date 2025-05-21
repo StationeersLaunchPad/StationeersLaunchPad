@@ -1,10 +1,6 @@
 using Assets.Scripts;
 using Assets.Scripts.Networking.Transports;
 using Assets.Scripts.Serialization;
-using Assets.Scripts.Util;
-using BepInEx;
-using BepInEx.Configuration;
-using Cysharp.Threading.Tasks;
 using Mono.Cecil;
 using Steamworks;
 using Steamworks.Ugc;
@@ -17,6 +13,10 @@ using System.IO.Compression;
 using System.Linq;
 using System.Reflection;
 using System.Xml.Serialization;
+using Assets.Scripts.Util;
+using BepInEx;
+using BepInEx.Configuration;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 
 namespace StationeersLaunchPad
@@ -35,23 +35,35 @@ namespace StationeersLaunchPad
   {
     public static ConfigEntry<bool> AutoUpdateOnStart;
     public static ConfigEntry<bool> AutoLoadOnStart;
+    public static ConfigEntry<bool> AutoSortOnStart;
     public static ConfigEntry<int> AutoLoadWaitTime;
-    public static ConfigEntry<bool> AutoSort;
+    public static ConfigEntry<LoadStrategyType> StrategyType;
+    public static ConfigEntry<LoadStrategyMode> StrategyMode;
     public static SortedConfigFile SortedConfig;
 
     public static SplashBehaviour SplashBehaviour;
     public static List<ModInfo> Mods = new();
     public static HashSet<string> GameAssemblies = new();
+
     public static LoadState LoadState = LoadState.Initializing;
+    public static LoadStrategyType LoadStrategyType = LoadStrategyType.Linear;
+    public static LoadStrategyMode LoadStrategyMode = LoadStrategyMode.Serial;
+
+    public static bool AutoSort = true;
     public static bool AutoUpdate = false;
     public static bool AutoLoad = true;
     public static bool HasUpdated = false;
+
     public static Stopwatch AutoStopwatch = new();
+    public static Stopwatch ElapsedStopwatch = new();
 
     public static async void Run()
     {
+      AutoSort = AutoSortOnStart.Value;
       AutoUpdate = AutoUpdateOnStart.Value;
       AutoLoad = AutoLoadOnStart.Value;
+      LoadStrategyType = StrategyType.Value;
+      LoadStrategyMode = StrategyMode.Value;
       
       await Load();
 
@@ -65,7 +77,7 @@ namespace StationeersLaunchPad
         await LaunchPadAlertGUI.Show("Restart Recommended", "StationeersLaunchPad has been updated, it is recommended to restart the game.", 
           LaunchPadAlertGUI.DefaultSize,
           LaunchPadAlertGUI.DefaultPosition,
-         ("Continue Loading", () => {
+          ("Continue Loading", () => {
             AutoLoad = true;
 
             return true;
@@ -81,7 +93,6 @@ namespace StationeersLaunchPad
             startInfo.Environment.Remove("DOORSTOP_DISABLE");
 
             Process.Start(startInfo);
-
             Application.Quit();
 
             return false;
@@ -140,9 +151,7 @@ namespace StationeersLaunchPad
 
         Logger.Global.Log("Mod Config Initialized");
 
-       
         LoadState = LoadState.Updating;
-
         Logger.Global.Log("Checking Version");
         try
         {
@@ -275,7 +284,7 @@ namespace StationeersLaunchPad
       }
       foreach (var mod in modsByPath.Values)
       {
-        Logger.Global.Log($"new mod added at {mod.Path}");
+        Logger.Global.LogDebug($"new mod added at {mod.Path}");
         newMods.Add(mod);
         mod.Enabled = true;
       }
@@ -304,7 +313,7 @@ namespace StationeersLaunchPad
       {
         foreach (var file in dir.GetFiles(fileName))
         {
-          Mods.Add(new ModInfo
+          Mods.Add(new ModInfo()
           {
             Source = ModSource.Local,
             Wrapped = SteamTransport.ItemWrapper.WrapLocalItem(file, type),
@@ -321,11 +330,11 @@ namespace StationeersLaunchPad
         var result = await query.AllowCachedResponse(0).WhereUserSubscribed().GetPageAsync(page);
 
         if (!result.HasValue || result.Value.ResultCount == 0)
-          break;
+          continue;
 
         foreach (var item in result.Value.Entries)
         {
-          Mods.Add(new ModInfo
+          Mods.Add(new ModInfo()
           {
             Source = ModSource.Workshop,
             Wrapped = SteamTransport.ItemWrapper.WrapWorkshopItem(item, "About\\About.xml"),
@@ -506,7 +515,7 @@ namespace StationeersLaunchPad
           Logger.Global.LogError($"- {mod.Source} {mod.DisplayName}");
         }
         AutoLoad = false;
-        AutoSort.Value = false;
+        AutoSort = false;
         return;
       }
 
@@ -574,17 +583,38 @@ namespace StationeersLaunchPad
         });
       }
 
-      config.SaveXml(WorkshopMenu.ConfigPath);
+      if (!config.SaveXml(WorkshopMenu.ConfigPath))
+        throw new Exception($"failed to save {WorkshopMenu.ConfigPath}");
     }
 
     private async static UniTask LoadMods()
     {
+      ElapsedStopwatch.Restart();
       LoadState = LoadState.ModsLoading;
 
-      var strategy = new LinearLoadStrategy();
-      await strategy.Load();
+      switch (LoadStrategyType) {
+        default:
+        case LoadStrategyType.Linear: {
+          switch (LoadStrategyMode) {
+            default:
+            case LoadStrategyMode.Serial: {
+              var loadStrategy = new LoadStrategyLinearSerial();
+              await loadStrategy.LoadMods();
+            }
+            break;
+            case LoadStrategyMode.Parallel: {
+              var loadStrategy = new LoadStrategyLinearParallel();
+              await loadStrategy.LoadMods();
+            }
+            break;
+          }
+        }
+        break;
+      }
 
-      Logger.Global.Log("Mods Loaded");
+      ElapsedStopwatch.Stop();
+      Logger.Global.LogWarning($"Took {ElapsedStopwatch.Elapsed.ToString(@"m\:ss\.fff")} to load mods.");
+
       LoadState = LoadState.ModsLoaded;
     }
 
