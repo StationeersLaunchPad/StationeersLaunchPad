@@ -8,7 +8,7 @@
 
 If the user clicks the loading window (`LaunchPadGUI.DrawAutoLoad`), it opens a larger configuration editor allowing changes to enabled mods and order before load (`LaunchPadGUI.DrawManualLoad`).
 
-The loading is currently done one mod at a time (`LinearLoadStrategy` in `ModLoader.cs`), but could be parallelized later based on dependencies if load time is an issue.
+The loading is currently done one mod at a time (`LoadStrategyLinearSerial` and `LoadStrategyLinearParallel` in `ModLoader.cs`)
 
 ## Code Organization
 
