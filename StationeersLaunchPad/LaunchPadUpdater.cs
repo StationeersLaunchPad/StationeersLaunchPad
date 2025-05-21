@@ -30,7 +30,7 @@ namespace StationeersLaunchPad {
       using (var request = UnityWebRequest.Get("https://api.github.com/repos/StationeersLaunchPad/StationeersLaunchPad/releases/latest")) {
         request.timeout = 10; // 10 seconds because we are only fetching a json file
 
-        Logger.Global.Log($"Requesting version...");
+        Logger.Global.LogDebug($"Requesting version...");
         UnityWebRequest result = await request.SendWebRequest();
 
         if (result.result != UnityWebRequest.Result.Success) {
@@ -87,7 +87,7 @@ namespace StationeersLaunchPad {
         using (var downloadRequest = UnityWebRequest.Get(downloadMatches[0].Groups[1].Value)) {
           downloadRequest.timeout = 45; // max of 45 seconds to download the zip file
 
-          Logger.Global.Log($"Requesting download file...");
+          Logger.Global.LogDebug($"Requesting download file...");
           UnityWebRequest downloadResult = await downloadRequest.SendWebRequest();
 
           if (downloadResult.result != UnityWebRequest.Result.Success) {
@@ -113,16 +113,16 @@ namespace StationeersLaunchPad {
             File.Delete(zipFilePath);
           }
 
-          Logger.Global.Log($"Writing file to {zipFilePath}...");
+          Logger.Global.LogDebug($"Writing file to {zipFilePath}...");
           File.WriteAllBytes(zipFilePath, downloadResult.downloadHandler.data);
 
           using (var zipFile = ZipFile.Open(zipFilePath, ZipArchiveMode.Read)) {
-            Logger.Global.Log($"Extracting file contents to {extractionPath}...");
+            Logger.Global.LogDebug($"Extracting file contents to {extractionPath}...");
             zipFile.ExtractToDirectory(tempPath);
           }
           File.Delete(zipFilePath);
 
-          Logger.Global.Log($"Extracted file contents to {extractionPath}!");
+          Logger.Global.LogDebug($"Extracted file contents to {extractionPath}!");
           if (!Directory.Exists(extractionPath)) {
             Logger.Global.LogError($"Failed to exteract zip file");
             return;
@@ -147,12 +147,12 @@ namespace StationeersLaunchPad {
               File.Delete(backupPath);
             }
 
-            Logger.Global.Log($"Backing up DLL to {backupPath}!");
+            Logger.Global.LogDebug($"Backing up DLL to {backupPath}!");
             File.Move(path, backupPath);
-            Logger.Global.Log($"Deleting DLL at {path}!");
+            Logger.Global.LogDebug($"Deleting DLL at {path}!");
             File.Delete(path);
 
-            Logger.Global.Log($"Moving new DLL to {newPath}!");
+            Logger.Global.LogDebug($"Moving new DLL to {newPath}!");
             File.Move(newPath, path);
             //File.Delete(newPath);
           }
@@ -180,7 +180,7 @@ namespace StationeersLaunchPad {
           File.Delete(path);
         }
 
-        Logger.Global.Log($"Moving backup DLL to {path}!");
+        Logger.Global.LogDebug($"Moving backup DLL to {path}!");
         File.Move(backupPath, path);
         //Logger.Global.Log($"Deleting DLL at {backupPath}!");
         //File.Delete(backupPath);
