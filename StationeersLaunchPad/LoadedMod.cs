@@ -149,10 +149,11 @@ namespace StationeersLaunchPad
     }
 
 
-    public UniTask LoadEntrypoints()
+    public async UniTask LoadEntrypoints()
     {
-      return UniTask.RunOnThreadPool(() =>
+      //await UniTask.RunOnThreadPool(async () =>
       {
+
         this.Logger.LogDebug("Loading Entrypoints");
 
         // StationeersMods tagged ModBehaviour/StartupClass/StartupPrefab
@@ -210,7 +211,7 @@ namespace StationeersLaunchPad
         this.Logger.LogDebug("Loaded Entrypoints");
 
         this.LoadFinished = true;
-      });
+      }//);
     }
 
     private UniTask<AssetBundle> LoadAssetBundle(string path)

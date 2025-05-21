@@ -330,7 +330,7 @@ namespace StationeersLaunchPad
         var result = await query.AllowCachedResponse(0).WhereUserSubscribed().GetPageAsync(page);
 
         if (!result.HasValue || result.Value.ResultCount == 0)
-          continue;
+          break;
 
         foreach (var item in result.Value.Entries)
         {
