@@ -36,9 +36,8 @@ namespace StationeersLaunchPad
     }
 
     public void LogDebug(string message) {
-#if DEBUG
-      this.Log(message, LogType.Log, true);
-#endif
+      if (LaunchPadConfig.Debug)
+        this.Log(message, LogType.Log, true);
     }
 
     public void LogWarning(string message)
