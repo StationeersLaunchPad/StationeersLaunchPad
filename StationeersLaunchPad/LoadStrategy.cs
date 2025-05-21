@@ -7,10 +7,11 @@ using System.Linq;
 namespace StationeersLaunchPad {
   public enum LoadStrategyType
   {
-    // load in 3 steps:
+    // loads in 4 steps:
     // - load all assemblies in order without resolving types
     // - resolve types in assemblies
-    // - load asset bundles, find and load entry points
+    // - load asset bundles
+    // - find and load entry points
     // each step is done in the order the mods are configured
     // if a mod fails to load, the following steps will be skipped for that mod
     Linear,
