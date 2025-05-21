@@ -12,17 +12,29 @@ The loading is currently done one mod at a time (`LinearLoadStrategy` in `ModLoa
 
 ## Code Organization
 
-### [LaunchPadPlugin.cs](LaunchPadPlugin.cs)
-Bepinex plugin entrypoint to the mod loader.
+### [AssemblyInfo.cs](AssemblyInfo.cs)
+Simple structure holding assembly name and the names of other assemblies it directly references. Part of a prototype of adding implicit dependencies based on assembly references. Currently this information is loaded but unused.
+
+### [LaunchPadAlertGUI.cs](LaunchPadAlertGUI.cs)
+ImGui mod alert window.
+
+### [LaunchPadGUI.cs](LaunchPadGUI.cs)
+ImGui mod configuration window.
 
 ### [LaunchPadConfig.cs](LaunchPadConfig.cs)
 Main workflow logic of loading mod configuration and mods.
 
-### [LaunchPadGUI.cs](LaunchPadGUI.cs)
-IMGui mod configuration window.
+### [LaunchPadPlugin.cs](LaunchPadPlugin.cs)
+Bepinex plugin entrypoint to the mod loader.
 
 ### [LaunchPadUpdater.cs](LaunchPadUpdater.cs)
 Main class for handling automatic plugin updating.
+
+### [LoadedMod.cs](LoadedMod.cs)
+Contains the implementations of loading in mod files, and information about load status.
+
+### [LoadStrategy.cs](LoadStrategy.cs)
+Contains all implementation types for loading assemblies, resloving types, loading assets, and loading entry points.
 
 ### [ModLoader.cs](ModLoader.cs)
 Contains the workflow for loading enabled mods into the game, currently just a simple linear load.
@@ -31,11 +43,8 @@ Also contains the logic for finding Bepinex and StationeersMods entry points in 
 ### [ModInfo.cs](ModInfo.cs)
 Information about an installed mod (name, folder, about.xml).
 
-### [LoadedMod.cs](LoadedMod.cs)
-Contains the implementations of loading in mod files, and information about load status.
-
 ### [Logger.cs](Logger.cs)
 A logger that can be scoped to a specific mod, as well as a log handler that associates log messages with a specific mod. This works, but the scoped logs can only be viewed during startup for now.
 
-### [AssemblyInfo.cs](AssemblyInfo.cs)
-Simple structure holding assembly name and the names of other assemblies it directly references. Part of a prototype of adding implicit dependencies based on assembly references. Currently this information is loaded but unused.
+### [TextFormatting.cs](TextFormatting.cs)
+Logic for converting Steam description tags to TextMeshPro tags.
