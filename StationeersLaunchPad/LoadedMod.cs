@@ -1,4 +1,3 @@
-
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -7,6 +6,7 @@ using System.Reflection;
 using BepInEx;
 using BepInEx.Configuration;
 using Cysharp.Threading.Tasks;
+using HarmonyLib;
 using StationeersMods.Interface;
 using StationeersMods.Shared;
 using UnityEngine;
@@ -27,49 +27,86 @@ namespace StationeersLaunchPad
     public ContentHandler ContentHandler;
 
     public List<Type> SMEntryTypes = new();
-    public List<Type> BepinexEntryTypes = new();
+    public List<Type> BepInExEntryTypes = new();
     public List<(Type, MethodInfo)> DefaultEntryTypes = new();
     public List<GameObject> EntryPrefabs = new();
 
     public List<ConfigFile> ConfigFiles = new();
 
-    public bool LoadFinished = false;
-    public bool LoadFailed = false;
+    public bool LoadedAssemblies;
+    public bool ResolvedAssemblies;
+    public bool LoadedAssets;
+    public bool LoadedEntryPoints;
+    public bool LoadFinished;
+    public bool LoadFailed;
 
     public LoadedMod(ModInfo info)
     {
-      this.Logger = Logger.Global.WithPrefix($"[{info.DisplayName}]");
+      this.Logger = Logger.Global.WithPrefix($"[{info.DisplayName}]: ");
       this.Info = info;
       var resource = new DummyResource(info.Path);
       this.ContentHandler = new(resource, new List<IResource>().AsReadOnly(), this.Prefabs.AsReadOnly());
     }
 
+    private async UniTask<Assembly> LoadAssemblySingle(AssemblyInfo assemblyInfo)
+    {
+      this.Logger.LogDebug($"Loading Assembly {assemblyInfo.Name}");
+      var assembly = await ModLoader.LoadAssembly(assemblyInfo.Path);
+      ModLoader.RegisterAssembly(assembly, this);
+      this.Logger.LogDebug($"Loaded Assembly");
+      return assembly;
+    }
+
     public async UniTask LoadAssembliesSerial()
     {
       foreach (var assemblyInfo in this.Info.Assemblies)
-        this.Assemblies.Add(await this.LoadAssembly(assemblyInfo));
+        this.Assemblies.Add(await this.LoadAssemblySingle(assemblyInfo));
     }
+
     public async UniTask LoadAssembliesParallel()
     {
       var assemblies = await UniTask.WhenAll(
-        this.Info.Assemblies.Select(assemblyInfo => this.LoadAssembly(assemblyInfo))
+        this.Info.Assemblies.Select(assemblyInfo => this.LoadAssemblySingle(assemblyInfo))
       );
       this.Assemblies.AddRange(assemblies);
     }
 
-    public void ResolveAssemblies()
+
+    private async UniTask ResolveAssembliesSingle(Assembly assembly)
+    {
+      assembly.GetTypes();
+    }
+
+    public async UniTask ResolveAssembliesSerial()
     {
       foreach (var assembly in this.Assemblies)
-        assembly.GetTypes();
+        await this.ResolveAssembliesSingle(assembly);
+    }
+
+    public async UniTask ResolveAssembliesParallel()
+    {
+      await UniTask.WhenAll(this.Assemblies.Select(async (assembly) => await this.ResolveAssembliesSingle(assembly)));
+    }
+
+    private async UniTask LoadAssetsSingle(string path)
+    {
+      var bundle = await this.LoadAssetBundle(path);
+      var prefabs = await this.LoadAssetBundleGameObjects(path, bundle);
+      lock (this._lock)
+        this.Prefabs.AddRange(prefabs);
+
+      var exportSettings = await this.LoadAssetBundleExportSettings(path, bundle);
+      if (exportSettings != null)
+        lock (this._lock)
+          this.Exports.Add(exportSettings);
     }
 
     public async UniTask LoadAssetsSerial()
     {
       foreach (var path in this.Info.AssetBundles)
-      {
         await this.LoadAssetsSingle(path);
-      }
     }
+
     public async UniTask LoadAssetsParallel()
     {
       await UniTask.WhenAll(this.Info.AssetBundles.Select(path => this.LoadAssetsSingle(path)));
@@ -79,146 +116,128 @@ namespace StationeersLaunchPad
     {
       return UniTask.RunOnThreadPool(() =>
       {
-        this.Logger.Log("Finding Entrypoints");
+        this.Logger.LogDebug("Finding Entrypoints");
 
-        this.SMEntryTypes.AddRange(ModLoader.FindExplicitStationeersModsEntrypoints(this.Assemblies));
-        foreach (var type in ModLoader.FindExportSettingsClassEntrypoints(this.Assemblies, this.Exports))
-        {
-          if (!this.SMEntryTypes.Contains(type))
-            this.SMEntryTypes.Add(type);
-        }
         // StationeersMods would take any ModBehaviour it found as an entrypoint when there were no ExportSettings
         // We'll do the same to ensure any mods relying on this still work
         if (this.Exports.Count == 0)
-        {
-          foreach (var type in ModLoader.FindAnyStationeersModsEntrypoints(this.Assemblies))
-          {
-            if (!this.SMEntryTypes.Contains(type))
-              this.SMEntryTypes.Add(type);
-          }
-        }
-        foreach (var exportSettings in this.Exports)
-        {
-          var prefab = exportSettings._startupPrefab;
-          if (prefab != null)
-            this.EntryPrefabs.Add(prefab);
-        }
-        this.BepinexEntryTypes.AddRange(ModLoader.FindBepinexEntrypoints(this.Assemblies));
+          this.SMEntryTypes.AddRange(ModLoader.FindAnyStationeersModsEntrypoints(this.Assemblies));
+        else
+          this.SMEntryTypes.AddRange(ModLoader.FindExplicitStationeersModsEntrypoints(this.Assemblies));
 
+        if (this.SMEntryTypes.Count == 0)
+          this.SMEntryTypes.AddRange(ModLoader.FindExportSettingsClassEntrypoints(this.Assemblies, this.Exports));
+
+        this.BepInExEntryTypes.AddRange(ModLoader.FindBepInExEntrypoints(this.Assemblies));
         this.DefaultEntryTypes.AddRange(ModLoader.FindDefaultEntrypoints(this.Assemblies));
+
+        this.Logger.LogDebug("Found Entrypoints");
       });
     }
 
-    public void PrintEntrypoints()
+    public async UniTask PrintEntrypoints()
     {
       // getting prefab names fails on a thread in the debug player, so just print all the entrypoints after we finish
       foreach (var type in this.SMEntryTypes)
-        this.Logger.Log($"- StationeersMods {type.FullName}");
+        this.Logger.Log($"- StationeersMods Entry {type.FullName}");
       foreach (var prefab in this.EntryPrefabs)
-        this.Logger.Log($"- prefab {prefab.name}");
-      foreach (var type in this.BepinexEntryTypes)
-        this.Logger.Log($"- Bepinex {type.FullName}");
-      foreach (var (type, _) in this.DefaultEntryTypes)
-        this.Logger.Log($"- Default {type.FullName}");
-    }
-
-    public void LoadEntrypoints()
-    {
-      this.Logger.Log("Loading Entrypoints");
-
-      // StationeersMods tagged ModBehaviour/StartupClass/StartupPrefab
-      var modBehaviours = new List<ModBehaviour>();
-      if (this.SMEntryTypes.Count > 0)
-      {
-        var gameObj = new GameObject();
-        GameObject.DontDestroyOnLoad(gameObj);
-        foreach (var type in this.SMEntryTypes)
-          gameObj.AddComponent(type);
-        modBehaviours.AddRange(gameObj.GetComponents<ModBehaviour>());
-      }
-      foreach (var prefab in this.EntryPrefabs)
-      {
-        var gameObj = GameObject.Instantiate(prefab);
-        GameObject.DontDestroyOnLoad(gameObj);
-        modBehaviours.AddRange(gameObj.GetComponents<ModBehaviour>());
-      }
-      foreach (var modBehaviour in modBehaviours)
-      {
-        modBehaviour.contentHandler = this.ContentHandler;
-        modBehaviour.OnLoaded(this.ContentHandler);
-        if (modBehaviour.Config != null)
-        {
-          modBehaviour.Config.SettingChanged += (_, _) => this.DirtyConfig();
-          this.ConfigFiles.Add(modBehaviour.Config);
-        }
-      }
-
-      foreach (var type in this.BepinexEntryTypes)
-      {
-        var gameObj = new GameObject();
-        GameObject.DontDestroyOnLoad(gameObj);
-        var component = gameObj.AddComponent(type);
-        if (component is BaseUnityPlugin plugin && plugin.Config != null)
-        {
-          plugin.Config.SettingChanged += (_, _) => this.DirtyConfig();
-          this.ConfigFiles.Add(plugin.Config);
-        }
-      }
-
+        this.Logger.Log($"- Prefab Entry {prefab.name}");
+      foreach (var type in this.BepInExEntryTypes)
+        this.Logger.Log($"- BepInEx Entry {type.FullName}");
       foreach (var (type, method) in this.DefaultEntryTypes)
+        this.Logger.Log($"- Default Entry {type.FullName}");
+    }
+
+
+    public UniTask LoadEntrypoints()
+    {
+      return UniTask.RunOnThreadPool(() =>
       {
-        var gameObj = new GameObject();
-        GameObject.DontDestroyOnLoad(gameObj);
-        var component = gameObj.AddComponent(type);
-        method.Invoke(component, new object[] { this.Prefabs });
-      }
+        this.Logger.LogDebug("Loading Entrypoints");
 
-      this.ConfigFiles.Sort((a, b) => a.ConfigFilePath.CompareTo(b.ConfigFilePath));
+        // StationeersMods tagged ModBehaviour/StartupClass/StartupPrefab
+        var modBehaviours = new List<ModBehaviour>();
 
-      this.Logger.Log("Done");
+        if (this.SMEntryTypes.Count > 0)
+        {
+          var gameObj = new GameObject();
+          GameObject.DontDestroyOnLoad(gameObj);
+          foreach (var type in this.SMEntryTypes)
+            gameObj.AddComponent(type);
+          modBehaviours.AddRange(gameObj.GetComponents<ModBehaviour>());
+        }
 
-      this.LoadFinished = true;
-    }
+        foreach (var prefab in this.EntryPrefabs)
+        {
+          var gameObj = GameObject.Instantiate(prefab);
+          GameObject.DontDestroyOnLoad(gameObj);
+          modBehaviours.AddRange(gameObj.GetComponents<ModBehaviour>());
+        }
 
-    private async UniTask<Assembly> LoadAssembly(AssemblyInfo assemblyInfo)
-    {
-      this.Logger.Log($"Loading Assembly {assemblyInfo.Name}");
-      var assembly = await ModLoader.LoadAssembly(assemblyInfo.Path);
-      ModLoader.RegisterAssembly(assembly, this);
-      return assembly;
-    }
+        foreach (var modBehaviour in modBehaviours)
+        {
+          modBehaviour.contentHandler = this.ContentHandler;
+          modBehaviour.OnLoaded(this.ContentHandler);
+          if (modBehaviour.Config != null)
+          {
+            modBehaviour.Config.SettingChanged += (_, _) => this.DirtyConfig();
+            this.ConfigFiles.Add(modBehaviour.Config);
+          }
+        }
 
-    private async UniTask LoadAssetsSingle(string path)
-    {
-      var bundle = await this.LoadAssetBundle(path);
-      var prefabs = await this.LoadAssetBundleGameObjects(path, bundle);
-      lock (this._lock) this.Prefabs.AddRange(prefabs);
-      var exportSettings = await this.LoadAssetBundleExportSettings(path, bundle);
-      if (exportSettings != null)
-        lock (this._lock) this.Exports.Add(exportSettings);
+        foreach (var type in this.BepInExEntryTypes)
+        {
+          var gameObj = new GameObject();
+          GameObject.DontDestroyOnLoad(gameObj);
+          var component = gameObj.AddComponent(type);
+          if (component is BaseUnityPlugin plugin && plugin.Config != null)
+          {
+            plugin.Config.SettingChanged += (_, _) => this.DirtyConfig();
+            this.ConfigFiles.Add(plugin.Config);
+          }
+        }
+
+        foreach (var (type, method) in this.DefaultEntryTypes)
+        {
+          var gameObj = new GameObject();
+          GameObject.DontDestroyOnLoad(gameObj);
+          var component = gameObj.AddComponent(type);
+          method.Invoke(component, new object[] { this.Prefabs });
+        }
+
+        this.ConfigFiles.Sort((a, b) => a.ConfigFilePath.CompareTo(b.ConfigFilePath));
+
+        this.Logger.LogDebug("Loaded Entrypoints");
+
+        this.LoadFinished = true;
+      });
     }
 
     private UniTask<AssetBundle> LoadAssetBundle(string path)
     {
       var name = Path.GetFileName(path);
-      this.Logger.Log($"Loading AssetBundle {name}");
+      this.Logger.LogDebug($"Loading AssetBundle {name}");
       return ModLoader.LoadAssetBundle(path);
     }
 
     private async UniTask<List<GameObject>> LoadAssetBundleGameObjects(string path, AssetBundle bundle)
     {
       var name = Path.GetFileName(path);
-      this.Logger.Log($"Loading AssetBundle {name} Prefabs");
+      this.Logger.LogDebug($"Loading AssetBundle {name} Prefabs");
       var assets = await ModLoader.LoadAllBundleAssets(bundle);
+
+#if DEBUG
       foreach (var asset in assets)
-        this.Logger.Log($"- {asset.name}");
+        this.Logger.LogDebug($"- Asset {asset.name}");
+#endif
+
       return assets;
     }
 
     private UniTask<ExportSettings> LoadAssetBundleExportSettings(string path, AssetBundle bundle)
     {
       var name = Path.GetFileName(path);
-      this.Logger.Log($"Loading AssetBundle {name} ExportSettings");
+      this.Logger.LogDebug($"Loading AssetBundle {name} ExportSettings");
       return ModLoader.LoadBundleExportSettings(bundle);
     }
 
