@@ -480,7 +480,7 @@ namespace StationeersLaunchPad
       }
       else if (value is string stringValue)
       {
-        if (ImGui.InputText("##stringvalue", ref stringValue, 256))
+        if (ImGui.InputText("##stringvalue", ref stringValue, 256, ImGuiInputTextFlags.EnterReturnsTrue) || ImGui.IsItemDeactivatedAfterEdit())
         {
           entry.BoxedValue = stringValue;
           changed = true;
