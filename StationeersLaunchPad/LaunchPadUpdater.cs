@@ -2,10 +2,12 @@
 using BepInEx;
 using Cysharp.Threading.Tasks;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.Networking;
 
@@ -15,6 +17,12 @@ namespace StationeersLaunchPad
   public static class LaunchPadUpdater
   {
     public static bool AllowUpdate;
+
+    public const string LatestReleaseUrl = "https://api.github.com/repos/StationeersLaunchPad/StationeersLaunchPad/releases/latest";
+    public const string GithubUrl = "https://github.com/StationeersLaunchPad/StationeersLaunchPad";
+
+    public static string TemporaryPath => Path.GetTempPath();
+    public static string ExtractionPath => Path.Combine(TemporaryPath, "StationeersLaunchPad");
 
     public static List<string> Assemblies = new()
     {
@@ -61,11 +69,11 @@ namespace StationeersLaunchPad
       }
     }
 
-    private static async UniTask<GithubRelease> FetchLatestRelease()
+    private static async UniTask<Github.Release> FetchLatestRelease()
     {
       try
       {
-        using (var request = UnityWebRequest.Get("https://api.github.com/repos/StationeersLaunchPad/StationeersLaunchPad/releases/latest"))
+        using (var request = UnityWebRequest.Get(LaunchPadUpdater.LatestReleaseUrl))
         {
           request.timeout = 10; // 10 seconds because we are only fetching a json file
 
@@ -78,7 +86,7 @@ namespace StationeersLaunchPad
             return null;
           }
 
-          return JsonConvert.DeserializeObject<GithubRelease>(result.downloadHandler.text);
+          return JsonConvert.DeserializeObject<Github.Release>(result.downloadHandler.text);
         }
       }
       catch (Exception ex)
@@ -89,7 +97,7 @@ namespace StationeersLaunchPad
       }
     }
 
-    private static async UniTask CheckShouldUpdate(GithubRelease release)
+    private static async UniTask CheckShouldUpdate(Github.Release release)
     {
       if (LaunchPadConfig.AutoUpdate)
       {
@@ -97,8 +105,9 @@ namespace StationeersLaunchPad
         return;
       }
 
-      await LaunchPadAlertGUI.Show("Update Available", "An update is available, would you like to automatically download and update?",
-        LaunchPadAlertGUI.DefaultSize,
+      var description = Github.FormatDescription(release.Description);
+      await LaunchPadAlertGUI.Show("Update Available", $"Update version {release.TagName} is available, would you like to automatically download and update?\n\n{description}",
+        new Vector2(800, 400),
         LaunchPadAlertGUI.DefaultPosition,
         ("Yes", () => {
           AllowUpdate = true; return true;
@@ -109,13 +118,12 @@ namespace StationeersLaunchPad
           return false;
         }),
         ("No", () => {
-          AllowUpdate = false;
-          return true;
+          AllowUpdate = false; return true;
         })
       );
     }
 
-    private static async UniTask PerformUpdate(GithubRelease release)
+    private static async UniTask ExtractDownloadArchive(Github.Release release)
     {
       var assetName = GameManager.IsBatchMode ? $"StationeersLaunchPad-server-{release.TagName}.zip" : $"StationeersLaunchPad-{release.TagName}.zip";
       var asset = release.Assets.Find(a => a.Name == assetName);
@@ -125,22 +133,21 @@ namespace StationeersLaunchPad
         return;
       }
 
-      var tempPath = Path.GetTempPath();
-      var extractionPath = Path.Combine(tempPath, "StationeersLaunchPad");
-      if (Directory.Exists(extractionPath))
+      if (Directory.Exists(LaunchPadUpdater.ExtractionPath))
       {
-        foreach (var file in Directory.GetFiles(extractionPath))
+        foreach (var file in Directory.GetFiles(LaunchPadUpdater.ExtractionPath))
         {
-          var path = Path.Combine(extractionPath, file);
+          var path = Path.Combine(LaunchPadUpdater.ExtractionPath, file);
 
           if (File.Exists(path))
           {
             File.Delete(path);
           }
         }
-        Directory.Delete(extractionPath);
+        Directory.Delete(LaunchPadUpdater.ExtractionPath);
       }
-      var zipFilePath = Path.Combine(tempPath, "SLP.zip");
+
+      var zipFilePath = Path.Combine(LaunchPadUpdater.TemporaryPath, assetName);
       if (File.Exists(zipFilePath))
       {
         File.Delete(zipFilePath);
@@ -165,13 +172,18 @@ namespace StationeersLaunchPad
 
       using (var zipFile = ZipFile.Open(zipFilePath, ZipArchiveMode.Read))
       {
-        Logger.Global.LogDebug($"Extracting file contents to {extractionPath}...");
-        zipFile.ExtractToDirectory(tempPath);
+        Logger.Global.LogDebug($"Extracting file contents to {LaunchPadUpdater.ExtractionPath}...");
+        zipFile.ExtractToDirectory(LaunchPadUpdater.TemporaryPath);
       }
       File.Delete(zipFilePath);
+    }
 
-      Logger.Global.LogDebug($"Extracted file contents to {extractionPath}!");
-      if (!Directory.Exists(extractionPath))
+    private static async UniTask PerformUpdate(Github.Release release)
+    {
+      await ExtractDownloadArchive(release);
+
+      Logger.Global.LogDebug($"Extracted file contents to {LaunchPadUpdater.ExtractionPath}!");
+      if (!Directory.Exists(LaunchPadUpdater.ExtractionPath))
       {
         Logger.Global.LogError($"Failed to exteract zip file");
         return;
@@ -182,7 +194,7 @@ namespace StationeersLaunchPad
       {
         var fileName = $"{file}.dll";
         var backupFileName = $"{file}.dll.bak";
-        var newPath = Path.Combine(extractionPath, fileName);
+        var newPath = Path.Combine(LaunchPadUpdater.ExtractionPath, fileName);
         if (!File.Exists(newPath))
         {
           continue;
@@ -208,7 +220,7 @@ namespace StationeersLaunchPad
         Logger.Global.LogDebug($"Moving new DLL to {newPath}!");
         File.Move(newPath, path);
       }
-      Directory.Delete(extractionPath);
+      Directory.Delete(LaunchPadUpdater.ExtractionPath);
     }
 
     private static void RevertUpdate()
@@ -246,22 +258,149 @@ namespace StationeersLaunchPad
       }
     }
 
-    public class GithubRelease
+    public class Github
     {
-      [JsonProperty("tag_name")]
-      public string TagName;
-      [JsonProperty("html_url")]
-      public string HtmlUrl;
-      [JsonProperty("assets")]
-      public List<GithubReleaseAsset> Assets;
-    }
+      public class Release
+      {
+        [JsonProperty("name")]
+        public string Name;
 
-    public class GithubReleaseAsset
-    {
-      [JsonProperty("name")]
-      public string Name;
-      [JsonProperty("browser_download_url")]
-      public string BrowserDownloadUrl;
+        [JsonProperty("tag_name")]
+        public string TagName;
+
+        [JsonProperty("target_commitish")]
+        public string BranchName;
+
+        [JsonProperty("id")]
+        public int Id;
+
+        [JsonProperty("body")]
+        public string Description;
+
+        [JsonProperty("author")]
+        public User Author;
+
+        [JsonProperty("assets")]
+        public List<Asset> Assets;
+
+        [JsonProperty("draft")]
+        public bool Draft;
+
+        [JsonProperty("prerelease")]
+        public bool Prerelease;
+
+        [JsonProperty("created_at")]
+        public DateTime Created;
+
+        [JsonProperty("uploaded_at")]
+        public DateTime Uploaded;
+
+        [JsonProperty("mentions_count")]
+        public int UsersMentioned;
+
+        [JsonProperty("url")]
+        public string Url;
+
+        [JsonProperty("assets_url")]
+        public string AssetsUrl;
+
+        [JsonProperty("upload_url")]
+        public string UploadUrl;
+
+        [JsonProperty("html_url")]
+        public string HtmlUrl;
+
+        [JsonProperty("tarball_url")]
+        public string TarballUrl;
+
+        [JsonProperty("zipball_url")]
+        public string ZipballUrl;
+      }
+
+
+      public class Asset
+      {
+        [JsonProperty("name")]
+        public string Name;
+
+        [JsonProperty("id")]
+        public int Id;
+
+        [JsonProperty("size")]
+        public int Size;
+
+        [JsonProperty("content_type")]
+        public string Type;
+
+        [JsonProperty("uploader")]
+        public User Uploader;
+
+        [JsonProperty("created_at")]
+        public DateTime Created;
+
+        [JsonProperty("updated_at")]
+        public DateTime Updated;
+
+        [JsonProperty("download_count")]
+        public int DownloadCount;
+
+        [JsonProperty("label")]
+        public string Label;
+
+        [JsonProperty("state")]
+        public string State;
+
+        [JsonProperty("url")]
+        public string Url;
+
+        [JsonProperty("digest")]
+        public string Digest;
+
+        [JsonProperty("browser_download_url")]
+        public string BrowserDownloadUrl;
+      }
+
+      public class User
+      {
+        [JsonProperty("login")]
+        public string Name;
+
+        [JsonProperty("id")]
+        public int Id;
+
+        [JsonProperty("type")]
+        public string Type;
+
+        [JsonProperty("url")]
+        public string Url;
+
+        [JsonProperty("avatar_url")]
+        public string AvatarUrl;
+
+        [JsonProperty("html_url")]
+        public string HtmlUrl;
+      }
+
+      public static string FormatDescription(string description)
+      {
+        var text = description
+          .Replace($"{LaunchPadUpdater.GithubUrl}/pull/", "#")
+          .Replace($"{LaunchPadUpdater.GithubUrl}/compare/", "")
+          .TrimEnd('v', 'V', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.')
+          .Split('\n')
+          .ToList();
+
+        var desc = "";
+        for (var i = 0; i < text.Count; i++)
+        {
+          if (i == 0 || i == text.Count - 1)
+            continue;
+
+          desc += text[i] + "\n";
+        }
+
+        return $"Whats Changed?\n{desc}";
+      }
     }
   }
 }
