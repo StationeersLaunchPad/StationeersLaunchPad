@@ -53,6 +53,7 @@ namespace StationeersLaunchPad
 
     public static bool Debug = false;
     public static bool AutoSort = true;
+    public static bool CheckUpdate = false;
     public static bool AutoUpdate = false;
     public static bool AutoLoad = true;
     public static bool HasUpdated = false;
@@ -64,6 +65,7 @@ namespace StationeersLaunchPad
     {
       Debug = DebugMode.Value;
       AutoSort = AutoSortOnStart.Value;
+      CheckUpdate = CheckForUpdate.Value;
       AutoUpdate = AutoUpdateOnStart.Value;
       AutoLoad = AutoLoadOnStart.Value;
       LoadStrategyType = StrategyType.Value;
@@ -155,7 +157,7 @@ namespace StationeersLaunchPad
 
         Logger.Global.Log("Mod Config Initialized");
 
-        if (CheckForUpdate.Value)
+        if (CheckUpdate)
         {
           LoadState = LoadState.Updating;
           Logger.Global.Log("Checking Version");
