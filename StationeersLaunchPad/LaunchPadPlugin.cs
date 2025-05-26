@@ -21,7 +21,7 @@ namespace StationeersLaunchPad
   {
     public const string pluginGuid = "stationeers.launchpad";
     public const string pluginName = "StationeersLaunchPad";
-    public const string pluginVersion = "0.1.10";
+    public const string pluginVersion = "0.1.9";
 
     void Awake()
     {
@@ -41,11 +41,18 @@ namespace StationeersLaunchPad
           "Automatically load after the configured wait time on startup. Can be stopped by clicking the loading window at the bottom"
         )
        );
+      LaunchPadConfig.CheckForUpdate = this.Config.Bind(
+        new ConfigDefinition("Startup", "CheckForUpdate"),
+        !GameManager.IsBatchMode, // Default to false on DS
+        new ConfigDescription(
+          "Automatically check for mod loader updates on startup."
+        )
+      );
       LaunchPadConfig.AutoUpdateOnStart = this.Config.Bind(
         new ConfigDefinition("Startup", "AutoUpdateOnStart"),
         !GameManager.IsBatchMode, // Default to false on DS
         new ConfigDescription(
-          "Automatically update mod loader on startup."
+          "Automatically update mod loader on startup. Ignored if CheckForUpdate is not also enabled."
         )
       );
       LaunchPadConfig.AutoLoadWaitTime = this.Config.Bind(

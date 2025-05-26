@@ -34,6 +34,7 @@ namespace StationeersLaunchPad
   public static class LaunchPadConfig
   {
     public static ConfigEntry<bool> DebugMode;
+    public static ConfigEntry<bool> CheckForUpdate;
     public static ConfigEntry<bool> AutoUpdateOnStart;
     public static ConfigEntry<bool> AutoLoadOnStart;
     public static ConfigEntry<bool> AutoSortOnStart;
@@ -67,7 +68,7 @@ namespace StationeersLaunchPad
       AutoLoad = AutoLoadOnStart.Value;
       LoadStrategyType = StrategyType.Value;
       LoadStrategyMode = StrategyMode.Value;
-      
+
       await Load();
 
       while (LoadState < LoadState.Updating)
@@ -77,7 +78,7 @@ namespace StationeersLaunchPad
       {
         AutoLoad = false;
 
-        await LaunchPadAlertGUI.Show("Restart Recommended", "StationeersLaunchPad has been updated, it is recommended to restart the game.", 
+        await LaunchPadAlertGUI.Show("Restart Recommended", "StationeersLaunchPad has been updated, it is recommended to restart the game.",
           LaunchPadAlertGUI.DefaultSize,
           LaunchPadAlertGUI.DefaultPosition,
           ("Continue Loading", () => {
@@ -154,17 +155,11 @@ namespace StationeersLaunchPad
 
         Logger.Global.Log("Mod Config Initialized");
 
-        LoadState = LoadState.Updating;
-        Logger.Global.Log("Checking Version");
-        try
+        if (CheckForUpdate.Value)
         {
+          LoadState = LoadState.Updating;
+          Logger.Global.Log("Checking Version");
           await LaunchPadUpdater.CheckVersion();
-        }
-        catch (Exception ex)
-        {
-          Logger.Global.LogError("Error occurred during updating.");
-          Logger.Global.LogException(ex);
-          await UniTask.Run(() => LaunchPadUpdater.RevertUpdate());
         }
 
         LoadState = LoadState.Configuring;
@@ -173,12 +168,12 @@ namespace StationeersLaunchPad
       {
         if (!GameManager.IsBatchMode)
         {
-         Logger.Global.LogError("Error occurred during initialization. Mods will not be loaded.");
-         Logger.Global.LogException(ex);
+          Logger.Global.LogError("Error occurred during initialization. Mods will not be loaded.");
+          Logger.Global.LogException(ex);
 
-         Mods = new();
-         LoadState = LoadState.ModsLoaded;
-         AutoLoad = false;
+          Mods = new();
+          LoadState = LoadState.ModsLoaded;
+          AutoLoad = false;
         }
         else
         {

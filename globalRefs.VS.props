@@ -8,6 +8,10 @@
       <HintPath>$(StationeersDirectory)\rocketstation_Data\Managed\Assembly-CSharp.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>$(StationeersDirectory)\rocketstation_Data\Managed\Newtonsoft.Json.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="System.IO.Compression">
       <HintPath>$(StationeersDirectory)\rocketstation_Data\Managed\System.IO.Compression.dll</HintPath>
       <Private>False</Private>
