@@ -391,11 +391,8 @@ namespace StationeersLaunchPad
           .ToList();
 
         var desc = "";
-        for (var i = 0; i < text.Count; i++)
+        for (var i = 1; i < text.Count - 2; i++)
         {
-          if (i == 0 || i == text.Count - 1)
-            continue;
-
           desc += text[i] + "\n";
         }
 
