@@ -70,6 +70,13 @@ namespace StationeersLaunchPad
           "Automatically sort based on LoadBefore/LoadAfter tags in mod data"
         )
       );
+      LaunchPadConfig.DisableSteam = this.Config.Bind(
+        new ConfigDefinition("Startup", "DisableSteam"),
+        false,
+         new ConfigDescription(
+          "Don't attempt to load steam workshop mods"
+        )
+      );
       LaunchPadConfig.StrategyType = this.Config.Bind(
         new ConfigDefinition("Mod Loading", "LoadStrategyType"),
         LoadStrategyType.Linear,

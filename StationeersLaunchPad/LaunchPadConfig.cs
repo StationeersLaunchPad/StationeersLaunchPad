@@ -41,6 +41,7 @@ namespace StationeersLaunchPad
     public static ConfigEntry<int> AutoLoadWaitTime;
     public static ConfigEntry<LoadStrategyType> StrategyType;
     public static ConfigEntry<LoadStrategyMode> StrategyMode;
+    public static ConfigEntry<bool> DisableSteam;
     public static SortedConfigFile SortedConfig;
 
     public static SplashBehaviour SplashBehaviour;
@@ -57,6 +58,7 @@ namespace StationeersLaunchPad
     public static bool AutoUpdate = false;
     public static bool AutoLoad = true;
     public static bool HasUpdated = false;
+    public static bool SteamDisabled = false;
 
     public static Stopwatch AutoStopwatch = new();
     public static Stopwatch ElapsedStopwatch = new();
@@ -70,6 +72,8 @@ namespace StationeersLaunchPad
       AutoLoad = AutoLoadOnStart.Value;
       LoadStrategyType = StrategyType.Value;
       LoadStrategyMode = StrategyMode.Value;
+      // steam is always disabled on dedicated servers
+      SteamDisabled = DisableSteam.Value || GameManager.IsBatchMode;
 
       await Load();
 
@@ -138,7 +142,7 @@ namespace StationeersLaunchPad
         Logger.Global.Log("Listing Local Mods");
         await UniTask.Run(() => LoadLocalItems());
 
-        if (!GameManager.IsBatchMode)
+        if (!SteamDisabled)
         {
           Logger.Global.Log("Listing Workshop Mods");
           await LoadWorkshopItems();
@@ -189,7 +193,7 @@ namespace StationeersLaunchPad
     {
       if (string.IsNullOrEmpty(Settings.CurrentData.SavePath))
         Settings.CurrentData.SavePath = StationSaveUtils.DefaultPath;
-      if (!SteamClient.IsValid && !GameManager.IsBatchMode)
+      if (!SteamClient.IsValid && !SteamDisabled)
       {
         try
         {
@@ -199,7 +203,9 @@ namespace StationeersLaunchPad
         {
           Logger.Global.LogError($"failed to initialize steam: {ex.Message}");
           Logger.Global.LogError("workshop mods will not be loaded");
+          Logger.Global.LogError("turn on DisableSteam in LaunchPad Configuration to hide this message");
           AutoLoad = false;
+          SteamDisabled = true;
         }
       }
       Mods.Add(new ModInfo { Source = ModSource.Core });
