@@ -72,6 +72,10 @@ namespace StationeersLaunchPad
       AutoLoad = AutoLoadOnStart.Value;
       LoadStrategyType = StrategyType.Value;
       LoadStrategyMode = StrategyMode.Value;
+
+      // we need to wait a frame so all the RuntimeInitializeOnLoad tasks are complete, otherwise GameManager.IsBatchMode won't be set yet
+      await UniTask.Yield();
+
       // steam is always disabled on dedicated servers
       SteamDisabled = DisableSteam.Value || GameManager.IsBatchMode;
 
