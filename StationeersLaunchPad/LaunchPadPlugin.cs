@@ -1,4 +1,5 @@
 using Assets.Scripts;
+using Assets.Scripts.Localization2;
 using Assets.Scripts.Networking.Transports;
 using Assets.Scripts.Serialization;
 using Assets.Scripts.UI;
@@ -7,12 +8,16 @@ using BepInEx.Configuration;
 using Cysharp.Threading.Tasks;
 using HarmonyLib;
 using Steamworks;
+using System;
+using System.Collections.Generic;
 using System.Reflection;
+using System.Text;
 using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.LowLevel;
+using GameString = Assets.Scripts.Localization2.GameString;
 
 namespace StationeersLaunchPad
 {
@@ -264,5 +269,14 @@ namespace StationeersLaunchPad
       // We initialize this before the game does, but we still want the game to think it initialized itself
       return !SteamClient.IsValid;
     }
+
+    [HarmonyPatch(typeof(GameString), "op_Implicit", new Type[] { typeof(GameString) }), HarmonyPrefix]
+    static bool GameString_op_Implicit(ref string __result, GameString gameString)
+    {
+      __result = gameString?.DisplayString ?? string.Empty;
+
+      return false;
+    }
+    
   }
 }
