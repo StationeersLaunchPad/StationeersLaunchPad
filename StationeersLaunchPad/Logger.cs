@@ -33,7 +33,7 @@ namespace StationeersLaunchPad
     {
       this.Name = name;
       this.Parent = parent;
-      this.Buffer = new LogBuffer(this.Name, this.IsGlobal ? LogBuffer.DEFAULT_BUFFER_SIZE : 256);
+      this.Buffer = new LogBuffer(this.IsGlobal ? LogBuffer.DEFAULT_BUFFER_SIZE : 256);
     }
 
     public Logger(string name, LogBuffer buffer, Logger parent = null)
@@ -49,49 +49,49 @@ namespace StationeersLaunchPad
 
     public void Clear() => this.Buffer.Clear();
 
-    public void Log(string message, LogSeverity logSeverity = LogSeverity.Information, bool unity = true)
+    public void Log(string message, LogSeverity logSeverity = LogSeverity.Information, bool unity = true, string name = "")
     {
-      this.Buffer.Add(message, logSeverity);
+      this.Buffer.Add(string.IsNullOrWhiteSpace(name) ? this.Name : name, message, logSeverity);
 
       if (this.IsChild)
-        this.Parent?.Log(message, logSeverity, unity);
+        this.Parent?.Log(message, logSeverity, unity, this.Name);
       else if (unity)
         this.LogUnity(message, logSeverity);
     }
 
-    public void Log(Exception exception, bool unity = true)
+    public void Log(Exception exception, bool unity = true, string name = "")
     {
-      this.Buffer.Add(exception);
+      this.Buffer.Add(string.IsNullOrWhiteSpace(name) ? this.Name : name, exception);
 
       if (this.IsChild)
-        this.Parent?.Log(exception, unity);
+        this.Parent?.Log(exception, unity, this.Name);
       else if (unity)
         this.LogUnity(exception);
     }
 
-    public void LogUnity(string message, LogSeverity severity = LogSeverity.Information)
+    public void LogUnity(string message, LogSeverity severity = LogSeverity.Information, string name = "")
     {
       switch (severity)
       {
         default:
         case LogSeverity.Debug:
         case LogSeverity.Information:
-          this.LogUnity(message, LogType.Log);
+          this.LogUnity(message, LogType.Log, name);
           break;
         case LogSeverity.Warning:
-          this.LogUnity(message, LogType.Warning);
+          this.LogUnity(message, LogType.Warning, name);
           break;
         case LogSeverity.Error:
         case LogSeverity.Fatal:
-          this.LogUnity(message, LogType.Error);
+          this.LogUnity(message, LogType.Error, name);
           break;
         case LogSeverity.Exception:
-          this.LogUnity(message, LogType.Exception);
+          this.LogUnity(message, LogType.Exception, name);
           break;
       }
     }
 
-    public void LogUnity(string message, LogType logType = LogType.Log) => Debug.LogFormat(logType, LogOption.None, null, $"[{this.Name}]: {message}");
+    public void LogUnity(string message, LogType logType = LogType.Log, string name = "") => Debug.LogFormat(logType, LogOption.None, null, $"[{(string.IsNullOrWhiteSpace(name) ? this.Name : name)}]: {message}");
     public void LogUnity(Exception exception) => Debug.LogException(exception);
     public void LogUnityAssert(string message) => this.LogUnity(message, LogType.Assert);
     public void LogUnityWarning(string message) => this.LogUnity(message, LogType.Warning);

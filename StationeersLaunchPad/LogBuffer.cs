@@ -10,11 +10,6 @@ namespace StationeersLaunchPad
 
     private readonly object _lock = new();
 
-    public string Name
-    {
-      get; private set;
-    }
-
     public int Size
     {
       get; private set;
@@ -50,23 +45,22 @@ namespace StationeersLaunchPad
 
     public LogLine this[int index] => this.Lines[(index + this.Start) % this.Lines.Length];
 
-    public LogBuffer(string name, int size = LogBuffer.DEFAULT_BUFFER_SIZE)
+    public LogBuffer(int size = LogBuffer.DEFAULT_BUFFER_SIZE)
     {
       this.Size = size;
       this.Lines = new LogLine[this.Size];
-      this.Name = name;
     }
 
-    public void Add(string message, LogSeverity severity)
+    public void Add(string name, string message, LogSeverity severity)
     {
-      var line = new LogLine(this.Name, message, severity);
+      var line = new LogLine(name, message, severity);
 
       this.AddLine(line);
     }
 
-    public void Add(Exception exception)
+    public void Add(string name, Exception exception)
     {
-      var line = new LogLine(this.Name, exception);
+      var line = new LogLine(name, exception);
 
       this.AddLine(line);
     }

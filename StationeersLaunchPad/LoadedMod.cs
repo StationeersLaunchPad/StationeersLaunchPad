@@ -52,7 +52,7 @@ namespace StationeersLaunchPad
       this.Logger.LogDebug($"Loading Assembly {assemblyInfo.Name}");
       var assembly = await ModLoader.LoadAssembly(assemblyInfo.Path);
       ModLoader.RegisterAssembly(assembly, this);
-      this.Logger.LogDebug($"Loaded Assembly");
+      this.Logger.LogInfo($"Loaded Assembly");
       return assembly;
     }
 
@@ -133,7 +133,7 @@ namespace StationeersLaunchPad
         this.BepInExEntryTypes.AddRange(ModLoader.FindBepInExEntrypoints(this.Assemblies));
         this.DefaultEntryTypes.AddRange(ModLoader.FindDefaultEntrypoints(this.Assemblies));
 
-        this.Logger.LogDebug("Found Entrypoints");
+        this.Logger.LogInfo("Found Entrypoints");
       });
     }
 
@@ -206,7 +206,7 @@ namespace StationeersLaunchPad
 
       this.ConfigFiles.Sort((a, b) => a.ConfigFilePath.CompareTo(b.ConfigFilePath));
 
-      this.Logger.LogDebug("Loaded Entrypoints");
+      this.Logger.LogInfo("Loaded Entrypoints");
       this.LoadFinished = true;
     }
 
