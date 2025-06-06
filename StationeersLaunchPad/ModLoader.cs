@@ -146,15 +146,16 @@ namespace StationeersLaunchPad
       var result = new List<(Type, MethodInfo)>();
       foreach (var assembly in assemblies)
       {
-        var name = assembly.GetName().Name;
-        var defType = assembly.GetType(name);
-        if (defType == null || !typeof(MonoBehaviour).IsAssignableFrom(defType))
-          continue;
+        foreach (var defType in assembly.GetTypes())
+        {
+          if (defType == null || defType.IsAbstract || !typeof(MonoBehaviour).IsAssignableFrom(defType))
+            continue;
 
-        var defMethod = defType.GetMethod(DEFAULT_METHOD, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, new Type[] { typeof(List<GameObject>) }, null);
-        if (defMethod == null || result.Contains((defType, defMethod)))
-          continue;
-        result.Add((defType, defMethod));
+          var defMethod = defType.GetMethod(DEFAULT_METHOD, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, new Type[] { typeof(List<GameObject>) }, null);
+          if (defMethod == null || result.Contains((defType, defMethod)))
+            continue;
+          result.Add((defType, defMethod));
+        }
       }
       return result;
     }
