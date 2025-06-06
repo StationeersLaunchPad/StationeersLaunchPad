@@ -6,7 +6,7 @@ namespace StationeersLaunchPad
 {
   public class LogBuffer
   {
-    public const int DEFAULT_BUFFER_SIZE = 1024;
+    public const int DEFAULT_BUFFER_SIZE = 512;
 
     private readonly object _lock = new();
 
