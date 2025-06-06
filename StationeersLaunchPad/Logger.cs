@@ -98,7 +98,13 @@ namespace StationeersLaunchPad
     public void LogUnityError(string message) => this.LogUnity(message, LogType.Error);
     public void LogUnityException(Exception exception) => this.LogUnity(exception);
 
-    public void LogDebug(string message, bool unity = true) => this.Log(message, LogSeverity.Debug, unity);
+    public void LogDebug(string message, bool unity = true)
+    {
+      if (LaunchPadConfig.Debug)
+      {
+        this.Log(message, LogSeverity.Debug, unity);
+      }
+    }
     public void LogInfo(string message, bool unity = true) => this.Log(message, LogSeverity.Information, unity);
     public void LogWarning(string message, bool unity = true) => this.Log(message, LogSeverity.Warning, unity);
     public void LogError(string message, bool unity = true) => this.Log(message, LogSeverity.Error, unity);
