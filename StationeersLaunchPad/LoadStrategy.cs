@@ -157,9 +157,7 @@ namespace StationeersLaunchPad {
         try
         {
           await mod.FindEntrypoints();
-          if (LaunchPadConfig.Debug)
-            mod.PrintEntrypoints();
-
+          mod.PrintEntrypoints();
           mod.LoadEntrypoints();
           mod.LoadedEntryPoints = true;
         }
@@ -250,9 +248,7 @@ namespace StationeersLaunchPad {
         try
         {
           await mod.FindEntrypoints();
-          if (LaunchPadConfig.Debug)
-            mod.PrintEntrypoints();
-
+          mod.PrintEntrypoints();
           mod.LoadEntrypoints();
           mod.LoadedEntryPoints = true;
         }

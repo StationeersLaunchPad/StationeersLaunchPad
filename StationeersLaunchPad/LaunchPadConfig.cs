@@ -140,35 +140,35 @@ namespace StationeersLaunchPad
       {
         LoadState = LoadState.Initializing;
 
-        Logger.Global.Log("Initializing...");
+        Logger.Global.LogInfo("Initializing...");
         await UniTask.Run(() => Initialize());
 
-        Logger.Global.Log("Listing Local Mods");
+        Logger.Global.LogInfo("Listing Local Mods");
         await UniTask.Run(() => LoadLocalItems());
 
         if (!SteamDisabled)
         {
-          Logger.Global.Log("Listing Workshop Mods");
+          Logger.Global.LogInfo("Listing Workshop Mods");
           await LoadWorkshopItems();
         }
 
-        Logger.Global.Log("Loading Mod Order");
+        Logger.Global.LogInfo("Loading Mod Order");
         await UniTask.Run(() => LoadConfig());
 
-        Logger.Global.Log("Listing Game Assemblies");
+        Logger.Global.LogInfo("Listing Game Assemblies");
         await UniTask.Run(() => LoadGameAssemblies());
 
-        Logger.Global.Log("Loading Details");
+        Logger.Global.LogInfo("Loading Details");
         await LoadDetails();
 
         SortByDeps();
 
-        Logger.Global.Log("Mod Config Initialized");
+        Logger.Global.LogInfo("Mod Config Initialized");
 
         if (CheckUpdate)
         {
           LoadState = LoadState.Updating;
-          Logger.Global.Log("Checking Version");
+          Logger.Global.LogInfo("Checking Version");
           await LaunchPadUpdater.CheckVersion();
         }
 

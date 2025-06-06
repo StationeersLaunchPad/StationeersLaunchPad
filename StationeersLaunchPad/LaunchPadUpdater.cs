@@ -44,7 +44,7 @@ namespace StationeersLaunchPad
 
       if (latestVersion <= currentVersion)
       {
-        Logger.Global.Log($"Plugin is up-to-date.");
+        Logger.Global.LogInfo($"Plugin is up-to-date.");
         return;
       }
 

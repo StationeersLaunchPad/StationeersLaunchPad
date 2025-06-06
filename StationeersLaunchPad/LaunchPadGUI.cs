@@ -72,9 +72,9 @@ namespace StationeersLaunchPad
         _ => "",
       }));
 
-      var logCount = Logger.Global.Lines.Count;
+      var logCount = Logger.Global.Buffer.Count;
       if (logCount > 0)
-        DrawLogLine(Logger.Global.Lines[logCount - 1]);
+        DrawLogLine(Logger.Global.Buffer[logCount - 1]);
       else
         Text("");
 
@@ -356,7 +356,7 @@ namespace StationeersLaunchPad
 
       var logger = Selected?.Loaded?.Logger ?? Logger.Global;
 
-      var logLines = logger.Lines;
+      var logLines = logger.Buffer;
       var totalCount = logLines.TotalCount;
       if (totalCount != LastLogCount)
       {
@@ -378,11 +378,8 @@ namespace StationeersLaunchPad
         TooltipText("Click to copy logs");
         if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
         {
-          var logText = new StringBuilder();
-          for (var i = 0; i < lineCount; i++)
-            logText.AppendLine(logLines[i].Text);
-          ImGui.SetClipboardText(logText.ToString());
-          logger.Log("Logs copied to clipboard");
+          logger.CopyToClipboard();
+          logger.LogInfo("Logs copied to clipboard");
         }
       }
 
@@ -391,12 +388,28 @@ namespace StationeersLaunchPad
 
     private static void DrawLogLine(LogLine line)
     {
-      if (line.Type == LogType.Log)
-        Text(line.Text);
-      else if (line.Type == LogType.Warning)
-        TextColored(Yellow, line.Text);
-      else
-        TextColored(Red, line.Text);
+      var text = line.ToString();
+      switch (line.Severity)
+      {
+        case LogSeverity.Debug:
+          TextDisabled(text);
+          break;
+        case LogSeverity.Information:
+          Text(text);
+          break;
+        case LogSeverity.Warning:
+          TextColored(Yellow, text);
+          break;
+        case LogSeverity.Error:
+          TextColored(Red, text);
+          break;
+        case LogSeverity.Exception:
+          TextColored(Red, text);
+          break;
+        case LogSeverity.Fatal:
+          TextColored(Red, text);
+          break;
+      }
     }
 
     private static void DrawConfig()
@@ -473,7 +486,6 @@ namespace StationeersLaunchPad
         }
         if (ImGui.Combo("##enumValue", ref index, names, names.Length))
         {
-          Logger.Global.Log($"{enumValue} {enumValue.GetType()} {values.GetValue(index)} {values.GetValue(index).GetType()}");
           entry.BoxedValue = values.GetValue(index);
           changed = true;
         }
