@@ -1,165 +1,115 @@
-using System;
-using System.Diagnostics;
+﻿using System;
 using UnityEngine;
-using Debug = UnityEngine.Debug;
 
 namespace StationeersLaunchPad
 {
   public class Logger
   {
-    public const int BUFFER_SIZE = 300;
-    public static readonly Logger Global = new();
-
-    public readonly string Prefix;
-    public readonly Logger Parent;
-    public readonly LineBuffer Lines = new(BUFFER_SIZE);
-
-    public Logger(string prefix = "", Logger parent = null)
+    public static Logger Global
     {
-      this.Prefix = prefix;
+      get; private set;
+    } = new Logger("Global");
+
+    public string Name
+    {
+      get; private set;
+    }
+
+    public Logger Parent
+    {
+      get; private set;
+    }
+
+    public LogBuffer Buffer
+    {
+      get; private set;
+    }
+
+    public bool IsGlobal => this.Parent == null;
+
+    public bool IsChild => this.Parent != null;
+
+    public Logger(string name = "", Logger parent = null)
+    {
+      this.Name = name;
       this.Parent = parent;
+      this.Buffer = new LogBuffer(this.Name, this.IsGlobal ? LogBuffer.DEFAULT_BUFFER_SIZE : 256);
     }
 
-    public void Log(string message, LogType logType = LogType.Log, bool logUnity = true)
+    public Logger(string name, LogBuffer buffer, Logger parent = null)
     {
-      this.Lines.AddLine(message, logType);
-      var fullMessage = $"{Prefix}{message}";
-      if (this.Parent != null)
-        this.Parent.Log(fullMessage, logType, logUnity);
-      else if (logUnity)
-        Debug.LogFormat(logType, LogOption.None, null, fullMessage);
+      this.Name = name;
+      this.Parent = parent;
+      this.Buffer = buffer;
     }
 
-    public void Log(string message)
+    public Logger CreateChild(string name) => new Logger(name, this);
+
+    public void CopyToClipboard() => this.Buffer.CopyToClipboard();
+
+    public void Clear() => this.Buffer.Clear();
+
+    public void Log(string message, LogSeverity logSeverity = LogSeverity.Information, bool unity = true)
     {
-      this.Log(message, LogType.Log, true);
+      this.Buffer.Add(message, logSeverity);
+
+      if (this.IsChild)
+        this.Parent?.Log(message, logSeverity, unity);
+      else if (unity)
+        this.LogUnity(message, logSeverity);
     }
 
-    public void LogDebug(string message) {
-      if (LaunchPadConfig.Debug)
-        this.Log(message, LogType.Log, true);
-    }
-
-    public void LogWarning(string message)
+    public void Log(Exception exception, bool unity = true)
     {
-      this.Log(message, LogType.Warning, true);
+      this.Buffer.Add(exception);
+
+      if (this.IsChild)
+        this.Parent?.Log(exception, unity);
+      else if (unity)
+        this.LogUnity(exception);
     }
 
-    public void LogError(string message)
+    public void LogUnity(string message, LogSeverity severity = LogSeverity.Information)
     {
-      this.Log(message, LogType.Error, true);
-    }
-
-    public void LogException(Exception ex, bool logUnity = true)
-    {
-      this.Lines.AddException(ex, "");
-      var parent = this.Parent;
-      var prefix = this.Prefix;
-      while (parent != null)
+      switch (severity)
       {
-        parent.Lines.AddException(ex, prefix);
-        prefix = parent.Prefix + prefix;
-        parent = parent.Parent;
+        default:
+        case LogSeverity.Debug:
+        case LogSeverity.Information:
+          this.LogUnity(message, LogType.Log);
+          break;
+        case LogSeverity.Warning:
+          this.LogUnity(message, LogType.Warning);
+          break;
+        case LogSeverity.Error:
+        case LogSeverity.Fatal:
+          this.LogUnity(message, LogType.Error);
+          break;
+        case LogSeverity.Exception:
+          this.LogUnity(message, LogType.Exception);
+          break;
       }
-      if (logUnity)
-        Debug.LogException(ex);
     }
 
-    public void LogFormat(LogType logType, string format, params object[] args)
-    {
-      this.Log(string.Format(format, args), logType, true);
-    }
+    public void LogUnity(string message, LogType logType = LogType.Log) => Debug.LogFormat(logType, LogOption.None, null, $"[{this.Name}]: {message}");
+    public void LogUnity(Exception exception) => Debug.LogException(exception);
+    public void LogUnityAssert(string message) => this.LogUnity(message, LogType.Assert);
+    public void LogUnityWarning(string message) => this.LogUnity(message, LogType.Warning);
+    public void LogUnityError(string message) => this.LogUnity(message, LogType.Error);
+    public void LogUnityException(Exception exception) => this.LogUnity(exception);
 
-    public void LogFormatSkip(LogType logType, string format, params object[] args)
-    {
-      this.Log(string.Format(format, args), logType, false);
-    }
+    public void LogDebug(string message, bool unity = true) => this.Log(message, LogSeverity.Debug, unity);
+    public void LogInfo(string message, bool unity = true) => this.Log(message, LogSeverity.Information, unity);
+    public void LogWarning(string message, bool unity = true) => this.Log(message, LogSeverity.Warning, unity);
+    public void LogError(string message, bool unity = true) => this.Log(message, LogSeverity.Error, unity);
+    public void LogException(Exception exception, bool unity = true) => this.Log(exception, unity);
+    public void LogFatal(string message, bool unity = true) => this.Log(message, LogSeverity.Fatal, unity);
 
-    public Logger WithPrefix(string prefix)
-    {
-      return new Logger($"{this.Prefix}{prefix}", this);
-    }
-
-    public class LineBuffer
-    {
-      private readonly object _lock = new();
-      private readonly LogLine[] lines;
-      public int Count { get; private set; }
-      public int TotalCount { get; private set; }
-      private int start = 0;
-      public LineBuffer(int bufferSize)
-      {
-        this.lines = new LogLine[bufferSize];
-      }
-
-      public void AddLine(string line, LogType logType)
-      {
-        var logLine = new LogLine
-        {
-          Text = line,
-          Type = logType,
-        };
-        lock (this._lock)
-        {
-          if (this.Count == this.lines.Length)
-          {
-            this.lines[this.start] = logLine;
-            this.start = (this.start + 1) % this.lines.Length;
-          }
-          else
-          {
-            this.lines[this.Count] = logLine;
-            this.Count++;
-          }
-          this.TotalCount++;
-        }
-      }
-
-      public void AddException(Exception ex, string prefix)
-      {
-        var stackTrace = (ex.StackTrace ?? "").Split('\n');
-        lock (this._lock)
-        {
-          this.AddLine($"{prefix}{ex.Message}", LogType.Exception);
-          foreach (var line in stackTrace)
-          {
-            this.AddLine($"{prefix}  {line.Trim()}", LogType.Exception);
-          }
-        }
-      }
-
-      public LogLine this[int index] => this.lines[(index + this.start) % this.lines.Length];
-    }
-  }
-
-  public class LogLine
-  {
-    public string Text;
-    public LogType Type;
-  }
-
-  public class LogWrapper : ILogHandler
-  {
-    public readonly ILogHandler Inner;
-    public LogWrapper(ILogHandler inner)
-    {
-      this.Inner = inner;
-    }
-
-    public void LogException(Exception exception, UnityEngine.Object context)
-    {
-      this.Inner.LogException(exception, context);
-      if (ModLoader.TryGetExecutingMod(out var mod))
-        mod.Logger.LogException(exception, false);
-      else if (ModLoader.TryGetStackTraceMod(new StackTrace(exception), out var mod2))
-        mod2.Logger.LogException(exception, false);
-    }
-
-    public void LogFormat(LogType logType, UnityEngine.Object context, string format, params object[] args)
-    {
-      this.Inner.LogFormat(logType, context, format, args);
-      if (ModLoader.TryGetExecutingMod(out var mod))
-        mod.Logger.LogFormatSkip(logType, format, args);
-    }
+    public void LogFormat(bool unity, LogSeverity severity, string format, params object[] args) => this.Log(string.Format(format, args), severity, unity);
+    public void LogDebugFormat(bool unity, string format, params object[] args) => this.LogFormat(unity, LogSeverity.Debug, format, args);
+    public void LogInfoFormat(bool unity, string format, params object[] args) => this.LogFormat(unity, LogSeverity.Information, format, args);
+    public void LogWarningFormat(bool unity, string format, params object[] args) => this.LogFormat(unity, LogSeverity.Warning, format, args);
+    public void LogErrorFormat(bool unity, string format, params object[] args) => this.LogFormat(unity, LogSeverity.Error, format, args);
+    public void LogFatalFormat(bool unity, string format, params object[] args) => this.LogFormat(unity, LogSeverity.Fatal, format, args);
   }
 }
