@@ -157,6 +157,8 @@ namespace StationeersLaunchPad
         var method = type?.GetMethod(DEFAULT_METHOD, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic, null, new Type[] { typeof(List<GameObject>) }, null);
         if (method == null || result.Contains((type, method)))
           failed = true;
+        else
+          result.Add((type, method));
 
         if (failed)
         {
