@@ -203,7 +203,42 @@ namespace StationeersLaunchPad
         var gameObj = new GameObject();
         GameObject.DontDestroyOnLoad(gameObj);
         var component = gameObj.AddComponent(type);
+        var componentType = component.GetType();
+
+        // we want to invoke first as config files may not be set
         method.Invoke(component, new object[] { this.Prefabs });
+
+        foreach (var member in componentType.GetMembers())
+        {
+          switch (member)
+          {
+            case FieldInfo fieldInfo:
+            {
+              if (fieldInfo.FieldType == typeof(ConfigFile))
+              {
+                var value = fieldInfo.GetValue(component);
+                if (value is ConfigFile config)
+                {
+                  config.SettingChanged += (_, _) => this.DirtyConfig();
+                  this.ConfigFiles.Add(config);
+                }
+              }
+            } break;
+            case PropertyInfo propertyInfo:
+            {
+              if (propertyInfo.PropertyType == typeof(ConfigFile))
+              {
+                var value = propertyInfo.GetValue(component);
+                if (value is ConfigFile config)
+                {
+                  config.SettingChanged += (_, _) => this.DirtyConfig();
+                  this.ConfigFiles.Add(config);
+                }
+              }
+            } break;
+          }
+        }
+
       }
 
       this.ConfigFiles.Sort((a, b) => a.ConfigFilePath.CompareTo(b.ConfigFilePath));
