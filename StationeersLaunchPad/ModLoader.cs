@@ -158,9 +158,7 @@ namespace StationeersLaunchPad
         if (method == null || result.Contains((type, method)))
           failed = true;
         else if (!failed)
-        {
           result.Add((type, method));
-        }
 
         if (failed)
         {
