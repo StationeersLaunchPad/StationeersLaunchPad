@@ -127,6 +127,18 @@ namespace StationeersLaunchPad
       return result;
     }
 
+    public static List<GameObject> FindExportSettingsPrefabEntrypoints(List<ExportSettings> exports)
+    {
+      var result = new List<GameObject>();
+      foreach (var exportSettings in exports)
+      {
+        var entryPrefab = exportSettings._startupPrefab;
+        if (entryPrefab != null && !result.Contains(entryPrefab))
+          result.Add(entryPrefab);
+      }
+      return result;
+    }
+
     public static List<Type> FindBepInExEntrypoints(List<Assembly> assemblies)
     {
       var result = new List<Type>();

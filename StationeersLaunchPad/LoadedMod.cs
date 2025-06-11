@@ -130,6 +130,8 @@ namespace StationeersLaunchPad
         if (this.SMEntryTypes.Count == 0)
           this.SMEntryTypes.AddRange(ModLoader.FindExportSettingsClassEntrypoints(this.Assemblies, this.Exports));
 
+        this.EntryPrefabs.AddRange(ModLoader.FindExportSettingsPrefabEntrypoints(this.Exports));
+
         this.BepInExEntryTypes.AddRange(ModLoader.FindBepInExEntrypoints(this.Assemblies));
         this.DefaultEntryTypes.AddRange(ModLoader.FindDefaultEntrypoints(this.Assemblies));
 
