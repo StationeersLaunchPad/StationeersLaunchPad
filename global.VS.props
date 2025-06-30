@@ -5,7 +5,8 @@
     <TargetFramework>net48</TargetFramework>
     <LangVersion>9.0</LangVersion>
     <OutputPath>$(SolutionDir)bin\$(Configuration)</OutputPath>
-    <StationeersDirectory>$(MSBuildProgramFiles32)\Steam\steamapps\common\Stationeers\</StationeersDirectory>
+    <StationeersDirectory>C:\steamcmd\steamapps\common\Stationeers Dedicated Server\</StationeersDirectory>
+    <StationeersLibDirectory>$(StationeersDirectory)\rocketstation_DedicatedServer_Data\Managed</StationeersLibDirectory>
     <UserDir>$(HOMEDRIVE)$(HOMEPATH)</UserDir>
     <MyStationeersDir>$(UserDir)\Documents\My Games\Stationeers\</MyStationeersDir>
     <PluginPath>$(StationeersDirectory)Bepinex\plugins\StationeersLaunchPad</PluginPath>

@@ -3,7 +3,7 @@
   <Import Project="$(SolutionDir)globalRefs.VS.props" />
   <PropertyGroup>
     <AssemblyName>StationeersLaunchPad</AssemblyName>
-    <IsServer>False</IsServer>
+    <IsServer>True</IsServer>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Compatibility\StationeersMods.Interface\StationeersMods.Interface.csproj" />
