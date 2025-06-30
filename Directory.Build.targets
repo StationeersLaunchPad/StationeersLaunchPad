@@ -1,5 +1,5 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Target Name="CopyToPlugins" AfterTargets="Build">
+  <!--<Target Name="CopyToPlugins" AfterTargets="Build">
     <ItemGroup>
       <InputFiles Include="$(OutputPath)$(AssemblyName).*" />
       <OutputFiles Include="$(PluginPath)/$(AssemblyName).*" />
@@ -14,5 +14,5 @@
     <Delete Files="%(OutputFiles.FullPath)" />
     <Message Text="%(CopyFiles.PrettySrc) -> %(CopyFiles.PrettyDest)" Importance="high" />
     <Copy SourceFiles="%(CopyFiles.FullPath)" DestinationFiles="%(CopyFiles.Dest)" />
-  </Target>
+  </Target>-->
 </Project>
