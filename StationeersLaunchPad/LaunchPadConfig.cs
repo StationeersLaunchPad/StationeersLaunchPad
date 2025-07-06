@@ -42,6 +42,7 @@ namespace StationeersLaunchPad
     public static ConfigEntry<LoadStrategyType> StrategyType;
     public static ConfigEntry<LoadStrategyMode> StrategyMode;
     public static ConfigEntry<bool> DisableSteam;
+    public static ConfigEntry<bool> PostUpdateCleanup;
     public static SortedConfigFile SortedConfig;
 
     public static SplashBehaviour SplashBehaviour;
@@ -164,6 +165,9 @@ namespace StationeersLaunchPad
         SortByDeps();
 
         Logger.Global.LogInfo("Mod Config Initialized");
+
+        if (CheckUpdate && PostUpdateCleanup.Value)
+          LaunchPadUpdater.RunPostUpdateCleanup();
 
         if (CheckUpdate)
         {

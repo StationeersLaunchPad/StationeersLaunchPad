@@ -32,13 +32,13 @@ namespace StationeersLaunchPad
     {
       if (Harmony.HasAnyPatches(pluginGuid))
         return;
-       LaunchPadConfig.DebugMode = this.Config.Bind(
-        new ConfigDefinition("Startup", "DebugMode"),
-        false,
-        new ConfigDescription(
-          "If you run into issues with loading mods, or anything else, please enable this for more verbosity in error reports"
-        )
-       );
+      LaunchPadConfig.DebugMode = this.Config.Bind(
+       new ConfigDefinition("Startup", "DebugMode"),
+       false,
+       new ConfigDescription(
+         "If you run into issues with loading mods, or anything else, please enable this for more verbosity in error reports"
+       )
+      );
       LaunchPadConfig.AutoLoadOnStart = this.Config.Bind(
         new ConfigDefinition("Startup", "AutoLoadOnStart"),
         true,
@@ -92,11 +92,20 @@ namespace StationeersLaunchPad
       LaunchPadConfig.StrategyMode = this.Config.Bind(
         new ConfigDefinition("Mod Loading", "LoadStrategyMode"),
         LoadStrategyMode.Serial,
-         new ConfigDescription(
+        new ConfigDescription(
           "Parallel mode loads faster for a large number of mods, but may fail in extremely rare cases. Switch to serial mode if running into loading issues."
         )
       );
-      LaunchPadConfig.SortedConfig = new SortedConfigFile(this.Config);
+      LaunchPadConfig.PostUpdateCleanup = this.Config.Bind(
+        new ConfigDefinition("Internal", "PostUpdateCleanup"),
+        true,
+        new ConfigDescription(
+          "This setting is automatically managed and should probably not be manually changed. Remove update backup files on start."
+        )
+      );
+      var sortedConfig = new SortedConfigFile(this.Config);
+      sortedConfig.Categories.Remove(sortedConfig.Categories.Find(cat => cat.Category == "Internal"));
+      LaunchPadConfig.SortedConfig = sortedConfig;
 
       var harmony = new Harmony(pluginGuid);
       harmony.PatchAll();
@@ -277,6 +286,5 @@ namespace StationeersLaunchPad
 
       return false;
     }
-    
   }
 }
