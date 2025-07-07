@@ -1,0 +1,31 @@
+<Project>
+  <Target Name="AfterSolution" AfterTargets="Build">
+    <Exec Command="git describe --tags --dirty" ConsoleToMSBuild="true" StandardOutputImportance="Low">
+      <Output TaskParameter="ConsoleOutput" PropertyName="BuildTag" />
+    </Exec>
+    <PropertyGroup>
+      <BuildDir>$(SolutionDir)build\</BuildDir>
+      <ZipSrcDir>$(BuildDir)contents\</ZipSrcDir>
+      <CopyTargetDir>$(ZipSrcDir)StationeersLaunchPad\</CopyTargetDir>
+      <ServerBuildZip>$(BuildDir)StationeersLaunchPad-server-$(BuildTag).zip</ServerBuildZip>
+      <ClientBuildZip>$(BuildDir)StationeersLaunchPad-$(BuildTag).zip</ClientBuildZip>
+    </PropertyGroup>
+    <ItemGroup>
+      <BuildFiles Include="@(CollectedBuildOutput)">
+        <CopyDest>$(CopyTargetDir)%(Filename)%(Extension)</CopyDest>
+        <IncludeInClient>true</IncludeInClient>
+        <IncludeInClient Condition=" '%(Filename)' == 'RG.ImGui' ">false</IncludeInClient>
+      </BuildFiles>
+      <SharedFiles Include="@(BuildFiles)" Condition=" '%(IncludeInClient)' == 'true' " />
+      <ServerOnlyFiles Include="@(BuildFiles)" Condition=" '%(IncludeInClient)' == 'false' " />
+      <ExistingZips Include="$(BuildDir)*.zip" />
+    </ItemGroup>
+    <Delete Files="%(ExistingZips.Identity)" />
+    <RemoveDir Directories="$(ZipSrcDir)" />
+    <Copy SourceFiles="%(SharedFiles.Identity)" DestinationFiles="%(SharedFiles.CopyDest)" />
+    <ZipDirectory DestinationFile="$(ClientBuildZip)" SourceDirectory="$(ZipSrcDir)" />
+    <Copy SourceFiles="%(ServerOnlyFiles.Identity)" DestinationFiles="%(ServerOnlyFiles.CopyDest)" />
+    <ZipDirectory DestinationFile="$(ServerBuildZip)" SourceDirectory="$(ZipSrcDir)" />
+    <RemoveDir Directories="$(ZipSrcDir)" />
+  </Target>
+</Project>
