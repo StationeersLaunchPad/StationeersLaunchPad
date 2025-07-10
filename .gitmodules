@@ -1,0 +1,3 @@
+[submodule "LaunchPadBooster"]
+	path = LaunchPadBooster
+	url = https://github.com/StationeersLaunchPad/LaunchPadBooster

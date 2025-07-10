@@ -8,6 +8,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RG.ImGui", "Compatibility/R
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StationeersLaunchPad", "StationeersLaunchPad/StationeersLaunchPad.csproj", "{99aa5fa7-3c70-4213-ada2-d6d745c38ac1}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LaunchPadBooster", "LaunchPadBooster/LaunchPadBooster/LaunchPadBooster.csproj", "{9544610a-20e3-4bb0-93c6-6f11701cca5d}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -30,5 +32,9 @@ Global
 		{99aa5fa7-3c70-4213-ada2-d6d745c38ac1}.Release|Any CPU.Build.0 = Release|Any CPU
 		{99aa5fa7-3c70-4213-ada2-d6d745c38ac1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{99aa5fa7-3c70-4213-ada2-d6d745c38ac1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9544610a-20e3-4bb0-93c6-6f11701cca5d}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9544610a-20e3-4bb0-93c6-6f11701cca5d}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9544610a-20e3-4bb0-93c6-6f11701cca5d}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9544610a-20e3-4bb0-93c6-6f11701cca5d}.Debug|Any CPU.Build.0 = Debug|Any CPU
 	EndGlobalSection
 EndGlobal
