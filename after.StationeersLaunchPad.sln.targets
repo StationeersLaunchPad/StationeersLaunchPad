@@ -7,25 +7,38 @@
       <BuildDir>$(SolutionDir)build\</BuildDir>
       <ZipSrcDir>$(BuildDir)contents\</ZipSrcDir>
       <CopyTargetDir>$(ZipSrcDir)StationeersLaunchPad\</CopyTargetDir>
+      <CompatBuildZip>$(BuildDir)StationeersLaunchPad-$(BuildTag).zip</CompatBuildZip>
+      <ClientBuildZip>$(BuildDir)StationeersLaunchPad-client-$(BuildTag).zip</ClientBuildZip>
       <ServerBuildZip>$(BuildDir)StationeersLaunchPad-server-$(BuildTag).zip</ServerBuildZip>
-      <ClientBuildZip>$(BuildDir)StationeersLaunchPad-$(BuildTag).zip</ClientBuildZip>
     </PropertyGroup>
     <ItemGroup>
       <BuildFiles Include="@(CollectedBuildOutput)">
         <CopyDest>$(CopyTargetDir)%(Filename)%(Extension)</CopyDest>
-        <IncludeInClient>true</IncludeInClient>
-        <IncludeInClient Condition=" '%(Filename)' == 'RG.ImGui' ">false</IncludeInClient>
+        <IncludeCompat>true</IncludeCompat>
+        <IncludeCompat Condition=" '%(Filename)' == 'RG.ImGui' ">false</IncludeCompat>
+        <IncludeCompat Condition=" '%(Filename)' == 'LaunchPadBooster' ">false</IncludeCompat>
+        <IncludeClient>true</IncludeClient>
+        <IncludeClient Condition=" '%(Filename)' == 'RG.ImGui' ">false</IncludeClient>
       </BuildFiles>
-      <SharedFiles Include="@(BuildFiles)" Condition=" '%(IncludeInClient)' == 'true' " />
-      <ServerOnlyFiles Include="@(BuildFiles)" Condition=" '%(IncludeInClient)' == 'false' " />
+      <CompatFiles Include="@(BuildFiles)" Condition=" '%(IncludeCompat)' == 'true' " />
+      <ClientFiles Include="@(BuildFiles)" Condition=" '%(IncludeClient)' == 'true' " />
+      <ServerFiles Include="@(BuildFiles)" />
       <ExistingZips Include="$(BuildDir)*.zip" />
     </ItemGroup>
     <Delete Files="%(ExistingZips.Identity)" />
+    <!-- build compat zip -->
     <RemoveDir Directories="$(ZipSrcDir)" />
-    <Copy SourceFiles="%(SharedFiles.Identity)" DestinationFiles="%(SharedFiles.CopyDest)" />
+    <Copy SourceFiles="%(CompatFiles.Identity)" DestinationFiles="%(CompatFiles.CopyDest)" />
+    <ZipDirectory DestinationFile="$(CompatBuildZip)" SourceDirectory="$(ZipSrcDir)" />
+    <!-- build client zip -->
+    <RemoveDir Directories="$(ZipSrcDir)" />
+    <Copy SourceFiles="%(ClientFiles.Identity)" DestinationFiles="%(ClientFiles.CopyDest)" />
     <ZipDirectory DestinationFile="$(ClientBuildZip)" SourceDirectory="$(ZipSrcDir)" />
-    <Copy SourceFiles="%(ServerOnlyFiles.Identity)" DestinationFiles="%(ServerOnlyFiles.CopyDest)" />
+    <!-- build server zip -->
+    <RemoveDir Directories="$(ZipSrcDir)" />
+    <Copy SourceFiles="%(ServerFiles.Identity)" DestinationFiles="%(ServerFiles.CopyDest)" />
     <ZipDirectory DestinationFile="$(ServerBuildZip)" SourceDirectory="$(ZipSrcDir)" />
+    <!-- cleanup -->
     <RemoveDir Directories="$(ZipSrcDir)" />
   </Target>
 </Project>

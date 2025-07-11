@@ -18,7 +18,7 @@ namespace StationeersLaunchPad
     private static List<UpdateAction> UpdateActions = new();
 
     private static string PluginPath => Path.Combine(Paths.PluginPath, "StationeersLaunchPad");
-    private static string TargetAssetName(Github.Release release) => GameManager.IsBatchMode ? $"StationeersLaunchPad-server-{release.TagName}.zip" : $"StationeersLaunchPad-{release.TagName}.zip";
+    private static string TargetAssetName(Github.Release release) => $"StationeersLaunchPad-{(GameManager.IsBatchMode ? "server" : "client")}-{release.TagName}.zip";
 
     public static void RunPostUpdateCleanup()
     {
@@ -41,7 +41,7 @@ namespace StationeersLaunchPad
         LaunchPadConfig.OneTimeBoosterInstall.Value = false;
         return;
       }
-      var targetTag = $"v{LaunchPadPlugin.pluginVersion}";
+      var targetTag = $"v{LaunchPadPlugin.pluginVersion}-dev";
       Logger.Global.Log($"Installing LaunchPadBooster from release {targetTag}");
       var release = await Github.FetchTagRelease(targetTag);
       if (release == null)
