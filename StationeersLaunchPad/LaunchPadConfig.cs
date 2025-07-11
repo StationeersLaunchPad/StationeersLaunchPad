@@ -42,8 +42,9 @@ namespace StationeersLaunchPad
     public static ConfigEntry<LoadStrategyType> StrategyType;
     public static ConfigEntry<LoadStrategyMode> StrategyMode;
     public static ConfigEntry<bool> DisableSteam;
-    public static ConfigEntry<bool> PostUpdateCleanup;
     public static ConfigEntry<string> SavePathOverride;
+    public static ConfigEntry<bool> PostUpdateCleanup;
+    public static ConfigEntry<bool> OneTimeBoosterInstall;
     public static SortedConfigFile SortedConfig;
 
     public static SplashBehaviour SplashBehaviour;
@@ -171,6 +172,9 @@ namespace StationeersLaunchPad
         if (CheckUpdate && PostUpdateCleanup.Value)
           LaunchPadUpdater.RunPostUpdateCleanup();
 
+        if (CheckUpdate && OneTimeBoosterInstall.Value)
+          await LaunchPadUpdater.RunOneTimeBoosterInstall();
+
         if (CheckUpdate)
         {
           LoadState = LoadState.Updating;
@@ -276,7 +280,7 @@ namespace StationeersLaunchPad
           continue;
         }
 
-        var modPath = (string)modcfg.DirectoryPath;
+        var modPath = (string) modcfg.DirectoryPath;
         if (!Path.IsPathRooted(modPath))
           modPath = Path.Combine(localBasePath, modPath);
 
@@ -450,8 +454,10 @@ namespace StationeersLaunchPad
       }
       foreach (var mod in Mods)
       {
-        if (!mod.Enabled) continue;
-        if (mod.Source == ModSource.Core) continue;
+        if (!mod.Enabled)
+          continue;
+        if (mod.Source == ModSource.Core)
+          continue;
         bool missingDeps = false;
         foreach (var dep in mod.About.Dependencies ?? new())
           if (!modsById.ContainsKey(dep.Id))
@@ -513,7 +519,8 @@ namespace StationeersLaunchPad
       var foundCircular = false;
       foreach (var mod in Mods)
       {
-        if (!mod.Enabled) continue;
+        if (!mod.Enabled)
+          continue;
 
         if (checkCircular(mod.SortIndex))
         {
@@ -558,7 +565,8 @@ namespace StationeersLaunchPad
         var progress = false;
         foreach (var mod in Mods)
         {
-          if (added[mod.SortIndex]) continue;
+          if (added[mod.SortIndex])
+            continue;
           if (!mod.Enabled || areDepsAdded(mod.SortIndex))
           {
             added[mod.SortIndex] = true;
@@ -625,7 +633,7 @@ namespace StationeersLaunchPad
     private static void StartGame()
     {
       LoadState = LoadState.GameRunning;
-      var co = (IEnumerator)typeof(SplashBehaviour).GetMethod("AwakeCoroutine", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(SplashBehaviour, new object[] { });
+      var co = (IEnumerator) typeof(SplashBehaviour).GetMethod("AwakeCoroutine", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(SplashBehaviour, new object[] { });
       SplashBehaviour.StartCoroutine(co);
       LaunchPadGUI.IsActive = false;
     }
@@ -640,7 +648,8 @@ namespace StationeersLaunchPad
           var config = new ModConfig();
           foreach (var mod in Mods)
           {
-            if (!mod.Enabled) continue;
+            if (!mod.Enabled)
+              continue;
             if (mod.Source == ModSource.Core)
             {
               config.Mods.Add(new CoreModData());

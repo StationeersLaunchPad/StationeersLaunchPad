@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using UnityEngine;
 
 namespace StationeersLaunchPad
@@ -17,6 +18,7 @@ namespace StationeersLaunchPad
     private static List<UpdateAction> UpdateActions = new();
 
     private static string PluginPath => Path.Combine(Paths.PluginPath, "StationeersLaunchPad");
+    private static string TargetAssetName(Github.Release release) => GameManager.IsBatchMode ? $"StationeersLaunchPad-server-{release.TagName}.zip" : $"StationeersLaunchPad-{release.TagName}.zip";
 
     public static void RunPostUpdateCleanup()
     {
@@ -27,6 +29,50 @@ namespace StationeersLaunchPad
         File.Delete(Path.Combine(PluginPath, file));
       }
       LaunchPadConfig.PostUpdateCleanup.Value = false;
+    }
+
+    public static async UniTask RunOneTimeBoosterInstall()
+    {
+      const string boosterName = "LaunchPadBooster.dll";
+      var boosterPath = Path.Combine(PluginPath, boosterName);
+      if (File.Exists(boosterPath))
+      {
+        // if file exists, this is a full install so nothing to do
+        LaunchPadConfig.OneTimeBoosterInstall.Value = false;
+        return;
+      }
+      var targetTag = $"v{LaunchPadPlugin.pluginVersion}-dev";
+      Logger.Global.Log($"Installing LaunchPadBooster from release {targetTag}");
+      var release = await Github.FetchTagRelease(targetTag);
+      if (release == null)
+      {
+        LaunchPadConfig.AutoLoad = false;
+        Logger.Global.LogError("Installation incomplete. Please download latest version from github.");
+        return;
+      }
+
+      var assetName = TargetAssetName(release);
+      var asset = release.Assets.Find(asset => asset.Name == assetName);
+      if (asset == null)
+      {
+        LaunchPadConfig.AutoLoad = false;
+        Logger.Global.LogError($"Failed to find {assetName} in release. Installation incomplete. Please download latest version from github.");
+        return;
+      }
+
+      using (var archive = await Github.FetchZipArchive(asset))
+      {
+        var entry = archive.Entries.First(entry => entry.Name == boosterName);
+        if (entry == null)
+        {
+          Logger.Global.LogError($"Failed to find {boosterName} in {assetName}. Installation incomplete. Please download latest version from github.");
+          LaunchPadConfig.AutoLoad = false;
+          return;
+        }
+        entry.ExtractToFile(boosterPath);
+      }
+
+      LaunchPadConfig.OneTimeBoosterInstall.Value = false;
     }
 
     public static async UniTask CheckVersion()
@@ -95,7 +141,7 @@ namespace StationeersLaunchPad
 
     private static async UniTask PerformUpdate(Github.Release release)
     {
-      var assetName = GameManager.IsBatchMode ? $"StationeersLaunchPad-server-{release.TagName}.zip" : $"StationeersLaunchPad-{release.TagName}.zip";
+      var assetName = TargetAssetName(release);
       var asset = release.Assets.Find(a => a.Name == assetName);
       if (asset == null)
       {

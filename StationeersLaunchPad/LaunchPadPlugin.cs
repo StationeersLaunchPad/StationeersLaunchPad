@@ -1,5 +1,4 @@
 using Assets.Scripts;
-using Assets.Scripts.Localization2;
 using Assets.Scripts.Networking.Transports;
 using Assets.Scripts.Serialization;
 using Assets.Scripts.UI;
@@ -9,10 +8,8 @@ using Cysharp.Threading.Tasks;
 using HarmonyLib;
 using Steamworks;
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
-using System.Text;
 using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
@@ -27,7 +24,7 @@ namespace StationeersLaunchPad
   {
     public const string pluginGuid = "stationeers.launchpad";
     public const string pluginName = "StationeersLaunchPad";
-    public const string pluginVersion = "0.1.16";
+    public const string pluginVersion = "0.2.0";
 
     void Awake()
     {
@@ -97,6 +94,13 @@ namespace StationeersLaunchPad
           "Parallel mode loads faster for a large number of mods, but may fail in extremely rare cases. Switch to serial mode if running into loading issues."
         )
       );
+      LaunchPadConfig.SavePathOverride = this.Config.Bind(
+        new ConfigDefinition("Mod Loading", "SavePathOverride"),
+        "",
+        new ConfigDescription(
+          "This setting allows you to override the default path that config and save files are stored. Notice, due to how this path is implemented in the base game, this setting can only be applied on server start.  Changing it while in game will not have an effect until after a restart."
+        )
+      );
       LaunchPadConfig.PostUpdateCleanup = this.Config.Bind(
         new ConfigDefinition("Internal", "PostUpdateCleanup"),
         true,
@@ -104,11 +108,13 @@ namespace StationeersLaunchPad
           "This setting is automatically managed and should probably not be manually changed. Remove update backup files on start."
         )
       );
-      
-      LaunchPadConfig.SavePathOverride = this.Config.Bind<string>(
-        new ConfigDefinition("Mod Loading", "SavePathOverride"), null, 
-        new ConfigDescription("This setting allows you to override the default path that config and save files are stored. Notice, due to how this path is implemented in the base game, this setting can only be applied on server start.  Changing it while in game will not have an effect until after a restart.")
-        );
+      LaunchPadConfig.OneTimeBoosterInstall = this.Config.Bind(
+        new ConfigDefinition("Internal", "OneTimeBoosterInstall"),
+        true,
+        new ConfigDescription(
+          "This setting is automatically managed and should probably not be manually changed. Perform one-time download of LaunchPadBooster to update from version that didn't include it."
+        )
+      );
 
       var sortedConfig = new SortedConfigFile(this.Config);
       sortedConfig.Categories.Remove(sortedConfig.Categories.Find(cat => cat.Category == "Internal"));
