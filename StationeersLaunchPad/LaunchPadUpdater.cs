@@ -41,7 +41,7 @@ namespace StationeersLaunchPad
         LaunchPadConfig.OneTimeBoosterInstall.Value = false;
         return;
       }
-      var targetTag = $"v{LaunchPadPlugin.pluginVersion}-dev";
+      var targetTag = $"v{LaunchPadPlugin.pluginVersion}";
       Logger.Global.Log($"Installing LaunchPadBooster from release {targetTag}");
       var release = await Github.FetchTagRelease(targetTag);
       if (release == null)
