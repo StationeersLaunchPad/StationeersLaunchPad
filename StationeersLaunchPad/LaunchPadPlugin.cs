@@ -3,6 +3,7 @@ using Assets.Scripts.Networking.Transports;
 using Assets.Scripts.Serialization;
 using Assets.Scripts.UI;
 using BepInEx;
+using BepInEx.Bootstrap;
 using BepInEx.Configuration;
 using Cysharp.Threading.Tasks;
 using HarmonyLib;
@@ -101,6 +102,20 @@ namespace StationeersLaunchPad
           "This setting allows you to override the default path that config and save files are stored. Notice, due to how this path is implemented in the base game, this setting can only be applied on server start.  Changing it while in game will not have an effect until after a restart."
         )
       );
+      LaunchPadConfig.AutoScrollLogs = this.Config.Bind(
+        new ConfigDefinition("Logging", "AutoScrollLogs"),
+        true,
+        new ConfigDescription(
+          "This setting will automatically scroll when new lines are present if enabled."
+        )
+      );
+      LaunchPadConfig.LogSeverities = this.Config.Bind(
+        new ConfigDefinition("Logging", "LogSeverities"),
+        LogSeverity.All,
+        new ConfigDescription(
+          "This setting will filter what log severities will appear in the logging window."
+        )
+      );
       LaunchPadConfig.PostUpdateCleanup = this.Config.Bind(
         new ConfigDefinition("Internal", "PostUpdateCleanup"),
         true,
@@ -116,9 +131,7 @@ namespace StationeersLaunchPad
         )
       );
 
-      var sortedConfig = new SortedConfigFile(this.Config);
-      sortedConfig.Categories.Remove(sortedConfig.Categories.Find(cat => cat.Category == "Internal"));
-      LaunchPadConfig.SortedConfig = sortedConfig;
+      LaunchPadConfig.SortedConfig = new SortedConfigFile(this.Config);
 
       var harmony = new Harmony(pluginGuid);
       harmony.PatchAll();
@@ -146,16 +159,33 @@ namespace StationeersLaunchPad
       return false;
     }
 
+    [HarmonyPatch(typeof(GameManager), nameof(GameManager.ManagerUpdate))]
+    static void MonoBehaviourDraw()
+    {
+     
+    }
+
     [HarmonyPatch(typeof(SplashBehaviour), nameof(SplashBehaviour.Draw)), HarmonyPrefix]
     static bool SplashDraw()
     {
-      if (LaunchPadGUI.IsActive)
-        LaunchPadGUI.DrawPreload();
+      if (GameManager.IsBatchMode)
+        return true;
+
+      if (LaunchPadLoader.IsActive)
+        LaunchPadLoader.Draw();
+
+      if (LaunchPadConsole.IsActive)
+        LaunchPadConsole.Draw();
+
+      if (LaunchPadConfig.IsActive)
+        LaunchPadConfig.Draw();
 
       if (LaunchPadAlertGUI.IsActive)
-        LaunchPadAlertGUI.DrawAlert();
+        LaunchPadAlertGUI.Draw();
 
-      return !LaunchPadGUI.IsActive && !LaunchPadAlertGUI.IsActive;
+      LaunchPadLoader.IsActive = LaunchPadConfig.LoadState != LoadState.Running;
+
+      return !LaunchPadLoader.IsActive && !LaunchPadConsole.IsActive && !LaunchPadConfig.IsActive && !LaunchPadAlertGUI.IsActive;
     }
 
     [HarmonyPatch(typeof(WorldManager), "LoadDataFiles"), HarmonyPostfix]
@@ -237,10 +267,7 @@ namespace StationeersLaunchPad
         publishButton.SetText("Update");
 
       var modIGDescription = modAbout.InGameDescription?.Value;
-      if (!string.IsNullOrEmpty(modIGDescription))
-        __instance.DescriptionText.text = modIGDescription;
-      else
-        __instance.DescriptionText.text = TextFormatting.SteamToTMP(modAbout.Description);
+      __instance.DescriptionText.text = !string.IsNullOrEmpty(modIGDescription) ? modIGDescription : TextFormatting.SteamToTMP(modAbout.Description);
     }
 
     [HarmonyPatch(typeof(WorkshopMenu), nameof(WorkshopMenu.ManagerAwake)), HarmonyPostfix]
@@ -249,6 +276,7 @@ namespace StationeersLaunchPad
       var handler = __instance.DescriptionText.gameObject.AddComponent<WorkshopMenuLinkHandler>();
       handler.DescriptionText = __instance.DescriptionText;
     }
+
     private class WorkshopMenuLinkHandler : MonoBehaviour, IPointerClickHandler
     {
       public TextMeshProUGUI DescriptionText;
@@ -267,11 +295,19 @@ namespace StationeersLaunchPad
     [HarmonyPatch(typeof(OrbitalSimulation), nameof(OrbitalSimulation.Draw)), HarmonyPrefix]
     static void WorkshopMenuDrawConfig()
     {
+      if (LaunchPadConsole.IsActive)
+        LaunchPadConsole.Draw();
+
+      if (LaunchPadConfig.IsActive)
+        LaunchPadConfig.Draw();
+
+      if (LaunchPadAlertGUI.IsActive)
+        LaunchPadAlertGUI.Draw();
+
       if (!WorkshopMenu.Instance.isActiveAndEnabled)
         return;
 
-      if (workshopMenuSelectedField == null)
-        workshopMenuSelectedField = typeof(WorkshopMenu).GetField("_selectedModItem", BindingFlags.Instance | BindingFlags.NonPublic);
+      workshopMenuSelectedField ??= typeof(WorkshopMenu).GetField("_selectedModItem", BindingFlags.Instance | BindingFlags.NonPublic);
 
       var selectedModItem = workshopMenuSelectedField.GetValue(WorkshopMenu.Instance) as WorkshopModListItem;
       if (selectedModItem == null)
@@ -281,7 +317,7 @@ namespace StationeersLaunchPad
       if (modData == null)
         return;
 
-      LaunchPadGUI.DrawMenuConfig(modData);
+      LaunchPadConfig.DrawWorkshopConfig(modData);
     }
 
     [HarmonyPatch(typeof(SteamClient), nameof(SteamClient.Init)), HarmonyPrefix]
@@ -302,7 +338,7 @@ namespace StationeersLaunchPad
 
     [HarmonyPatch(typeof(StationSaveUtils), nameof(StationSaveUtils.DefaultPath), MethodType.Getter), HarmonyPrefix]
     static bool StationSaveUtils_DefaultPath(ref string __result)
-    {      
+    {
       if (string.IsNullOrEmpty(LaunchPadConfig.SavePath))
       {
         return true;
@@ -315,7 +351,6 @@ namespace StationeersLaunchPad
             StationSaveUtils.ExeDirectory.FullName,
           LaunchPadConfig.SavePath);
       return false;
-  }
-    
+    }
   }
 }

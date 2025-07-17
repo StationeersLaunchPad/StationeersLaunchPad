@@ -1,6 +1,11 @@
 using Assets.Scripts;
 using Assets.Scripts.Networking.Transports;
 using Assets.Scripts.Serialization;
+using Assets.Scripts.Util;
+using BepInEx;
+using BepInEx.Configuration;
+using Cysharp.Threading.Tasks;
+using ImGuiNET;
 using Mono.Cecil;
 using Steamworks;
 using Steamworks.Ugc;
@@ -13,22 +18,23 @@ using System.IO.Compression;
 using System.Linq;
 using System.Reflection;
 using System.Xml.Serialization;
-using Assets.Scripts.Util;
-using BepInEx;
-using BepInEx.Configuration;
-using Cysharp.Threading.Tasks;
+using UI.ImGuiUi;
 using UnityEngine;
+using static UnityEngine.EventSystems.EventTrigger;
 
 namespace StationeersLaunchPad
 {
   public enum LoadState
   {
     Initializing,
+    Searching,
     Updating,
     Configuring,
-    ModsLoading,
-    ModsLoaded,
-    GameRunning
+    Loading,
+    Loaded,
+    Running,
+    Updated,
+    Failed,
   }
 
   public static class LaunchPadConfig
@@ -45,6 +51,9 @@ namespace StationeersLaunchPad
     public static ConfigEntry<string> SavePathOverride;
     public static ConfigEntry<bool> PostUpdateCleanup;
     public static ConfigEntry<bool> OneTimeBoosterInstall;
+    public static ConfigEntry<bool> AutoScrollLogs;
+    public static ConfigEntry<LogSeverity> LogSeverities;
+
     public static SortedConfigFile SortedConfig;
 
     public static SplashBehaviour SplashBehaviour;
@@ -62,6 +71,8 @@ namespace StationeersLaunchPad
     public static bool AutoLoad = true;
     public static bool HasUpdated = false;
     public static bool SteamDisabled = false;
+    public static bool AutoScroll = false;
+    public static LogSeverity Severities;
     public static string SavePath;
     public static Stopwatch AutoStopwatch = new();
     public static Stopwatch ElapsedStopwatch = new();
@@ -76,6 +87,8 @@ namespace StationeersLaunchPad
       LoadStrategyType = StrategyType.Value;
       LoadStrategyMode = StrategyMode.Value;
       SavePath = SavePathOverride.Value;
+      AutoScroll = AutoScrollLogs.Value;
+      Severities = LogSeverities.Value;
 
       // we need to wait a frame so all the RuntimeInitializeOnLoad tasks are complete, otherwise GameManager.IsBatchMode won't be set yet
       await UniTask.Yield();
@@ -120,19 +133,17 @@ namespace StationeersLaunchPad
       }
 
       AutoStopwatch.Restart();
-
       while (LoadState == LoadState.Configuring && (!AutoLoad || AutoStopwatch.Elapsed.TotalSeconds < AutoLoadWaitTime.Value))
         await UniTask.Yield();
 
       if (LoadState == LoadState.Configuring)
-        LoadState = LoadState.ModsLoading;
+        LoadState = LoadState.Loading;
 
-      if (LoadState == LoadState.ModsLoading)
+      if (LoadState == LoadState.Loading)
         await LoadMods();
 
       AutoStopwatch.Restart();
-
-      while (LoadState == LoadState.ModsLoaded && (!AutoLoad || AutoStopwatch.Elapsed.TotalSeconds < AutoLoadWaitTime.Value))
+      while (LoadState == LoadState.Loaded && (!AutoLoad || AutoStopwatch.Elapsed.TotalSeconds < AutoLoadWaitTime.Value))
         await UniTask.Yield();
 
       StartGame();
@@ -146,6 +157,8 @@ namespace StationeersLaunchPad
 
         Logger.Global.LogInfo("Initializing...");
         await UniTask.Run(() => Initialize());
+
+        LoadState = LoadState.Searching;
 
         Logger.Global.LogInfo("Listing Local Mods");
         await UniTask.Run(() => LoadLocalItems());
@@ -178,6 +191,7 @@ namespace StationeersLaunchPad
         if (CheckUpdate)
         {
           LoadState = LoadState.Updating;
+
           Logger.Global.LogInfo("Checking Version");
           await LaunchPadUpdater.CheckVersion();
         }
@@ -192,7 +206,7 @@ namespace StationeersLaunchPad
           Logger.Global.LogException(ex);
 
           Mods = new();
-          LoadState = LoadState.ModsLoaded;
+          LoadState = LoadState.Failed;
           AutoLoad = false;
         }
         else
@@ -614,7 +628,7 @@ namespace StationeersLaunchPad
     private async static UniTask LoadMods()
     {
       ElapsedStopwatch.Restart();
-      LoadState = LoadState.ModsLoading;
+      LoadState = LoadState.Loading;
 
       LoadStrategy loadStrategy = (LoadStrategyType, LoadStrategyMode) switch
       {
@@ -627,15 +641,19 @@ namespace StationeersLaunchPad
       ElapsedStopwatch.Stop();
       Logger.Global.LogWarning($"Took {ElapsedStopwatch.Elapsed.ToString(@"m\:ss\.fff")} to load mods.");
 
-      LoadState = LoadState.ModsLoaded;
+      LoadState = LoadState.Loaded;
     }
 
     private static void StartGame()
     {
-      LoadState = LoadState.GameRunning;
+      LoadState = LoadState.Running;
       var co = (IEnumerator) typeof(SplashBehaviour).GetMethod("AwakeCoroutine", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(SplashBehaviour, new object[] { });
       SplashBehaviour.StartCoroutine(co);
-      LaunchPadGUI.IsActive = false;
+
+      IsActive = false;
+      LaunchPadLoader.IsActive = false;
+      LaunchPadConsole.IsActive = false;
+      LaunchPadAlertGUI.IsActive = false;
     }
 
     public static void ExportModPackage()
@@ -679,6 +697,698 @@ namespace StationeersLaunchPad
       {
         Logger.Global.LogException(ex);
       }
+    }
+
+    public static bool IsActive = false;
+
+    public static void Draw()
+    {
+      ImGuiHelper.Draw(() => DrawConfigEditor());
+    }
+
+    public static bool ConfigChanged = false;
+    private static ModInfo draggingMod = null;
+    private static int draggingIndex = -1;
+    public static void DrawConfigTable(bool edit = false)
+    {
+      if (!ImGui.IsMouseDown(ImGuiMouseButton.Left))
+        draggingMod = null;
+
+      var hoveringIndex = -1;
+      if (draggingMod != null)
+        draggingIndex = Mods.IndexOf(draggingMod);
+
+      if (!edit)
+        ImGui.BeginDisabled();
+
+      if (ImGui.BeginTable("##configtable", 3, ImGuiTableFlags.SizingFixedFit))
+      {
+        ImGui.TableSetupColumn("##enabled");
+        ImGui.TableSetupColumn("##type");
+        ImGui.TableSetupColumn("##name", ImGuiTableColumnFlags.WidthStretch);
+
+        for (var i = 0; i < Mods.Count; i++)
+        {
+          var mod = Mods[i];
+
+          ImGui.TableNextRow();
+          ImGui.PushID(i);
+          ImGui.TableNextColumn();
+
+          if (ImGui.Checkbox("Enabled", ref mod.Enabled))
+            ConfigChanged = true;
+
+          ImGui.TableNextColumn();
+          ImGui.Selectable($"##rowdrag", mod == draggingMod, ImGuiSelectableFlags.SpanAllColumns);
+          if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenBlockedByActiveItem) && ImGui.IsMouseClicked(ImGuiMouseButton.Left) && draggingMod == null)
+          {
+            hoveringIndex = draggingIndex = i;
+            draggingMod = mod;
+          }
+
+          ImGuiHelper.DrawSameLine(() => ImGuiHelper.Text($"{mod.Source}"));
+
+          ImGui.TableNextColumn();
+          ImGuiHelper.Text($"{mod.DisplayName}");
+
+          if (draggingMod != null)
+            if (mod.SortBefore(draggingMod))
+              ImGuiHelper.DrawSameLine(() => ImGuiHelper.TextRightDisabled("Before"));
+            else if (draggingMod.SortBefore(mod))
+              ImGuiHelper.DrawSameLine(() => ImGuiHelper.TextRightDisabled("After"));
+
+          ImGui.PopID();
+        }
+        ImGui.EndTable();
+      }
+
+      if (!edit)
+        ImGui.EndDisabled();
+
+      if (edit && draggingIndex != -1 && hoveringIndex != -1 && draggingIndex != hoveringIndex)
+      {
+        while (draggingIndex < hoveringIndex)
+        {
+          (Mods[draggingIndex + 1], Mods[draggingIndex]) = (Mods[draggingIndex], Mods[draggingIndex + 1]);
+          draggingIndex++;
+        }
+
+        while (draggingIndex > hoveringIndex)
+        {
+          (Mods[draggingIndex - 1], Mods[draggingIndex]) = (Mods[draggingIndex], Mods[draggingIndex - 1]);
+          draggingIndex--;
+        }
+
+        ConfigChanged = true;
+      }
+    }
+
+    public static void DrawWorkshopConfig(ModData modData)
+    {
+      if (modData == null)
+        LaunchPadLoader.SelectedInfo = null;
+      else if (LaunchPadLoader.SelectedMod == null || LaunchPadLoader.SelectedInfo.Path != modData.DirectoryPath)
+        LaunchPadLoader.SelectedInfo = Mods.Find(mod => mod.Path == modData.DirectoryPath);
+
+      var screenSize = ImguiHelper.ScreenSize;
+      var padding = new Vector2(25, 25);
+      var topLeft = new Vector2(screenSize.x - 800f - padding.x, padding.y);
+      var bottomRight = screenSize - padding;
+
+      ImGuiHelper.Draw(() =>
+      {
+        ImGui.SetNextWindowSize(bottomRight - topLeft);
+        ImGui.SetNextWindowPos(topLeft);
+        if (ImGui.Begin("Mod Configuration##menuconfig", ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoSavedSettings))
+          DrawConfigEditor();
+        ImGui.End();
+      });
+    }
+
+    public static void DrawConfigEditor()
+    {
+      if (LaunchPadLoader.SelectedInfo == null || LaunchPadLoader.SelectedInfo.Source == ModSource.Core)
+      {
+        ImGuiHelper.TextDisabled("Select a mod to edit configuration");
+        return; 
+      }
+
+      if (LaunchPadLoader.SelectedMod == null)
+      {
+        ImGuiHelper.TextDisabled("Mod was not enabled at load time or is not configurable.");
+        return;
+      }
+
+      var configFiles = LaunchPadLoader.SelectedMod.GetSortedConfigs();
+      if (configFiles == null || configFiles.Count == 0)
+      {
+        ImGuiHelper.TextDisabled($"{LaunchPadLoader.SelectedInfo.DisplayName} does not have any configuration");
+        return;
+      }
+
+      ImGuiHelper.TextDisabled("These configurations may require a restart to apply");
+      ImGui.BeginChild("##config", ImGuiWindowFlags.HorizontalScrollbar);
+      foreach (var configFile in configFiles)
+      {
+        DrawConfigFile(configFile);
+      }
+      ImGui.EndChild();
+    }
+
+    public static void DrawConfigFile(SortedConfigFile configFile, Func<string, bool> except = null)
+    {
+      ImGuiHelper.Text(configFile.FileName);
+      ImGui.PushID(configFile.FileName);
+
+      foreach (var category in configFile.Categories)
+      {
+        if (except?.Invoke(category.Category) ?? false)
+          continue;
+
+        if (!ImGui.CollapsingHeader(category.Category, ImGuiTreeNodeFlags.DefaultOpen))
+          continue;
+
+        foreach (var entry in category.Entries)
+        {
+           if (DrawConfigEntry(entry))
+            ConfigChanged = true;
+        }
+      }
+
+      ImGui.PopID();
+    }
+
+    public static bool DrawConfigEntry(ConfigEntryBase entry, bool fill = true)
+    {
+      var changed = false;
+      ImGui.PushID(entry.Definition.Key);
+      ImGui.BeginGroup();
+
+      ImGuiHelper.Text(entry.Definition.Key);
+      ImGui.SameLine();
+      if (fill)
+        ImGui.SetNextItemWidth(-float.Epsilon);
+
+      var value = entry.BoxedValue;
+      changed = value switch
+      {
+        Color => DrawColorEntry(entry as ConfigEntry<Color>),
+        Vector2 => DrawVector2Entry(entry as ConfigEntry<Vector2>),
+        Vector3 => DrawVector3Entry(entry as ConfigEntry<Vector3>),
+        Vector4 => DrawVector4Entry(entry as ConfigEntry<Vector4>),
+
+        Enum => DrawEnumEntry(entry, value as Enum),
+        string => DrawStringEntry(entry as ConfigEntry<string>),
+        char => DrawCharEntry(entry as ConfigEntry<char>),
+        bool => DrawBoolEntry(entry as ConfigEntry<bool>),
+        float => DrawFloatEntry(entry as ConfigEntry<float>),
+        double => DrawDoubleEntry(entry as ConfigEntry<double>),
+        decimal => DrawDecimalEntry(entry as ConfigEntry<decimal>),
+        byte => DrawByteEntry(entry as ConfigEntry<byte>),
+        sbyte => DrawSByteEntry(entry as ConfigEntry<sbyte>),
+        short => DrawShortEntry(entry as ConfigEntry<short>),
+        ushort => DrawUShortEntry(entry as ConfigEntry<ushort>),
+        int => DrawIntEntry(entry as ConfigEntry<int>),
+        uint => DrawUIntEntry(entry as ConfigEntry<uint>),
+        long => DrawLongEntry(entry as ConfigEntry<long>),
+        ulong => DrawULongEntry(entry as ConfigEntry<ulong>),
+        _ => DrawDefault(entry),
+      };
+
+      ImGui.EndGroup();
+      ImGui.PopID();
+      ImGuiHelper.ItemTooltip(entry.Description.Description, 600f);
+      return changed;
+    }
+
+    private static bool DrawColorEntry(ConfigEntry<Color> entry)
+    {
+      var changed = false;
+
+      var value = entry.Value;
+      var r = value.r;
+      ImGuiHelper.Text("Red:");
+      if (ImGui.SliderFloat("##colorvaluer", ref r, 0.0f, 1.0f))
+      {
+        entry.BoxedValue = new Color(r, value.g, value.b, value.a);
+        changed = true;
+      }
+
+      var g = value.g;
+      ImGuiHelper.Text("Green:");
+      if (ImGui.SliderFloat("##colorvalueg", ref g, 0.0f, 1.0f))
+      {
+        entry.BoxedValue = new Color(value.r, g, value.b, value.a);
+        changed = true;
+      }
+
+      var b = value.b;
+      ImGuiHelper.Text("Blue:");
+      if (ImGui.SliderFloat("##colorvalueb", ref b, 0.0f, 1.0f))
+      {
+        entry.BoxedValue = new Color(value.g, value.g, b, value.a);
+        changed = true;
+      }
+
+      var a = value.b;
+      ImGuiHelper.Text("Alpha:");
+      if (ImGui.SliderFloat("##colorvaluea", ref a, 0.0f, 1.0f))
+      {
+        entry.BoxedValue = new Color(value.r, value.g, value.b, a);
+        changed = true;
+      }
+
+      return changed;
+    }
+
+    private static bool DrawVector2Entry(ConfigEntry<Vector2> entry)
+    {
+      var changed = false;
+
+      var value = entry.Value;
+      var x = value.x;
+      ImGuiHelper.Text("X:");
+      ImGui.SameLine();
+      if (ImGui.InputFloat("##vector2valuex", ref x))
+      {
+        entry.BoxedValue = new Vector2(x, value.y);
+        changed = true;
+      }
+
+      var y = value.y;
+      ImGuiHelper.Text("Y:");
+      ImGui.SameLine();
+      if (ImGui.InputFloat("##vector2valuey", ref y))
+      {
+        entry.BoxedValue = new Vector2(value.x, y);
+        changed = true;
+      }
+
+      return changed;
+    }
+
+    private static bool DrawVector3Entry(ConfigEntry<Vector3> entry)
+    {
+      var changed = false;
+
+      var value = entry.Value;
+      var x = value.x;
+      ImGuiHelper.Text("X:");
+      ImGui.SameLine();
+      if (ImGui.InputFloat("##vector3valuex", ref x))
+      {
+        entry.BoxedValue = new Vector3(x, value.y, value.z);
+        changed = true;
+      }
+
+      var y = value.y;
+      ImGuiHelper.Text("Y:");
+      ImGui.SameLine();
+      if (ImGui.InputFloat("##vector3valuey", ref y))
+      {
+        entry.BoxedValue = new Vector3(value.x, y, value.z);
+        changed = true;
+      }
+
+      var z = value.z;
+      ImGuiHelper.Text("Z:");
+      ImGui.SameLine();
+      if (ImGui.InputFloat("##vector3valuez", ref z))
+      {
+        entry.BoxedValue = new Vector3(value.x, value.y, z);
+        changed = true;
+      }
+
+      return changed;
+    }
+
+    private static bool DrawVector4Entry(ConfigEntry<Vector4> entry)
+    {
+      var changed = false;
+
+      var value = entry.Value;
+      var x = value.x;
+      ImGuiHelper.Text("X:");
+      ImGui.SameLine();
+      if (ImGui.InputFloat("##vector4valuex", ref x))
+      {
+        entry.BoxedValue = new Vector4(x, value.y, value.z, value.w);
+        changed = true;
+      }
+
+      var y = value.y;
+      ImGuiHelper.Text("Y:");
+      ImGui.SameLine();
+      if (ImGui.InputFloat("##vector4valuey", ref y))
+      {
+        entry.BoxedValue = new Vector4(value.x, y, value.z, value.w);
+        changed = true;
+      }
+
+      var z = value.z;
+      ImGuiHelper.Text("Z:");
+      ImGui.SameLine();
+      if (ImGui.InputFloat("##vector4valuez", ref z))
+      {
+        entry.BoxedValue = new Vector4(value.x, value.y, z, value.w);
+        changed = true;
+      }
+
+      var w = value.z;
+      ImGuiHelper.Text("W:");
+      ImGui.SameLine();
+      if (ImGui.InputFloat("##vector4valuew", ref w))
+      {
+        entry.BoxedValue = new Vector4(value.x, value.y, value.z, w);
+        changed = true;
+      }
+
+      return changed;
+    }
+
+    public static bool DrawEnumEntry(ConfigEntryBase entry, Enum value)
+    {
+      var changed = false;
+      var currentValue = Convert.ToInt32(value);
+      var type = value.GetType();
+      var values = Enum.GetValues(type);
+      var names = Enum.GetNames(type);
+      var index = -1;
+      for (var i = 0; i < values.Length; i++)
+      {
+        if (values.GetValue(i).Equals(value))
+        {
+          index = i;
+          break;
+        }
+      }
+
+      if (type.GetCustomAttribute<FlagsAttribute>() != null)
+      {
+        for (var i = 0; i < values.Length; i++)
+        {
+          for (; i < values.Length; i++)
+          {
+            var val = (int) values.GetValue(i);
+            var newValue = (currentValue & val) == val;
+            if (ImGui.Checkbox(names.GetValue(i).ToString(), ref newValue))
+            {
+              entry.BoxedValue = newValue ? currentValue | val : currentValue & ~val;
+              changed = true;
+            }
+            if (i != values.Length - 1)
+              ImGui.SameLine();
+          }
+        } 
+      }
+      else
+      {
+        if (ImGui.Combo("##enumvalue", ref index, names, names.Length))
+        {
+          entry.BoxedValue = values.GetValue(index);
+          changed = true;
+        }
+      }
+
+      return changed;
+    }
+
+    public static bool DrawStringEntry(ConfigEntry<string> entry)
+    {
+      var changed = false;
+      var value = entry.Value;
+      if (ImGui.InputText("##stringvalue", ref value, uint.MaxValue, ImGuiInputTextFlags.EnterReturnsTrue) || ImGui.IsItemDeactivatedAfterEdit())
+      {
+        entry.BoxedValue = value;
+        changed = true;
+      }
+
+      return changed;
+    }
+
+    public static bool DrawCharEntry(ConfigEntry<char> entry)
+    {
+      var changed = false;
+      var value = $"{entry.Value}";
+      if (ImGui.InputText("##charvalue", ref value, 1, ImGuiInputTextFlags.EnterReturnsTrue) || ImGui.IsItemDeactivatedAfterEdit())
+      {
+        entry.BoxedValue = value[0];
+        changed = true;
+      }
+
+      return changed;
+    }
+
+    public static bool DrawBoolEntry(ConfigEntry<bool> entry)
+    {
+      var changed = false;
+
+      var value = entry.Value;
+      if (ImGui.Checkbox("##boolvalue", ref value))
+      {
+        entry.BoxedValue = value;
+        changed = true;
+      }
+
+      return changed;
+    }
+
+    public static bool DrawFloatEntry(ConfigEntry<float> entry)
+    {
+      var changed = false;
+
+      var value = entry.Value;
+      if (entry.Description.AcceptableValues is AcceptableValueRange<float> valueRange)
+      {
+        if (ImGui.SliderFloat("##floatvalue", ref value, valueRange.MinValue, valueRange.MaxValue))
+        {
+          entry.BoxedValue = value;
+          changed = true;
+        }
+      }
+      else if (ImGui.InputFloat("##floatvalue", ref value, step: 0))
+      {
+        entry.BoxedValue = value;
+        changed = true;
+      }
+
+      return changed;
+    }
+
+    public static unsafe bool DrawDoubleEntry(ConfigEntry<double> entry)
+    {
+      var changed = false;
+
+      var value = entry.Value;
+      if (entry.Description.AcceptableValues is AcceptableValueRange<double> valueRange)
+      {
+        var min = valueRange.MinValue;
+        var max = valueRange.MaxValue;
+        if (ImGui.SliderScalar("##doublevalue", ImGuiDataType.Double, (IntPtr) (&value), (IntPtr) (&min), (IntPtr) (&max)))
+        {
+          entry.BoxedValue = value;
+          changed = true;
+        }
+      }
+      else if (ImGui.InputDouble("##doublevalue", ref value, step: 0))
+      {
+        entry.BoxedValue = value;
+        changed = true;
+      }
+
+      return changed;
+    }
+
+    public static unsafe bool DrawDecimalEntry(ConfigEntry<decimal> entry)
+    {
+      var changed = false;
+
+      var value = (double) entry.Value;
+      if (entry.Description.AcceptableValues is AcceptableValueRange<decimal> valueRange)
+      {
+        var min = valueRange.MinValue;
+        var max = valueRange.MaxValue;
+        if (ImGui.SliderScalar("##decimalvalue", ImGuiDataType.Double, (IntPtr) (&value), (IntPtr) (&min), (IntPtr) (&max)))
+        {
+          entry.BoxedValue = value;
+          changed = true;
+        }
+      }
+      else if (ImGui.InputDouble("##decimalvalue", ref value, step: 0))
+      {
+        entry.BoxedValue = value;
+        changed = true;
+      }
+
+      return changed;
+    }
+
+    public static bool DrawByteEntry(ConfigEntry<byte> entry)
+    {
+      var changed = false;
+
+      var value = (int) entry.Value;
+      if (entry.Description.AcceptableValues is AcceptableValueRange<byte> valueRange)
+      {
+        if (ImGui.SliderInt("##bytevalue", ref value, valueRange.MinValue, valueRange.MaxValue))
+        {
+          entry.BoxedValue = (byte) value;
+          changed = true;
+        }
+      }
+      else if (ImGui.InputInt("##bytevalue", ref value, step: 0))
+      {
+        entry.BoxedValue = (byte) value;
+        changed = true;
+      }
+
+      return changed;
+    }
+
+    public static bool DrawSByteEntry(ConfigEntry<sbyte> entry)
+    {
+      var changed = false;
+      var value = (int) entry.Value;
+      if (entry.Description.AcceptableValues is AcceptableValueRange<sbyte> valueRange)
+      {
+        if (ImGui.SliderInt("##sbytevalue", ref value, valueRange.MinValue, valueRange.MaxValue))
+        {
+          entry.BoxedValue = (sbyte) value;
+          changed = true;
+        }
+      }
+      else if (ImGui.InputInt("##sbytevalue", ref value, step: 0))
+      {
+        entry.BoxedValue = (sbyte) value;
+        changed = true;
+      }
+
+      return changed;
+    }
+
+    public static bool DrawShortEntry(ConfigEntry<short> entry)
+    {
+      var changed = false;
+
+      var value = (int) entry.Value;
+      if (entry.Description.AcceptableValues is AcceptableValueRange<short> valueRange)
+      {
+        if (ImGui.SliderInt("##shortvalue", ref value, valueRange.MinValue, valueRange.MaxValue))
+        {
+          entry.BoxedValue = (short) value;
+          changed = true;
+        }
+      }
+      else if (ImGui.InputInt("##shortvalue", ref value, step: 0))
+      {
+        entry.BoxedValue = (short) value;
+        changed = true;
+      }
+
+      return changed;
+    }
+
+    public static bool DrawUShortEntry(ConfigEntry<ushort> entry)
+    {
+      var changed = false;
+
+      var value = (int) entry.Value;
+      if (entry.Description.AcceptableValues is AcceptableValueRange<ushort> valueRange)
+      {
+        if (ImGui.SliderInt("##ushortvalue", ref value, valueRange.MinValue, valueRange.MaxValue))
+        {
+          entry.BoxedValue = (ushort) value;
+          changed = true;
+        }
+      }
+      else if (ImGui.InputInt("##ushortvalue", ref value, step: 0))
+      {
+        entry.BoxedValue = (ushort) value;
+        changed = true;
+      }
+
+      return changed;
+    }
+
+    public static bool DrawIntEntry(ConfigEntry<int> entry)
+    {
+      var changed = false;
+
+      var value = entry.Value;
+      if (entry.Description.AcceptableValues is AcceptableValueRange<int> valueRange)
+      {
+        if (ImGui.SliderInt("##intvalue", ref value, valueRange.MinValue, valueRange.MaxValue))
+        {
+          entry.BoxedValue = value;
+          changed = true;
+        }
+      }
+      else if (ImGui.InputInt("##intvalue", ref value, step: 0))
+      {
+        entry.BoxedValue = value;
+        changed = true;
+      }
+
+      return changed;
+    }
+
+    public static bool DrawUIntEntry(ConfigEntry<uint> entry)
+    {
+      var changed = false;
+
+      var value = (int) entry.Value;
+      if (entry.Description.AcceptableValues is AcceptableValueRange<uint> valueRange)
+      {
+        if (ImGui.SliderInt("##uintvalue", ref value, (int) valueRange.MinValue, (int) valueRange.MaxValue))
+        {
+          entry.BoxedValue = (uint) value;
+          changed = true;
+        }
+      }
+      else if (ImGui.InputInt("##uintvalue", ref value, step: 0))
+      {
+        entry.BoxedValue = (uint) value;
+        changed = true;
+      }
+
+      return changed;
+    }
+
+    public static bool DrawLongEntry(ConfigEntry<long> entry)
+    {
+      var changed = false;
+
+      var value = (int) entry.Value;
+      if (entry.Description.AcceptableValues is AcceptableValueRange<long> valueRange)
+      {
+        if (ImGui.SliderInt("##longvalue", ref value, (int) valueRange.MinValue, (int) valueRange.MaxValue))
+        {
+          entry.BoxedValue = (long) value;
+          changed = true;
+        }
+      }
+      else if (ImGui.InputInt("##longvalue", ref value, step: 0))
+      {
+        entry.BoxedValue = (long) value;
+        changed = true;
+      }
+
+      return changed;
+    }
+
+    public static bool DrawULongEntry(ConfigEntry<ulong> entry)
+    {
+      var changed = false;
+
+      var value = (int) entry.Value;
+      if (entry.Description.AcceptableValues is AcceptableValueRange<ulong> valueRange)
+      {
+        if (ImGui.SliderInt("##ulongvalue", ref value, (int) valueRange.MinValue, (int) valueRange.MaxValue))
+        {
+          entry.BoxedValue = (ulong) value;
+          changed = true;
+        }
+      }
+      else if (ImGui.InputInt("##ulongvalue", ref value, step: 0))
+      {
+        entry.BoxedValue = (ulong) value;
+        changed = true;
+      }
+
+      return changed;
+    }
+
+    public static bool DrawDefault(ConfigEntryBase entry)
+    {
+      var changed = false;
+
+      var value = entry.BoxedValue;
+      if (value != null)
+        ImGuiHelper.TextDisabled($"{value}");
+      else
+        ImGuiHelper.TextDisabled("is null");
+
+      return changed;
     }
   }
 }

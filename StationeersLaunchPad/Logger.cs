@@ -3,6 +3,18 @@ using UnityEngine;
 
 namespace StationeersLaunchPad
 {
+  [Flags]
+  public enum LogSeverity
+  {
+    Debug = 1 << 0,
+    Information = 1 << 1,
+    Warning = 1 << 2,
+    Error = 1 << 3,
+    Exception = 1 << 4,
+    Fatal = 1 << 5,
+    All = 0xFFFFFF,
+  }
+
   public class Logger
   {
     public static Logger Global
@@ -25,15 +37,18 @@ namespace StationeersLaunchPad
       get; private set;
     }
 
+    public int Count => this.Buffer.Count;
+    public int TotalCount => this.Buffer.TotalCount;
+
     public bool IsGlobal => this.Parent == null;
 
     public bool IsChild => this.Parent != null;
 
-    public Logger(string name = "", Logger parent = null)
+    public Logger(string name = "", Logger parent = null, int size = LogBuffer.DEFAULT_BUFFER_SIZE)
     {
       this.Name = name;
       this.Parent = parent;
-      this.Buffer = new LogBuffer(this.IsGlobal ? LogBuffer.DEFAULT_BUFFER_SIZE : 256);
+      this.Buffer = new LogBuffer(this.IsGlobal ? size : 256);
     }
 
     public Logger(string name, LogBuffer buffer, Logger parent = null)
@@ -48,6 +63,12 @@ namespace StationeersLaunchPad
     public void CopyToClipboard() => this.Buffer.CopyToClipboard();
 
     public void Clear() => this.Buffer.Clear();
+
+    public LogLine At(int index) => this.Count >= index ? this.Buffer[index] : null;
+
+    public LogLine First() => this.Count > 0 ? this.Buffer[0] : null;
+
+    public LogLine Last() => this.Count > 0 ? this.Buffer[this.Count - 1] : null;
 
     public void Log(string message, LogSeverity logSeverity = LogSeverity.Information, bool unity = true, string name = "")
     {

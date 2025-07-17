@@ -163,6 +163,8 @@ namespace StationeersLaunchPad
           action.PerformUpdate(entry);
         }
       }
+
+      LaunchPadConfig.LoadState = LoadState.Updated;
     }
 
     private static void RevertUpdate()
