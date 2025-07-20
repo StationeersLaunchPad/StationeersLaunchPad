@@ -1,55 +1,55 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Reference Include="Facepunch.Steamworks.Win64">
-      <HintPath>$(StationeersDirectory)\rocketstation_Data\Managed\Facepunch.Steamworks.Win64.dll</HintPath>
+      <HintPath>$(StationeersLibraryDirectory)\Facepunch.Steamworks.Win64.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Assembly-CSharp">
-      <HintPath>$(StationeersDirectory)\rocketstation_Data\Managed\Assembly-CSharp.dll</HintPath>
+      <HintPath>$(StationeersLibraryDirectory)\Assembly-CSharp.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Newtonsoft.Json">
-      <HintPath>$(StationeersDirectory)\rocketstation_Data\Managed\Newtonsoft.Json.dll</HintPath>
+      <HintPath>$(StationeersLibraryDirectory)\Newtonsoft.Json.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="System.IO.Compression">
-      <HintPath>$(StationeersDirectory)\rocketstation_Data\Managed\System.IO.Compression.dll</HintPath>
+      <HintPath>$(StationeersLibraryDirectory)\System.IO.Compression.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine">
-      <HintPath>$(StationeersDirectory)\rocketstation_Data\Managed\UnityEngine.dll</HintPath>
+      <HintPath>$(StationeersLibraryDirectory)\UnityEngine.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine.AnimationModule">
-      <HintPath>$(StationeersDirectory)\rocketstation_Data\Managed\UnityEngine.AnimationModule.dll</HintPath>
+      <HintPath>$(StationeersLibraryDirectory)\UnityEngine.AnimationModule.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine.AssetBundleModule">
-      <HintPath>$(StationeersDirectory)\rocketstation_Data\Managed\UnityEngine.AssetBundleModule.dll</HintPath>
+      <HintPath>$(StationeersLibraryDirectory)\UnityEngine.AssetBundleModule.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine.CoreModule">
-      <HintPath>$(StationeersDirectory)\rocketstation_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
+      <HintPath>$(StationeersLibraryDirectory)\UnityEngine.CoreModule.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine.PhysicsModule">
-      <HintPath>$(StationeersDirectory)\rocketstation_Data\Managed\UnityEngine.PhysicsModule.dll</HintPath>
+      <HintPath>$(StationeersLibraryDirectory)\UnityEngine.PhysicsModule.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine.UnityWebRequestModule">
-      <HintPath>$(StationeersDirectory)\rocketstation_Data\Managed\UnityEngine.UnityWebRequestModule.dll</HintPath>
+      <HintPath>$(StationeersLibraryDirectory)\UnityEngine.UnityWebRequestModule.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine.UI">
-      <HintPath>$(StationeersDirectory)\rocketstation_Data\Managed\UnityEngine.UI.dll</HintPath>
+      <HintPath>$(StationeersLibraryDirectory)\UnityEngine.UI.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Unity.TextMeshPro">
-      <HintPath>$(StationeersDirectory)\rocketstation_Data\Managed\Unity.TextMeshPro.dll</HintPath>
+      <HintPath>$(StationeersLibraryDirectory)\Unity.TextMeshPro.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Unitask">
-      <HintPath>$(StationeersDirectory)\rocketstation_Data\Managed\Unitask.dll</HintPath>
+      <HintPath>$(StationeersLibraryDirectory)\Unitask.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="0Harmony">

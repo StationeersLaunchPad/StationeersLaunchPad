@@ -10,6 +10,7 @@ using HarmonyLib;
 using Steamworks;
 using System;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using TMPro;
@@ -25,18 +26,46 @@ namespace StationeersLaunchPad
   {
     public const string pluginGuid = "stationeers.launchpad";
     public const string pluginName = "StationeersLaunchPad";
-    public const string pluginVersion = "0.2.1";
+    public const string pluginVersion = "0.2.2";
 
     void Awake()
     {
       if (Harmony.HasAnyPatches(pluginGuid))
         return;
+
+      // If the windows steamworks assembly is not found, try to replace it with the linux one
+      AppDomain.CurrentDomain.AssemblyResolve += (_, args) =>
+      {
+        if (args.Name == "Facepunch.Steamworks.Win64")
+          return AppDomain.CurrentDomain.GetAssemblies().First(assembly => assembly.GetName().Name == "Facepunch.Steamworks.Posix");
+        return null;
+      };
+
+      // *** DO NOT REFERENCE LaunchPadConfig FIELDS IN THIS METHOD ***
+      // referencing LaunchPadConfig fields in this method will force the class to initialize before the method starts
+      // we need to add the resolve hook above before LaunchPadConfig initializes so the steamworks types will be valid on linux
+      this.InitConfig();
+
+      var harmony = new Harmony(pluginGuid);
+      harmony.PatchAll();
+
+      var unityLogger = Debug.unityLogger as UnityEngine.Logger;
+      unityLogger.logHandler = new LogWrapper(unityLogger.logHandler);
+
+      var playerLoop = PlayerLoop.GetCurrentPlayerLoop();
+      PlayerLoopHelper.Initialize(ref playerLoop);
+
+      LaunchPadConfig.Run();
+    }
+
+    private void InitConfig()
+    {
       LaunchPadConfig.DebugMode = this.Config.Bind(
-       new ConfigDefinition("Startup", "DebugMode"),
-       false,
-       new ConfigDescription(
-         "If you run into issues with loading mods, or anything else, please enable this for more verbosity in error reports"
-       )
+        new ConfigDefinition("Startup", "DebugMode"),
+        false,
+        new ConfigDescription(
+          "If you run into issues with loading mods, or anything else, please enable this for more verbosity in error reports"
+        )
       );
       LaunchPadConfig.AutoLoadOnStart = this.Config.Bind(
         new ConfigDefinition("Startup", "AutoLoadOnStart"),
@@ -141,8 +170,6 @@ namespace StationeersLaunchPad
 
       var playerLoop = PlayerLoop.GetCurrentPlayerLoop();
       PlayerLoopHelper.Initialize(ref playerLoop);
-
-      LaunchPadConfig.Run();
     }
   }
 
@@ -340,14 +367,12 @@ namespace StationeersLaunchPad
     static bool StationSaveUtils_DefaultPath(ref string __result)
     {
       if (string.IsNullOrEmpty(LaunchPadConfig.SavePath))
-      {
         return true;
-      }
 
       __result = Path.IsPathRooted(LaunchPadConfig.SavePath)
         ? LaunchPadConfig.SavePath
-        : Path.Combine(!GameManager.IsBatchMode ? 
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Personal), "My Games") : 
+        : Path.Combine(!GameManager.IsBatchMode ?
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Personal), "My Games") :
             StationSaveUtils.ExeDirectory.FullName,
           LaunchPadConfig.SavePath);
       return false;

@@ -6,6 +6,7 @@
     <LangVersion>9.0</LangVersion>
     <OutputPath>$(SolutionDir)bin\$(Configuration)</OutputPath>
     <StationeersDirectory>$(MSBuildProgramFiles32)\Steam\steamapps\common\Stationeers\</StationeersDirectory>
+    <StationeersLibraryDirectory>$(StationeersDirectory)rocketstation_Data\Managed\</StationeersLibraryDirectory>
     <UserDir>$(HOMEDRIVE)$(HOMEPATH)</UserDir>
     <MyStationeersDir>$(UserDir)\Documents\My Games\Stationeers\</MyStationeersDir>
     <PluginPath>$(StationeersDirectory)Bepinex\plugins\StationeersLaunchPad</PluginPath>
