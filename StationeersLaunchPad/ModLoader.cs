@@ -9,6 +9,7 @@ using StationeersMods.Shared;
 using UnityEngine;
 using Mono.Cecil;
 using BepInEx.Bootstrap;
+using System;
 
 namespace StationeersLaunchPad
 {
@@ -218,7 +219,7 @@ namespace StationeersLaunchPad
     }
     private static MethodDefinition FindDefaultEntrypointMethod(TypeDefinition typeDef)
     {
-      return typeDef.Methods.FirstOrDefault(methodDef =>
+      return FindMethod(typeDef, methodDef =>
       {
         if (methodDef.Name != DEFAULT_METHOD)
           return false;
@@ -268,6 +269,20 @@ namespace StationeersLaunchPad
         Logger.Global.LogDebug($"Skipping type {typeDef.FullName} from {assembly.Info.Name}: failed to resolve {ex.AssemblyReference.FullName}");
         return null;
       }
+    }
+
+    private static MethodDefinition FindMethod(TypeDefinition typeDef, Func<MethodDefinition, bool> match)
+    {
+      while (typeDef != null)
+      {
+        foreach (var method in typeDef.Methods)
+        {
+          if (match(method))
+            return method;
+        }
+        typeDef = typeDef.BaseType?.Resolve();
+      }
+      return null;
     }
   }
 }
