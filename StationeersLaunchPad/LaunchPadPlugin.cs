@@ -161,15 +161,6 @@ namespace StationeersLaunchPad
       );
 
       LaunchPadConfig.SortedConfig = new SortedConfigFile(this.Config);
-
-      var harmony = new Harmony(pluginGuid);
-      harmony.PatchAll();
-
-      var unityLogger = Debug.unityLogger as UnityEngine.Logger;
-      unityLogger.logHandler = new LogWrapper(unityLogger.logHandler);
-
-      var playerLoop = PlayerLoop.GetCurrentPlayerLoop();
-      PlayerLoopHelper.Initialize(ref playerLoop);
     }
   }
 
