@@ -897,7 +897,10 @@ namespace StationeersLaunchPad
 
       ImGui.EndGroup();
       ImGui.PopID();
-      ImGuiHelper.ItemTooltip(entry.Description.Description, 600f);
+
+      var description = entry.Description?.Description;
+      if (!string.IsNullOrEmpty(description))
+        ImGuiHelper.ItemTooltip(description, 600f);
       return changed;
     }
 
@@ -907,7 +910,8 @@ namespace StationeersLaunchPad
 
       var value = entry.Value;
       var r = value.r;
-      ImGuiHelper.Text("Red:");
+      ImGui.Spacing();
+      ImGuiHelper.Text($"Red ({r * 255}):");
       if (ImGui.SliderFloat("##colorvaluer", ref r, 0.0f, 1.0f))
       {
         entry.BoxedValue = new Color(r, value.g, value.b, value.a);
@@ -915,7 +919,7 @@ namespace StationeersLaunchPad
       }
 
       var g = value.g;
-      ImGuiHelper.Text("Green:");
+      ImGuiHelper.Text($"Green ({g * 255}):");
       if (ImGui.SliderFloat("##colorvalueg", ref g, 0.0f, 1.0f))
       {
         entry.BoxedValue = new Color(value.r, g, value.b, value.a);
@@ -923,15 +927,15 @@ namespace StationeersLaunchPad
       }
 
       var b = value.b;
-      ImGuiHelper.Text("Blue:");
+      ImGuiHelper.Text($"Blue ({b * 255}):");
       if (ImGui.SliderFloat("##colorvalueb", ref b, 0.0f, 1.0f))
       {
-        entry.BoxedValue = new Color(value.g, value.g, b, value.a);
+        entry.BoxedValue = new Color(value.r, value.g, b, value.a);
         changed = true;
       }
 
-      var a = value.b;
-      ImGuiHelper.Text("Alpha:");
+      var a = value.a;
+      ImGuiHelper.Text($"Alpha ({a * 255}):");
       if (ImGui.SliderFloat("##colorvaluea", ref a, 0.0f, 1.0f))
       {
         entry.BoxedValue = new Color(value.r, value.g, value.b, a);
@@ -947,6 +951,7 @@ namespace StationeersLaunchPad
 
       var value = entry.Value;
       var x = value.x;
+      ImGui.Spacing();
       ImGuiHelper.Text("X:");
       ImGui.SameLine();
       if (ImGui.InputFloat("##vector2valuex", ref x))
@@ -973,6 +978,7 @@ namespace StationeersLaunchPad
 
       var value = entry.Value;
       var x = value.x;
+      ImGui.Spacing();
       ImGuiHelper.Text("X:");
       ImGui.SameLine();
       if (ImGui.InputFloat("##vector3valuex", ref x))
@@ -1008,6 +1014,7 @@ namespace StationeersLaunchPad
 
       var value = entry.Value;
       var x = value.x;
+      ImGui.Spacing();
       ImGuiHelper.Text("X:");
       ImGui.SameLine();
       if (ImGui.InputFloat("##vector4valuex", ref x))
