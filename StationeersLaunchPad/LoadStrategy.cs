@@ -7,9 +7,8 @@ using System.Linq;
 namespace StationeersLaunchPad {
   public enum LoadStrategyType
   {
-    // loads in 4 steps:
-    // - load all assemblies in order without resolving types
-    // - resolve types in assemblies
+    // loads in 3 steps:
+    // - load all assemblies in order
     // - load asset bundles
     // - find and load entry points
     // each step is done in the order the mods are configured
@@ -41,12 +40,6 @@ namespace StationeersLaunchPad {
       this.ElapsedStopwatch.Stop();
       Logger.Global.LogWarning($"Assembly loading took {this.ElapsedStopwatch.Elapsed.ToString(@"m\:ss\.fff")}");
 
-      Logger.Global.LogDebug($"Resolving...");
-      this.ElapsedStopwatch.Restart();
-      await this.ResolveAssemblies();
-      this.ElapsedStopwatch.Stop();
-      Logger.Global.LogWarning($"Resolving took {this.ElapsedStopwatch.Elapsed.ToString(@"m\:ss\.fff")}");
-
       Logger.Global.LogDebug($"Assets loading...");
       this.ElapsedStopwatch.Restart();
       await this.LoadAssets();
@@ -70,7 +63,6 @@ namespace StationeersLaunchPad {
     }
 
     public abstract UniTask LoadAssemblies();
-    public abstract UniTask ResolveAssemblies();
     public abstract UniTask LoadAssets();
     public abstract UniTask LoadEntryPoints();
   }
@@ -102,28 +94,6 @@ namespace StationeersLaunchPad {
           this.LoadFailed(mod, ex);
         }
       }
-    }
-
-    public async override UniTask ResolveAssemblies()
-    {
-
-      foreach (var info in this.Mods)
-      {
-        var mod = info.Loaded;
-        if (mod == null || mod.ResolvedAssemblies || mod.LoadFailed || mod.LoadFinished)
-          continue;
-
-        try
-        {
-          await mod.ResolveAssembliesSerial();
-          mod.ResolvedAssemblies = true;
-        }
-        catch (Exception ex)
-        {
-          this.LoadFailed(mod, ex);
-        }
-      }
-
     }
 
     public async override UniTask LoadAssets()
@@ -188,27 +158,6 @@ namespace StationeersLaunchPad {
         {
           await mod.LoadAssembliesParallel();
           mod.LoadedAssemblies = true;
-        }
-        catch (Exception ex)
-        {
-          this.LoadFailed(mod, ex);
-        }
-      }));
-    }
-
-
-    public async override UniTask ResolveAssemblies()
-    {
-      await UniTask.WhenAll(this.Mods.Select(async (info) =>
-      {
-        var mod = info.Loaded;
-        if (mod == null || mod.ResolvedAssemblies || mod.LoadFailed || mod.LoadFinished)
-          return;
-
-        try
-        {
-          await mod.ResolveAssembliesParallel();
-          mod.ResolvedAssemblies = true;
         }
         catch (Exception ex)
         {

@@ -1,9 +1,6 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Reflection;
-using BepInEx;
 using BepInEx.Configuration;
 using Cysharp.Threading.Tasks;
 using StationeersMods.Interface;
@@ -20,20 +17,16 @@ namespace StationeersLaunchPad
 
     public Logger Logger;
 
-    public List<Assembly> Assemblies = new();
+    public List<LoadedAssembly> Assemblies = new();
     public List<GameObject> Prefabs = new();
     public List<ExportSettings> Exports = new();
     public ContentHandler ContentHandler;
 
-    public List<Type> SMEntryTypes = new();
-    public List<Type> BepInExEntryTypes = new();
-    public List<(Type, MethodInfo)> DefaultEntryTypes = new();
-    public List<GameObject> EntryPrefabs = new();
+    public List<ModEntrypoint> Entrypoints = new();
 
     public List<ConfigFile> ConfigFiles = new();
 
     public bool LoadedAssemblies;
-    public bool ResolvedAssemblies;
     public bool LoadedAssets;
     public bool LoadedEntryPoints;
     public bool LoadFinished;
@@ -47,11 +40,11 @@ namespace StationeersLaunchPad
       this.ContentHandler = new(resource, new List<IResource>().AsReadOnly(), this.Prefabs.AsReadOnly());
     }
 
-    private async UniTask<Assembly> LoadAssemblySingle(AssemblyInfo assemblyInfo)
+    private async UniTask<LoadedAssembly> LoadAssemblySingle(AssemblyInfo assemblyInfo)
     {
       this.Logger.LogDebug($"Loading Assembly {assemblyInfo.Name}");
-      var assembly = await ModLoader.LoadAssembly(assemblyInfo.Path);
-      ModLoader.RegisterAssembly(assembly, this);
+      var assembly = await ModLoader.LoadAssembly(assemblyInfo);
+      ModLoader.RegisterAssembly(assembly.Assembly, this);
       this.Logger.LogInfo($"Loaded Assembly");
       return assembly;
     }
@@ -68,26 +61,6 @@ namespace StationeersLaunchPad
         this.Info.Assemblies.Select(assemblyInfo => this.LoadAssemblySingle(assemblyInfo))
       );
       this.Assemblies.AddRange(assemblies);
-    }
-
-
-    private UniTask ResolveAssembliesSingle(Assembly assembly)
-    {
-      return UniTask.RunOnThreadPool(() =>
-      {
-        assembly.GetTypes();
-      });
-    }
-
-    public async UniTask ResolveAssembliesSerial()
-    {
-      foreach (var assembly in this.Assemblies)
-        await this.ResolveAssembliesSingle(assembly);
-    }
-
-    public async UniTask ResolveAssembliesParallel()
-    {
-      await UniTask.WhenAll(this.Assemblies.Select(async (assembly) => await this.ResolveAssembliesSingle(assembly)));
     }
 
     private async UniTask LoadAssetsSingle(string path)
@@ -122,18 +95,18 @@ namespace StationeersLaunchPad
 
         // StationeersMods would take any ModBehaviour it found as an entrypoint when there were no ExportSettings
         // We'll do the same to ensure any mods relying on this still work
-        if (this.Exports.Count == 0)
-          this.SMEntryTypes.AddRange(ModLoader.FindAnyStationeersModsEntrypoints(this.Assemblies));
-        else
-          this.SMEntryTypes.AddRange(ModLoader.FindExplicitStationeersModsEntrypoints(this.Assemblies));
+        var smEntries = this.Exports.Count == 0 ?
+            ModLoader.FindAnyStationeersModsEntrypoints(this.Assemblies) :
+            ModLoader.FindExplicitStationeersModsEntrypoints(this.Assemblies);
 
-        if (this.SMEntryTypes.Count == 0)
-          this.SMEntryTypes.AddRange(ModLoader.FindExportSettingsClassEntrypoints(this.Assemblies, this.Exports));
+        if (smEntries.Count == 0)
+          smEntries = ModLoader.FindExportSettingsClassEntrypoints(this.Assemblies, this.Exports);
 
-        this.EntryPrefabs.AddRange(ModLoader.FindExportSettingsPrefabEntrypoints(this.Exports));
+        this.Entrypoints.AddRange(smEntries);
 
-        this.BepInExEntryTypes.AddRange(ModLoader.FindBepInExEntrypoints(this.Assemblies));
-        this.DefaultEntryTypes.AddRange(ModLoader.FindDefaultEntrypoints(this.Assemblies));
+        this.Entrypoints.AddRange(ModLoader.FindExportSettingsPrefabEntrypoints(this.Exports));
+        this.Entrypoints.AddRange(ModLoader.FindBepInExEntrypoints(this.Assemblies));
+        this.Entrypoints.AddRange(ModLoader.FindDefaultEntrypoints(this.Assemblies));
 
         this.Logger.LogInfo("Found Entrypoints");
       });
@@ -142,14 +115,8 @@ namespace StationeersLaunchPad
     public void PrintEntrypoints()
     {
       // getting prefab names fails on a thread in the debug player, so just print all the entrypoints after we finish
-      foreach (var type in this.SMEntryTypes)
-        this.Logger.LogDebug($"- StationeersMods Entry {type.FullName}");
-      foreach (var prefab in this.EntryPrefabs)
-        this.Logger.LogDebug($"- Prefab Entry {prefab.name}");
-      foreach (var type in this.BepInExEntryTypes)
-        this.Logger.LogDebug($"- BepInEx Entry {type.FullName}");
-      foreach (var (type, method) in this.DefaultEntryTypes)
-        this.Logger.LogDebug($"- Default Entry {type.FullName}");
+      foreach (var entry in this.Entrypoints)
+        this.Logger.LogDebug($"- {entry.DebugName()}");
     }
 
 
@@ -157,54 +124,23 @@ namespace StationeersLaunchPad
     {
       this.Logger.LogDebug("Loading Entrypoints");
 
-      // StationeersMods tagged ModBehaviour/StartupClass/StartupPrefab
-      var modBehaviours = new List<ModBehaviour>();
-      if (this.SMEntryTypes.Count > 0)
+      var gameObj = new GameObject();
+      gameObj.name = this.Info.DisplayName;
+      GameObject.DontDestroyOnLoad(gameObj);
+
+      // instantiate all entrypoints
+      foreach (var entrypoint in this.Entrypoints)
+        entrypoint.Instantiate(gameObj);
+
+      // initialize all entrypoints
+      foreach (var entrypoint in this.Entrypoints)
       {
-        var gameObj = new GameObject();
-        GameObject.DontDestroyOnLoad(gameObj);
-        foreach (var type in this.SMEntryTypes)
-          gameObj.AddComponent(type);
-        modBehaviours.AddRange(gameObj.GetComponents<ModBehaviour>());
+        entrypoint.Initialize(this);
+        this.ConfigFiles.AddRange(entrypoint.Configs());
       }
 
-      foreach (var prefab in this.EntryPrefabs)
-      {
-        var gameObj = GameObject.Instantiate(prefab);
-        GameObject.DontDestroyOnLoad(gameObj);
-        modBehaviours.AddRange(gameObj.GetComponents<ModBehaviour>());
-      }
-
-      foreach (var modBehaviour in modBehaviours)
-      {
-        modBehaviour.contentHandler = this.ContentHandler;
-        modBehaviour.OnLoaded(this.ContentHandler);
-        if (modBehaviour.Config != null)
-        {
-          modBehaviour.Config.SettingChanged += (_, _) => this.DirtyConfig();
-          this.ConfigFiles.Add(modBehaviour.Config);
-        }
-      }
-
-      foreach (var type in this.BepInExEntryTypes)
-      {
-        var gameObj = new GameObject();
-        GameObject.DontDestroyOnLoad(gameObj);
-        var component = gameObj.AddComponent(type);
-        if (component is BaseUnityPlugin plugin && plugin.Config != null)
-        {
-          plugin.Config.SettingChanged += (_, _) => this.DirtyConfig();
-          this.ConfigFiles.Add(plugin.Config);
-        }
-      }
-
-      foreach (var (type, method) in this.DefaultEntryTypes)
-      {
-        var gameObj = new GameObject();
-        GameObject.DontDestroyOnLoad(gameObj);
-        var component = gameObj.AddComponent(type);
-        method.Invoke(component, new object[] { this.Prefabs });
-      }
+      foreach (var config in this.ConfigFiles)
+        config.SettingChanged += (_, _) => this.DirtyConfig();
 
       this.ConfigFiles.Sort((a, b) => a.ConfigFilePath.CompareTo(b.ConfigFilePath));
 

@@ -20,7 +20,7 @@ using System.Reflection;
 using System.Xml.Serialization;
 using UI.ImGuiUi;
 using UnityEngine;
-using static UnityEngine.EventSystems.EventTrigger;
+using BepInEx.Bootstrap;
 
 namespace StationeersLaunchPad
 {
@@ -58,7 +58,6 @@ namespace StationeersLaunchPad
 
     public static SplashBehaviour SplashBehaviour;
     public static List<ModInfo> Mods = new();
-    public static HashSet<string> GameAssemblies = new();
 
     public static LoadState LoadState = LoadState.Initializing;
     public static LoadStrategyType LoadStrategyType = LoadStrategyType.Linear;
@@ -175,9 +174,6 @@ namespace StationeersLaunchPad
 
         Logger.Global.LogInfo("Loading Mod Order");
         await UniTask.Run(() => LoadConfig());
-
-        Logger.Global.LogInfo("Listing Game Assemblies");
-        await UniTask.Run(() => LoadGameAssemblies());
 
         Logger.Global.LogInfo("Loading Details");
         await LoadDetails();
@@ -382,26 +378,6 @@ namespace StationeersLaunchPad
       }
     }
 
-    private static void LoadGameAssemblies()
-    {
-      foreach (var file in Directory.EnumerateFiles(AppDomain.CurrentDomain.BaseDirectory, "*.dll", SearchOption.AllDirectories))
-      {
-        try
-        {
-          using var def = AssemblyDefinition.ReadAssembly(file);
-          GameAssemblies.Add(def.Name.Name);
-        }
-        catch (BadImageFormatException)
-        {
-          // silently ignore
-        }
-        catch (Exception ex)
-        {
-          Logger.Global.LogError($"error reading game assembly {file}: {ex.Message}");
-        }
-      }
-    }
-
     private static async UniTask LoadDetails()
     {
       await UniTask.WhenAll(Mods.Select(mod => UniTask.Run(() => LoadModDetails(mod))));
@@ -423,17 +399,13 @@ namespace StationeersLaunchPad
 
       foreach (var file in Directory.GetFiles(mod.Wrapped.DirectoryPath, "*.dll", SearchOption.AllDirectories))
       {
-        var info = new AssemblyInfo { Path = file, Dependencies = new() };
-
-        using (var def = AssemblyDefinition.ReadAssembly(file))
+        var def = AssemblyDefinition.ReadAssembly(file, TypeLoader.ReaderParameters);
+        mod.Assemblies.Add(new()
         {
-          info.Name = def.Name.Name;
-          foreach (var module in def.Modules)
-            foreach (var mref in module.AssemblyReferences)
-              if (!GameAssemblies.Contains(mref.Name))
-                info.Dependencies.Add(mref.Name);
-        }
-        mod.Assemblies.Add(info);
+          Path = file,
+          Definition = def,
+          Name = def.Name.Name,
+        });
       }
 
       foreach (var file in Directory.GetFiles(mod.Wrapped.DirectoryPath, "*.assets", SearchOption.AllDirectories))
