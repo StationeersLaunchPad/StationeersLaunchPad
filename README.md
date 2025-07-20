@@ -12,7 +12,7 @@ A simple mod loader for Stationeers that allows you to edit mod configuration at
   - should end up with `BepInEx` folder and `doorstop_config.ini` file in same folder as rocketstation.exe
   - run game once to create folder structure
   - If running on Linux/Steam Deck via Proton/Wine, you will need to [perform some additional installation steps](https://docs.bepinex.dev/articles/advanced/proton_wine.html)
-    - Make sure to install the Windows version of BepInEx when running via Proton
+    - Since you are running a windows executable via Proton, make sure to use the Windows version of BepInEx linked above.
 - Install StationeersLaunchPad
   - download latest client zip from [Releases](https://github.com/StationeersLaunchPad/StationeersLaunchPad/releases)
   - extract into `BepInEx/plugins` folder
