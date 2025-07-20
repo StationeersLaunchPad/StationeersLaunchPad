@@ -2,7 +2,7 @@
 
 namespace StationeersLaunchPad
 {
-  public static class LaunchPadConsole
+  public static class LaunchPadConsoleGUI
   {
     public static bool IsActive = false;
 
@@ -19,11 +19,11 @@ namespace StationeersLaunchPad
     internal static bool shouldScroll = false;
     public static void DrawConsole()
     {
-      if (LaunchPadConfig.DrawEnumEntry(LaunchPadConfig.LogSeverities, logSeverity))
-        LaunchPadConfig.ConfigChanged = true;
+      if (LaunchPadConfigGUI.DrawEnumEntry(LaunchPadConfig.LogSeverities, logSeverity))
+        LaunchPadConfigGUI.ConfigChanged = true;
       ImGui.BeginChild("##logs", ImGuiWindowFlags.HorizontalScrollbar);
 
-      var logger = LaunchPadLoader.SelectedLogger ?? Logger.Global;
+      var logger = LaunchPadLoaderGUI.SelectedLogger ?? Logger.Global;
       var buffer = logger.Buffer;
       var lines = buffer.Lines;
       var lineCount = buffer.TotalCount;

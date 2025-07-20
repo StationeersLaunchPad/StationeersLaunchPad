@@ -189,21 +189,21 @@ namespace StationeersLaunchPad
       if (GameManager.IsBatchMode)
         return true;
 
-      if (LaunchPadLoader.IsActive)
-        LaunchPadLoader.Draw();
+      if (LaunchPadLoaderGUI.IsActive)
+        LaunchPadLoaderGUI.Draw();
 
-      if (LaunchPadConsole.IsActive)
-        LaunchPadConsole.Draw();
+      if (LaunchPadConsoleGUI.IsActive)
+        LaunchPadConsoleGUI.Draw();
 
-      if (LaunchPadConfig.IsActive)
-        LaunchPadConfig.Draw();
+      if (LaunchPadConfigGUI.IsActive)
+        LaunchPadConfigGUI.Draw();
 
       if (LaunchPadAlertGUI.IsActive)
         LaunchPadAlertGUI.Draw();
 
-      LaunchPadLoader.IsActive = LaunchPadConfig.LoadState != LoadState.Running;
+      LaunchPadLoaderGUI.IsActive = LaunchPadConfig.LoadState != LoadState.Running;
 
-      return !LaunchPadLoader.IsActive && !LaunchPadConsole.IsActive && !LaunchPadConfig.IsActive && !LaunchPadAlertGUI.IsActive;
+      return !LaunchPadLoaderGUI.IsActive && !LaunchPadConsoleGUI.IsActive && !LaunchPadConfigGUI.IsActive && !LaunchPadAlertGUI.IsActive;
     }
 
     [HarmonyPatch(typeof(WorldManager), "LoadDataFiles"), HarmonyPostfix]
@@ -313,11 +313,11 @@ namespace StationeersLaunchPad
     [HarmonyPatch(typeof(OrbitalSimulation), nameof(OrbitalSimulation.Draw)), HarmonyPrefix]
     static void WorkshopMenuDrawConfig()
     {
-      if (LaunchPadConsole.IsActive)
-        LaunchPadConsole.Draw();
+      if (LaunchPadConsoleGUI.IsActive)
+        LaunchPadConsoleGUI.Draw();
 
-      if (LaunchPadConfig.IsActive)
-        LaunchPadConfig.Draw();
+      if (LaunchPadConfigGUI.IsActive)
+        LaunchPadConfigGUI.Draw();
 
       if (LaunchPadAlertGUI.IsActive)
         LaunchPadAlertGUI.Draw();
@@ -335,7 +335,7 @@ namespace StationeersLaunchPad
       if (modData == null)
         return;
 
-      LaunchPadConfig.DrawWorkshopConfig(modData);
+      LaunchPadConfigGUI.DrawWorkshopConfig(modData);
     }
 
     [HarmonyPatch(typeof(SteamClient), nameof(SteamClient.Init)), HarmonyPrefix]

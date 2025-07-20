@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace StationeersLaunchPad
 {
-  public class LaunchPadLoader
+  public class LaunchPadLoaderGUI
   {
     public static bool IsActive = false;
 
@@ -35,7 +35,7 @@ namespace StationeersLaunchPad
       ImGui.Spacing();
       var line = Logger.Global.Last();
       if (line != null)
-        LaunchPadConsole.DrawConsoleLine(line, true);
+        LaunchPadConsoleGUI.DrawConsoleLine(line, true);
       else
         ImGuiHelper.Text("");
 
@@ -68,15 +68,16 @@ namespace StationeersLaunchPad
       ImGuiHelper.DrawWithPadding2(() => ImGui.Begin("##preloadermanual", ImGuiWindowFlags.NoDecoration | ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoSavedSettings));
 
       ImGuiHelper.TextColored("Initalize", LoadStateColor(LoadState.Initializing));
+      ImGuiHelper.ItemTooltip("State when LaunchPad is initalizing core components.");
       ImGuiHelper.DrawSameLine(() => ImGuiHelper.TextDisabled(">"), true);
 
       ImGuiHelper.TextColored("Locate Mods", LoadStateColor(LoadState.Searching));
+      ImGuiHelper.ItemTooltip("State when LaunchPad is searching for mods.");
       ImGuiHelper.DrawSameLine(() => ImGuiHelper.TextDisabled(">"), true);
 
       if (LaunchPadConfig.CheckUpdate)
       {
         ImGuiHelper.TextColored("Check Updates", LoadStateColor(LoadState.Updating));
-        ImGuiHelper.DrawSameLine(() => ImGuiHelper.TextDisabled("?"), true);
         ImGuiHelper.ItemTooltip("State when LaunchPad is checking for updates.");
         ImGuiHelper.DrawSameLine(() => ImGuiHelper.TextDisabled(">"), true);
       }
@@ -90,7 +91,6 @@ namespace StationeersLaunchPad
       {
         ImGuiHelper.TextColored("Load Mods", LoadStateColor(LoadState.Loading));
       }
-      ImGuiHelper.DrawSameLine(() => ImGuiHelper.TextDisabled("?"), true);
       ImGuiHelper.ItemTooltip("State when LaunchPad is ready to load mods.");
 
       ImGuiHelper.DrawSameLine(() => ImGuiHelper.TextDisabled(">"), true);
@@ -103,7 +103,6 @@ namespace StationeersLaunchPad
       {
         ImGuiHelper.TextColored("Start Game", LoadStateColor(LoadState.Loaded));
       }
-      ImGuiHelper.DrawSameLine(() => ImGuiHelper.TextDisabled("?"));
       ImGuiHelper.ItemTooltip("State when LaunchPad is ready to load the game.");
       ImGui.Separator();
 
@@ -117,7 +116,7 @@ namespace StationeersLaunchPad
         case LoadState.Updating:
         case LoadState.Configuring:
         {
-          LaunchPadConfig.ConfigChanged = false;
+          LaunchPadConfigGUI.ConfigChanged = false;
 
           if (LaunchPadConfig.LoadState == LoadState.Initializing)
           {
@@ -126,16 +125,16 @@ namespace StationeersLaunchPad
           }
           else
           {
-            if (LaunchPadConfig.DrawConfigEntry(LaunchPadConfig.AutoSortOnStart))
-              LaunchPadConfig.ConfigChanged = true;
+            if (LaunchPadConfigGUI.DrawConfigEntry(LaunchPadConfig.AutoSortOnStart))
+              LaunchPadConfigGUI.ConfigChanged = true;
 
             ImGui.SetCursorPosY(ImGui.GetCursorPosY() - ImGui.GetStyle().ItemSpacing.y);
             ImGui.Separator();
           }
 
-          LaunchPadConfig.DrawConfigTable(LaunchPadConfig.LoadState == LoadState.Configuring);
+          LaunchPadConfigGUI.DrawConfigTable(LaunchPadConfig.LoadState == LoadState.Configuring);
 
-          if (LaunchPadConfig.ConfigChanged)
+          if (LaunchPadConfigGUI.ConfigChanged)
           {
             if (LaunchPadConfig.AutoSort)
               LaunchPadConfig.SortByDeps();
@@ -166,7 +165,7 @@ namespace StationeersLaunchPad
       {
         if (ImGui.BeginTabItem("Logs"))
         {
-          LaunchPadConsole.DrawConsole();
+          LaunchPadConsoleGUI.DrawConsole();
           ImGui.EndTabItem();
         }
 
@@ -180,14 +179,14 @@ namespace StationeersLaunchPad
         );
         if (open)
         {
-          LaunchPadConfig.DrawConfigEditor();
+          LaunchPadConfigGUI.DrawConfigEditor();
           ImGui.EndTabItem();
         }
 
         if (ImGui.BeginTabItem("LaunchPad Configuration"))
         {
           DrawExportButton();
-          LaunchPadConfig.DrawConfigFile(LaunchPadConfig.SortedConfig, (category) => category == "Internal");
+          LaunchPadConfigGUI.DrawConfigFile(LaunchPadConfig.SortedConfig, (category) => category == "Internal");
 
           ImGui.EndTabItem();
         }
@@ -229,7 +228,7 @@ namespace StationeersLaunchPad
           if (ImGui.Selectable("##scopeselect", isSelected, ImGuiSelectableFlags.SpanAllColumns))
           {
             SelectedInfo = isSelected ? null : info;
-            LaunchPadConsole.shouldScroll = LaunchPadConfig.AutoScroll;
+            LaunchPadConsoleGUI.shouldScroll = LaunchPadConfig.AutoScroll;
           }
           ImGuiHelper.DrawSameLine(() => ImGuiHelper.Text($"{info.Source}"));
 
