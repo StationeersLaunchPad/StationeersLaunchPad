@@ -1,11 +1,7 @@
 ﻿using BepInEx.Configuration;
 using ImGuiNET;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
 using UI.ImGuiUi;
 using UnityEngine;
 
@@ -168,8 +164,7 @@ namespace StationeersLaunchPad
 
         foreach (var entry in category.Entries)
         {
-          if (DrawConfigEntry(entry))
-            ConfigChanged = true;
+          DrawConfigEntry(entry);
         }
       }
 

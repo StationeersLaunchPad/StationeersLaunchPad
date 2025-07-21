@@ -5,7 +5,6 @@ using Assets.Scripts.Util;
 using BepInEx;
 using BepInEx.Configuration;
 using Cysharp.Threading.Tasks;
-using ImGuiNET;
 using Mono.Cecil;
 using Steamworks;
 using Steamworks.Ugc;
@@ -18,7 +17,6 @@ using System.IO.Compression;
 using System.Linq;
 using System.Reflection;
 using System.Xml.Serialization;
-using UI.ImGuiUi;
 using UnityEngine;
 using BepInEx.Bootstrap;
 
@@ -53,6 +51,7 @@ namespace StationeersLaunchPad
     public static ConfigEntry<bool> OneTimeBoosterInstall;
     public static ConfigEntry<bool> AutoScrollLogs;
     public static ConfigEntry<LogSeverity> LogSeverities;
+    public static ConfigEntry<bool> CompactLogs;
 
     public static SortedConfigFile SortedConfig;
 
@@ -76,21 +75,135 @@ namespace StationeersLaunchPad
     public static Stopwatch AutoStopwatch = new();
     public static Stopwatch ElapsedStopwatch = new();
 
-    public static async void Run()
+    private static void InitConfig(ConfigFile config)
     {
+      DebugMode = config.Bind(
+        new ConfigDefinition("Startup", "DebugMode"),
+        false,
+        new ConfigDescription(
+          "If you run into issues with loading mods, or anything else, please enable this for more verbosity in error reports"
+        )
+      );
+      AutoLoadOnStart = config.Bind(
+        new ConfigDefinition("Startup", "AutoLoadOnStart"),
+        true,
+        new ConfigDescription(
+          "Automatically load after the configured wait time on startup. Can be stopped by clicking the loading window at the bottom"
+        )
+       );
+      CheckForUpdate = config.Bind(
+        new ConfigDefinition("Startup", "CheckForUpdate"),
+        !GameManager.IsBatchMode, // Default to false on DS
+        new ConfigDescription(
+          "Automatically check for mod loader updates on startup."
+        )
+      );
+      AutoUpdateOnStart = config.Bind(
+        new ConfigDefinition("Startup", "AutoUpdateOnStart"),
+        !GameManager.IsBatchMode, // Default to false on DS
+        new ConfigDescription(
+          "Automatically update mod loader on startup. Ignored if CheckForUpdate is not also enabled."
+        )
+      );
+      AutoLoadWaitTime = config.Bind(
+        new ConfigDefinition("Startup", "AutoLoadWaitTime"),
+        3,
+        new ConfigDescription(
+          "How many seconds to wait before loading mods, then loading the game",
+          new AcceptableValueRange<int>(3, 30)
+        )
+      );
+      AutoSortOnStart = config.Bind(
+        new ConfigDefinition("Startup", "AutoSort"),
+        true,
+        new ConfigDescription(
+          "Automatically sort based on LoadBefore/LoadAfter tags in mod data"
+        )
+      );
+      DisableSteam = config.Bind(
+        new ConfigDefinition("Startup", "DisableSteam"),
+        false,
+         new ConfigDescription(
+          "Don't attempt to load steam workshop mods"
+        )
+      );
+      StrategyType = config.Bind(
+        new ConfigDefinition("Mod Loading", "LoadStrategyType"),
+        LoadStrategyType.Linear,
+        new ConfigDescription(
+          "Linear type loads mods one by one in sequential order. More types of mod loading will be added later."
+        )
+      );
+      StrategyMode = config.Bind(
+        new ConfigDefinition("Mod Loading", "LoadStrategyMode"),
+        LoadStrategyMode.Serial,
+        new ConfigDescription(
+          "Parallel mode loads faster for a large number of mods, but may fail in extremely rare cases. Switch to serial mode if running into loading issues."
+        )
+      );
+      SavePathOverride = config.Bind(
+        new ConfigDefinition("Mod Loading", "SavePathOverride"),
+        "",
+        new ConfigDescription(
+          "This setting allows you to override the default path that config and save files are stored. Notice, due to how this path is implemented in the base game, this setting can only be applied on server start.  Changing it while in game will not have an effect until after a restart."
+        )
+      );
+      AutoScrollLogs = config.Bind(
+        new ConfigDefinition("Logging", "AutoScrollLogs"),
+        true,
+        new ConfigDescription(
+          "This setting will automatically scroll when new lines are present if enabled."
+        )
+      );
+      LogSeverities = config.Bind(
+        new ConfigDefinition("Logging", "LogSeverities"),
+        LogSeverity.All,
+        new ConfigDescription(
+          "This setting will filter what log severities will appear in the logging window."
+        )
+      );
+      CompactLogs = config.Bind(
+        new ConfigDefinition("Logging", "CompactLogs"),
+        false,
+        new ConfigDescription(
+          "Omit extra information from logs displayed in game."
+        )
+      );
+      PostUpdateCleanup = config.Bind(
+        new ConfigDefinition("Internal", "PostUpdateCleanup"),
+        true,
+        new ConfigDescription(
+          "This setting is automatically managed and should probably not be manually changed. Remove update backup files on start."
+        )
+      );
+      OneTimeBoosterInstall = config.Bind(
+        new ConfigDefinition("Internal", "OneTimeBoosterInstall"),
+        true,
+        new ConfigDescription(
+          "This setting is automatically managed and should probably not be manually changed. Perform one-time download of LaunchPadBooster to update from version that didn't include it."
+        )
+      );
+
+      SortedConfig = new SortedConfigFile(config);
+    }
+
+    public static async void Run(ConfigFile config)
+    {
+      // we need to wait a frame so all the RuntimeInitializeOnLoad tasks are complete, otherwise GameManager.IsBatchMode won't be set yet
+      await UniTask.Yield();
+
+      InitConfig(config);
+
       Debug = DebugMode.Value;
       AutoSort = AutoSortOnStart.Value;
       CheckUpdate = CheckForUpdate.Value;
       AutoUpdate = AutoUpdateOnStart.Value;
-      AutoLoad = AutoLoadOnStart.Value;
+      AutoLoad = AutoLoadOnStart.Value || GameManager.IsBatchMode; // always autoload on server
       LoadStrategyType = StrategyType.Value;
       LoadStrategyMode = StrategyMode.Value;
       SavePath = SavePathOverride.Value;
       AutoScroll = AutoScrollLogs.Value;
       Severities = LogSeverities.Value;
-
-      // we need to wait a frame so all the RuntimeInitializeOnLoad tasks are complete, otherwise GameManager.IsBatchMode won't be set yet
-      await UniTask.Yield();
 
       // steam is always disabled on dedicated servers
       SteamDisabled = DisableSteam.Value || GameManager.IsBatchMode;
@@ -100,8 +213,14 @@ namespace StationeersLaunchPad
       while (LoadState < LoadState.Updating)
         await UniTask.Yield();
 
-      if (HasUpdated && !GameManager.IsBatchMode)
+      if (HasUpdated)
       {
+        if (GameManager.IsBatchMode)
+        {
+          Logger.Global.LogWarning("LaunchPad has updated. Exiting");
+          Application.Quit();
+        }
+
         AutoLoad = false;
 
         await LaunchPadAlertGUI.Show("Restart Recommended", "StationeersLaunchPad has been updated, it is recommended to restart the game.",
@@ -135,8 +254,14 @@ namespace StationeersLaunchPad
         );
       }
 
+      if (!AutoLoad && GameManager.IsBatchMode)
+      {
+        Logger.Global.LogError("An error occurred during initialization. Exiting");
+        Application.Quit();
+      }
+
       AutoStopwatch.Restart();
-      while (LoadState == LoadState.Configuring && (!AutoLoad || AutoStopwatch.Elapsed.TotalSeconds < AutoLoadWaitTime.Value))
+      while (LoadState == LoadState.Configuring && !GameManager.IsBatchMode && (!AutoLoad || AutoStopwatch.Elapsed.TotalSeconds < AutoLoadWaitTime.Value))
         await UniTask.Yield();
 
       if (LoadState == LoadState.Configuring)
@@ -145,8 +270,14 @@ namespace StationeersLaunchPad
       if (LoadState == LoadState.Loading)
         await LoadMods();
 
+      if (!AutoLoad && GameManager.IsBatchMode)
+      {
+        Logger.Global.LogError("An error occurred during mod loading. Exiting");
+        Application.Quit();
+      }
+
       AutoStopwatch.Restart();
-      while (LoadState == LoadState.Loaded && (!AutoLoad || AutoStopwatch.Elapsed.TotalSeconds < AutoLoadWaitTime.Value))
+      while (LoadState == LoadState.Loaded && !GameManager.IsBatchMode && (!AutoLoad || AutoStopwatch.Elapsed.TotalSeconds < AutoLoadWaitTime.Value))
         await UniTask.Yield();
 
       StartGame();
@@ -366,8 +497,21 @@ namespace StationeersLaunchPad
         if (!result.HasValue || result.Value.ResultCount == 0)
           break;
 
+        var needsUpdate = result.Value.Entries.Where(item => item.NeedsUpdate || !item.IsInstalled || !Directory.Exists(item.Directory)).ToList();
+        if (needsUpdate.Count > 0)
+        {
+          Logger.Global.Log($"Updating {needsUpdate.Count} workshop items");
+          await UniTask.WhenAll(needsUpdate.Select(item => item.DownloadAsync().AsUniTask()));
+        }
+
         foreach (var item in result.Value.Entries)
         {
+          if (!item.IsInstalled)
+          {
+            Logger.Global.LogWarning($"workshop item {item.Title}({item.Id}) is not installed and will be skipped");
+            AutoLoad = false;
+            continue;
+          }
           Mods.Add(new ModInfo()
           {
             Source = ModSource.Workshop,

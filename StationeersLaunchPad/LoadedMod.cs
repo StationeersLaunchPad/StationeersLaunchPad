@@ -108,7 +108,7 @@ namespace StationeersLaunchPad
         this.Entrypoints.AddRange(ModLoader.FindBepInExEntrypoints(this.Assemblies));
         this.Entrypoints.AddRange(ModLoader.FindDefaultEntrypoints(this.Assemblies));
 
-        this.Logger.LogInfo("Found Entrypoints");
+        this.Logger.LogInfo($"Found {this.Entrypoints.Count} Entrypoints");
       });
     }
 

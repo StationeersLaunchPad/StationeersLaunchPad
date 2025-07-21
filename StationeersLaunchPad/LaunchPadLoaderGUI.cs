@@ -126,7 +126,10 @@ namespace StationeersLaunchPad
           else
           {
             if (LaunchPadConfigGUI.DrawConfigEntry(LaunchPadConfig.AutoSortOnStart))
+            {
+              LaunchPadConfig.AutoSort = LaunchPadConfig.AutoSortOnStart.Value;
               LaunchPadConfigGUI.ConfigChanged = true;
+            }
 
             ImGui.SetCursorPosY(ImGui.GetCursorPosY() - ImGui.GetStyle().ItemSpacing.y);
             ImGui.Separator();

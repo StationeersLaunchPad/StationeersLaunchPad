@@ -187,6 +187,9 @@ namespace StationeersLaunchPad
         AllowUpdate = true;
         return;
       }
+      // if autoupdate is not enabled on server, just move on after the out-of-date message
+      if (GameManager.IsBatchMode)
+        return;
 
       var description = Github.FormatDescription(release.Description);
       await LaunchPadAlertGUI.Show("Update Available", $"Update version {release.TagName} is available, would you like to automatically download and update?\n\n{description}",

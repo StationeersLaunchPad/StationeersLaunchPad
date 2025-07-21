@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Text;
 
 namespace StationeersLaunchPad
 {
@@ -31,6 +32,9 @@ namespace StationeersLaunchPad
 
     public bool IsException => !string.IsNullOrEmpty(this.Source) || !string.IsNullOrEmpty(this.StackTrace);
 
+    public readonly string FullString;
+    public readonly string CompactString;
+
     public LogLine(string prefix, string message, LogSeverity severity)
     {
       this.Prefix = prefix;
@@ -38,6 +42,9 @@ namespace StationeersLaunchPad
       this.Source = string.Empty;
       this.StackTrace = string.Empty;
       this.Severity = severity;
+
+      this.FullString = $"[{this.Prefix} - {this.Severity}]: {this.Message}";
+      this.CompactString = $"[{this.Prefix}]: {this.Message}";
     }
 
     public LogLine(string prefix, Exception exception)
@@ -47,8 +54,20 @@ namespace StationeersLaunchPad
       this.Source = exception.Source ?? string.Empty;
       this.StackTrace = exception.StackTrace ?? string.Empty;
       this.Severity = LogSeverity.Exception;
+
+      var sb = new StringBuilder();
+      while (exception != null)
+      {
+        sb.AppendLine(exception.Message);
+        sb.AppendLine(exception.StackTrace);
+        exception = exception.InnerException;
+      }
+      var fullStackTrace = sb.ToString().Trim();
+
+      this.FullString = $"[{this.Prefix} - {this.Source}]: {fullStackTrace}";
+      this.CompactString = $"[{this.Prefix}]: {fullStackTrace}";
     }
 
-    public override string ToString() => this.IsException ? $"[{this.Prefix} - {this.Source} - {this.StackTrace}]: {this.Message}" : $"[{this.Prefix} - {this.Severity}]: {this.Message}";
+    public override string ToString() => FullString;
   }
 }
