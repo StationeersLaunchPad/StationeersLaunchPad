@@ -72,20 +72,22 @@ namespace StationeersLaunchPad
 
     public void Log(string message, LogSeverity logSeverity = LogSeverity.Information, bool unity = true, string name = "")
     {
-      this.Buffer.Add(string.IsNullOrWhiteSpace(name) ? this.Name : name, message, logSeverity);
+      name = string.IsNullOrWhiteSpace(name) ? this.Name : name;
+      this.Buffer.Add(name, message, logSeverity);
 
       if (this.IsChild)
-        this.Parent?.Log(message, logSeverity, unity, this.Name);
+        this.Parent?.Log(message, logSeverity, unity, name);
       else if (unity)
-        this.LogUnity(message, logSeverity);
+        this.LogUnity(message, logSeverity, name);
     }
 
     public void Log(Exception exception, bool unity = true, string name = "")
     {
-      this.Buffer.Add(string.IsNullOrWhiteSpace(name) ? this.Name : name, exception);
+      name = string.IsNullOrWhiteSpace(name) ? this.Name : name;
+      this.Buffer.Add(name, exception);
 
       if (this.IsChild)
-        this.Parent?.Log(exception, unity, this.Name);
+        this.Parent?.Log(exception, unity, name);
       else if (unity)
         this.LogUnity(exception);
     }

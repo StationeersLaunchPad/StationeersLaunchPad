@@ -22,13 +22,13 @@ namespace StationeersLaunchPad
 
     public static bool ConfigChanged = false;
     private static ModInfo draggingMod = null;
-    private static int draggingIndex = -1;
     public static void DrawConfigTable(bool edit = false)
     {
       if (!ImGui.IsMouseDown(ImGuiMouseButton.Left))
         draggingMod = null;
 
       var hoveringIndex = -1;
+      var draggingIndex = -1;
       if (draggingMod != null)
         draggingIndex = LaunchPadConfig.Mods.IndexOf(draggingMod);
 
@@ -54,10 +54,14 @@ namespace StationeersLaunchPad
 
           ImGui.TableNextColumn();
           ImGui.Selectable($"##rowdrag", mod == draggingMod, ImGuiSelectableFlags.SpanAllColumns);
-          if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenBlockedByActiveItem) && ImGui.IsMouseClicked(ImGuiMouseButton.Left) && draggingMod == null)
+          if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenBlockedByActiveItem))
           {
-            hoveringIndex = draggingIndex = i;
-            draggingMod = mod;
+            hoveringIndex = i;
+            if (ImGui.IsMouseClicked(ImGuiMouseButton.Left) && draggingMod == null)
+            {
+              draggingIndex = i;
+              draggingMod = mod;
+            }
           }
 
           ImGuiHelper.DrawSameLine(() => ImGuiHelper.Text($"{mod.Source}"));
@@ -89,7 +93,7 @@ namespace StationeersLaunchPad
 
         while (draggingIndex > hoveringIndex)
         {
-          (LaunchPadConfig.Mods[draggingIndex - 1], LaunchPadConfig.Mods[draggingIndex]) = (LaunchPadConfig.Mods[draggingIndex],  LaunchPadConfig.Mods[draggingIndex - 1]);
+          (LaunchPadConfig.Mods[draggingIndex - 1], LaunchPadConfig.Mods[draggingIndex]) = (LaunchPadConfig.Mods[draggingIndex], LaunchPadConfig.Mods[draggingIndex - 1]);
           draggingIndex--;
         }
 
