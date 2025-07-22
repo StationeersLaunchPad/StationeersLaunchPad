@@ -336,7 +336,7 @@ namespace StationeersLaunchPad
     {
       var changed = false;
       var value = entry.Value;
-      if (ImGui.InputText("##stringvalue", ref value, uint.MaxValue, ImGuiInputTextFlags.EnterReturnsTrue) || ImGui.IsItemDeactivatedAfterEdit())
+      if (ImGui.InputText("##stringvalue", ref value, 512, ImGuiInputTextFlags.EnterReturnsTrue) || ImGui.IsItemDeactivatedAfterEdit())
       {
         entry.BoxedValue = value;
         changed = true;
