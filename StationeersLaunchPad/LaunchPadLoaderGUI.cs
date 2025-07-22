@@ -30,6 +30,7 @@ namespace StationeersLaunchPad
     {
       ImGuiHelper.DrawWithPadding(() => ImGui.Begin("##preloaderauto", ImGuiWindowFlags.NoDecoration | ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoSavedSettings));
 
+      ImGuiHelper.Text($"StationeersLaunchPad {LaunchPadPlugin.pluginVersion}");
       DrawLoadingState();
 
       ImGui.Spacing();
@@ -51,21 +52,26 @@ namespace StationeersLaunchPad
 
     public static void DrawLoadingState() => ImGuiHelper.Text(LaunchPadConfig.LoadState switch
     {
-      LoadState.Initializing => "LaunchPad Initializing",
-      LoadState.Searching => "LaunchPad Finding Mods",
-      LoadState.Updating => "LaunchPad Checking for Updating",
-      LoadState.Configuring => $"LaunchPad Loading Mods in {autoTime}s",
-      LoadState.Loading => "LaunchPad Loading Mods",
+      LoadState.Initializing => "Initializing",
+      LoadState.Searching => "Finding Mods",
+      LoadState.Updating => "Checking for Updating",
+      LoadState.Configuring => $"Loading Mods in {autoTime}s",
+      LoadState.Loading => "Loading Mods",
       LoadState.Loaded => $"Starting game in {autoTime}s",
       LoadState.Running => "Game Running",
-      LoadState.Updated => "LaunchPad Updated",
-      LoadState.Failed => "LaunchPad Loading Failed",
+      LoadState.Updated => "Updated",
+      LoadState.Failed => "Loading Failed",
       _ => throw new ArgumentOutOfRangeException(),
     });
 
+    private static bool openLogs = false;
+    private static bool openInfo = false;
     public static void DrawManualLoad()
     {
       ImGuiHelper.DrawWithPadding2(() => ImGui.Begin("##preloadermanual", ImGuiWindowFlags.NoDecoration | ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoSavedSettings));
+
+      ImGuiHelper.TextDisabled(LaunchPadPlugin.pluginVersion);
+      ImGuiHelper.DrawSameLine(() => ImGuiHelper.TextDisabled("|"), true);
 
       ImGuiHelper.TextColored("Initalize", LoadStateColor(LoadState.Initializing));
       ImGuiHelper.ItemTooltip("State when LaunchPad is initalizing core components.");
@@ -85,7 +91,10 @@ namespace StationeersLaunchPad
       if (LaunchPadConfig.LoadState == LoadState.Configuring)
       {
         if (ImGui.SmallButton("Load Mods"))
+        {
           LaunchPadConfig.LoadState = LoadState.Loading;
+          openLogs = true;
+        }
       }
       else
       {
@@ -116,7 +125,7 @@ namespace StationeersLaunchPad
         case LoadState.Updating:
         case LoadState.Configuring:
         {
-          LaunchPadConfigGUI.ConfigChanged = false;
+          ConfigChanged = false;
 
           if (LaunchPadConfig.LoadState == LoadState.Initializing)
           {
@@ -128,16 +137,16 @@ namespace StationeersLaunchPad
             if (LaunchPadConfigGUI.DrawConfigEntry(LaunchPadConfig.AutoSortOnStart))
             {
               LaunchPadConfig.AutoSort = LaunchPadConfig.AutoSortOnStart.Value;
-              LaunchPadConfigGUI.ConfigChanged = true;
+              ConfigChanged = true;
             }
 
             ImGui.SetCursorPosY(ImGui.GetCursorPosY() - ImGui.GetStyle().ItemSpacing.y);
             ImGui.Separator();
           }
 
-          LaunchPadConfigGUI.DrawConfigTable(LaunchPadConfig.LoadState == LoadState.Configuring);
+          DrawConfigTable(LaunchPadConfig.LoadState == LoadState.Configuring);
 
-          if (LaunchPadConfigGUI.ConfigChanged)
+          if (ConfigChanged)
           {
             if (LaunchPadConfig.AutoSort)
               LaunchPadConfig.SortByDeps();
@@ -166,15 +175,29 @@ namespace StationeersLaunchPad
       ImGui.SetCursorPosY(ImGui.GetStyle().ItemSpacing.y * 2);
       if (ImGui.BeginTabBar("##right"))
       {
-        if (ImGui.BeginTabItem("Logs"))
+        if (ImGui.BeginTabItem("Logs", openLogs ? ImGuiTabItemFlags.SetSelected : ImGuiTabItemFlags.None))
         {
           LaunchPadConsoleGUI.DrawConsole();
           ImGui.EndTabItem();
         }
+        openLogs = false;
+
+        var open = ImGui.BeginTabItem("Mod Info", openInfo ? ImGuiTabItemFlags.SetSelected : ImGuiTabItemFlags.None);
+        ImGuiHelper.ItemTooltip("View detailed mod information");
+        if (open)
+        {
+          ImGui.BeginChild("##modinfo", ImGuiWindowFlags.HorizontalScrollbar);
+          DrawModInfo();
+          ImGui.EndChild();
+          ImGui.EndTabItem();
+        }
+        else if (!openInfo && LaunchPadConfig.LoadState <= LoadState.Loading)
+          SelectedInfo = null;
+        openInfo = false;
 
         var disabled = LaunchPadConfig.LoadState <= LoadState.Loading;
         ImGui.BeginDisabled(disabled);
-        var open = ImGui.BeginTabItem("Mod Configuration");
+        open = ImGui.BeginTabItem("Mod Configuration");
         ImGui.EndDisabled();
         ImGuiHelper.ItemTooltip(
           disabled ? "Mods must be loaded to edit configuration" : "Edit mod specific configuration",
@@ -199,6 +222,99 @@ namespace StationeersLaunchPad
 
       ImGui.EndColumns();
       ImGui.End();
+    }
+
+    public static bool ConfigChanged = false;
+    private static ModInfo draggingMod = null;
+    private static bool dragged = false;
+    public static void DrawConfigTable(bool edit = false)
+    {
+      if (!ImGui.IsMouseDown(ImGuiMouseButton.Left))
+      {
+        if (draggingMod != null && !dragged)
+        {
+          SelectedInfo = draggingMod;
+          if (SelectedInfo?.Source == ModSource.Core)
+            SelectedInfo = null;
+          openInfo = SelectedInfo != null;
+        }
+        draggingMod = null;
+        dragged = false;
+      }
+
+      var hoveringIndex = -1;
+      var draggingIndex = -1;
+      if (draggingMod != null)
+        draggingIndex = LaunchPadConfig.Mods.IndexOf(draggingMod);
+
+      if (!edit)
+        ImGui.BeginDisabled();
+
+      if (ImGui.BeginTable("##configtable", 3, ImGuiTableFlags.SizingFixedFit))
+      {
+        ImGui.TableSetupColumn("##enabled");
+        ImGui.TableSetupColumn("##type");
+        ImGui.TableSetupColumn("##name", ImGuiTableColumnFlags.WidthStretch);
+
+        for (var i = 0; i < LaunchPadConfig.Mods.Count; i++)
+        {
+          var mod = LaunchPadConfig.Mods[i];
+
+          ImGui.TableNextRow();
+          ImGui.PushID(i);
+          ImGui.TableNextColumn();
+
+          if (ImGui.Checkbox("##enable", ref mod.Enabled))
+            ConfigChanged = true;
+
+          ImGui.TableNextColumn();
+          ImGui.Selectable($"##rowdrag", mod == draggingMod || (draggingMod == null && mod == SelectedInfo), ImGuiSelectableFlags.SpanAllColumns);
+          if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenBlockedByActiveItem))
+          {
+            hoveringIndex = i;
+            if (ImGui.IsMouseClicked(ImGuiMouseButton.Left) && draggingMod == null)
+            {
+              draggingIndex = i;
+              draggingMod = mod;
+            }
+          }
+
+          ImGuiHelper.DrawSameLine(() => ImGuiHelper.Text($"{mod.Source}"));
+
+          ImGui.TableNextColumn();
+          ImGuiHelper.Text($"{mod.DisplayName}");
+
+          if (draggingMod != null)
+            if (mod.SortBefore(draggingMod))
+              ImGuiHelper.DrawSameLine(() => ImGuiHelper.TextRightDisabled("Before"));
+            else if (draggingMod.SortBefore(mod))
+              ImGuiHelper.DrawSameLine(() => ImGuiHelper.TextRightDisabled("After"));
+
+          ImGui.PopID();
+        }
+        ImGui.EndTable();
+      }
+
+      if (!edit)
+        ImGui.EndDisabled();
+
+      if (edit && draggingIndex != -1 && hoveringIndex != -1 && draggingIndex != hoveringIndex)
+      {
+        dragged = true;
+        while (draggingIndex < hoveringIndex)
+        {
+          (LaunchPadConfig.Mods[draggingIndex + 1], LaunchPadConfig.Mods[draggingIndex]) = (LaunchPadConfig.Mods[draggingIndex], LaunchPadConfig.Mods[draggingIndex + 1]);
+          draggingIndex++;
+        }
+
+        while (draggingIndex > hoveringIndex)
+        {
+          (LaunchPadConfig.Mods[draggingIndex - 1], LaunchPadConfig.Mods[draggingIndex]) = (LaunchPadConfig.Mods[draggingIndex], LaunchPadConfig.Mods[draggingIndex - 1]);
+          draggingIndex--;
+        }
+
+        ConfigChanged = true;
+      }
     }
 
     public static ModInfo SelectedInfo = null;
@@ -295,6 +411,66 @@ namespace StationeersLaunchPad
       if (ImGui.Button("Export Mod Package"))
         LaunchPadConfig.ExportModPackage();
       ImGuiHelper.ItemTooltip("Package enabled mods into a zip file for dedicated servers.");
+    }
+
+    public static void DrawModInfo()
+    {
+      if (SelectedInfo == null)
+      {
+        ImGuiHelper.TextDisabled("Selected a mod to view detailed info");
+        return;
+      }
+      var about = SelectedInfo.About;
+      var workshopId = SelectedInfo.Wrapped.Id;
+      if (workshopId == 0)
+        workshopId = about?.WorkshopHandle ?? 0;
+
+      ImGuiHelper.Text(SelectedInfo.DisplayName);
+
+      if (ImGui.Button("Open Local Folder"))
+        SelectedInfo.OpenLocalFolder();
+
+      if (workshopId != 0)
+      {
+        ImGui.SameLine();
+        if (ImGui.Button("Open Workshop Page"))
+          SelectedInfo.OpenWorkshopPage();
+      }
+
+      ImGuiHelper.Text("Source:");
+      ImGui.SameLine();
+      ImGuiHelper.Text(SelectedInfo.Source.ToString());
+
+      ImGuiHelper.Text("Path:");
+      ImGui.SameLine();
+      ImGuiHelper.Text(SelectedInfo.Path);
+
+      if (about == null)
+      {
+        ImGuiHelper.TextDisabled("Missing About.xml");
+        return;
+      }
+
+      if (workshopId != 0)
+      {
+        ImGuiHelper.Text("Workshop ID:");
+        ImGui.SameLine();
+        ImGuiHelper.Text($"{workshopId}");
+      }
+
+      ImGuiHelper.Text("Author:");
+      ImGui.SameLine();
+      ImGuiHelper.Text(about.Author ?? "");
+
+      ImGuiHelper.Text("Version:");
+      ImGui.SameLine();
+      ImGuiHelper.Text(about.Version ?? "");
+
+      ImGuiHelper.Text("ChangeLog:");
+      ImGuiHelper.Text(about.ChangeLog ?? "");
+
+      ImGuiHelper.Text("Description:");
+      ImGuiHelper.Text(about.Description ?? "");
     }
 
     public static bool IsLoadState(params LoadState[] expected) => expected.Contains(LaunchPadConfig.LoadState);

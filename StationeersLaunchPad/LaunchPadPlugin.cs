@@ -3,8 +3,6 @@ using Assets.Scripts.Networking.Transports;
 using Assets.Scripts.Serialization;
 using Assets.Scripts.UI;
 using BepInEx;
-using BepInEx.Bootstrap;
-using BepInEx.Configuration;
 using Cysharp.Threading.Tasks;
 using HarmonyLib;
 using Steamworks;
@@ -69,12 +67,6 @@ namespace StationeersLaunchPad
       typeof(SplashBehaviour).GetProperty("IsActive").SetValue(null, true);
 
       return false;
-    }
-
-    [HarmonyPatch(typeof(GameManager), nameof(GameManager.ManagerUpdate))]
-    static void MonoBehaviourDraw()
-    {
-     
     }
 
     [HarmonyPatch(typeof(SplashBehaviour), nameof(SplashBehaviour.Draw)), HarmonyPrefix]

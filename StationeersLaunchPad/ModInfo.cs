@@ -1,13 +1,17 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Xml;
 using System.Xml.Serialization;
 using Assets.Scripts.Networking.Transports;
 using Steamworks.Ugc;
+using UnityEngine;
 
-namespace StationeersLaunchPad {
-  public class ModInfo {
+namespace StationeersLaunchPad
+{
+  public class ModInfo
+  {
     public const int MOD_NAME_SIZE_LIMIT = 128;
     public const int MOD_DESCRIPTION_SIZE_LIMIT = 8000;
     public const int MOD_CHANGELOG_SIZE_LIMIT = 8000;
@@ -34,8 +38,10 @@ namespace StationeersLaunchPad {
 
     public LoadedMod Loaded;
 
-    public string DisplayName {
-      get {
+    public string DisplayName
+    {
+      get
+      {
         if (this.Source == ModSource.Core)
           return "Core";
         if (this.About == null)
@@ -44,17 +50,18 @@ namespace StationeersLaunchPad {
       }
     }
 
-    public ulong WorkshopHandle {
-      get {
-        if (this.Source == ModSource.Core)
-          return 1;
-        if (this.About == null)
-          return ulong.MaxValue;
-        return this.About.WorkshopHandle;
-      }
+    public ulong WorkshopHandle
+    {
+      get => this.Source switch
+      {
+        ModSource.Core => 1,
+        ModSource.Workshop => this.Wrapped.Id,
+        _ => this.About?.WorkshopHandle ?? ulong.MaxValue,
+      };
     }
 
-    public bool SortBefore(ModInfo other) {
+    public bool SortBefore(ModInfo other)
+    {
       if (other.About?.LoadBefore?.Find(v => v.Id == this.WorkshopHandle) != null)
         return true;
       var selfAfter = this.About?.LoadAfter;
@@ -63,7 +70,8 @@ namespace StationeersLaunchPad {
       return false;
     }
 
-    public (bool, string) IsWorkshopValid() {
+    public (bool, string) IsWorkshopValid()
+    {
       // if its core its fine, if its on the workshop in the first place its probably fine too
       if (this.Source != ModSource.Local)
         return (true, string.Empty);
@@ -89,16 +97,42 @@ namespace StationeersLaunchPad {
 
       return (true, string.Empty);
     }
+
+    public void OpenLocalFolder()
+    {
+      try
+      {
+        Process.Start("explorer.exe", $"\"{this.Wrapped.DirectoryPath}\"");
+      }
+      catch (Exception ex)
+      {
+        Logger.Global.LogException(ex);
+      }
+    }
+
+    public void OpenWorkshopPage()
+    {
+      try
+      {
+        Application.OpenURL($"steam://url/CommunityFilePage/{WorkshopHandle}");
+      }
+      catch (Exception ex)
+      {
+        Logger.Global.LogException(ex);
+      }
+    }
   }
 
-  public enum ModSource {
+  public enum ModSource
+  {
     Core,
     Local,
     Workshop
   }
 
   [XmlRoot("ModMetadata")]
-  public class ModAbout {
+  public class ModAbout
+  {
     [XmlElement]
     public string Name;
 
@@ -115,7 +149,8 @@ namespace StationeersLaunchPad {
     private string _inGameDescription;
 
     [XmlElement("InGameDescription", IsNullable = true)]
-    public XmlCDataSection InGameDescription {
+    public XmlCDataSection InGameDescription
+    {
       get => !string.IsNullOrEmpty(this._inGameDescription) ? new XmlDocument().CreateCDataSection(this._inGameDescription) : null;
       set => this._inGameDescription = value?.Value;
     }
@@ -140,7 +175,8 @@ namespace StationeersLaunchPad {
   }
 
   [XmlRoot("Mod")]
-  public class ModVersion {
+  public class ModVersion
+  {
     [XmlElement]
     public string Version;
 

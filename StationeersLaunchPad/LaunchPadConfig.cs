@@ -750,6 +750,8 @@ namespace StationeersLaunchPad
       ElapsedStopwatch.Restart();
       LoadState = LoadState.Loading;
 
+      LaunchPadLoaderGUI.SelectedInfo = null;
+
       LoadStrategy loadStrategy = (LoadStrategyType, LoadStrategyMode) switch
       {
         (LoadStrategyType.Linear, LoadStrategyMode.Serial) => new LoadStrategyLinearSerial(),
