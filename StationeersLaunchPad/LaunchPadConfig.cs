@@ -489,36 +489,33 @@ namespace StationeersLaunchPad
 
     private static async UniTask LoadWorkshopItems()
     {
+      var items = new List<Item>();
       for (var page = 1; ; page++)
       {
         var query = Query.Items.WithTag("Mod");
-        var result = await query.AllowCachedResponse(0).WhereUserSubscribed().GetPageAsync(page);
+        using var result = await query.AllowCachedResponse(0).WhereUserSubscribed().GetPageAsync(page);
 
         if (!result.HasValue || result.Value.ResultCount == 0)
           break;
 
-        var needsUpdate = result.Value.Entries.Where(item => item.NeedsUpdate || !item.IsInstalled || !Directory.Exists(item.Directory)).ToList();
-        if (needsUpdate.Count > 0)
-        {
-          Logger.Global.Log($"Updating {needsUpdate.Count} workshop items");
-          await UniTask.WhenAll(needsUpdate.Select(item => item.DownloadAsync().AsUniTask()));
-        }
+        items.AddRange(result.Value.Entries);
+      }
 
-        foreach (var item in result.Value.Entries)
+      var needsUpdate = items.Where(item => item.NeedsUpdate || !Directory.Exists(item.Directory)).ToList();
+      if (needsUpdate.Count > 0)
+      {
+        Logger.Global.Log($"Updating {needsUpdate.Count} workshop items");
+        await UniTask.WhenAll(needsUpdate.Select(item => item.DownloadAsync().AsUniTask()));
+      }
+
+      foreach (var item in items)
+      {
+        Mods.Add(new ModInfo()
         {
-          if (!item.IsInstalled)
-          {
-            Logger.Global.LogWarning($"workshop item {item.Title}({item.Id}) is not installed and will be skipped");
-            AutoLoad = false;
-            continue;
-          }
-          Mods.Add(new ModInfo()
-          {
-            Source = ModSource.Workshop,
-            Wrapped = SteamTransport.ItemWrapper.WrapWorkshopItem(item, "About\\About.xml"),
-            WorkshopItem = item,
-          });
-        }
+          Source = ModSource.Workshop,
+          Wrapped = SteamTransport.ItemWrapper.WrapWorkshopItem(item, "About\\About.xml"),
+          WorkshopItem = item,
+        });
       }
     }
 

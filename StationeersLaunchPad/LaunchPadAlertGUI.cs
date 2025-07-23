@@ -66,7 +66,7 @@ namespace StationeersLaunchPad {
       Size = DefaultSize;
       Position = DefaultPosition;
 
-      Buttons?.Clear();
+      Buttons = null;
     }
 
     public static void DrawAlert() {
