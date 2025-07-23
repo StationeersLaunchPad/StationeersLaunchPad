@@ -136,6 +136,20 @@ namespace StationeersLaunchPad
         detail.ChangeNote = SavedChangeLog;
     }
 
+    [HarmonyPatch(typeof(WorkshopMenu), "SaveWorkShopFileHandle"), HarmonyPrefix]
+    static bool WorkshopMenu_SaveWorkShopFileHandle(SteamTransport.WorkShopItemDetail ItemDetail, ModData mod)
+    {
+      // If we can deserialize it as our extended mod metadata, use that instead
+      var about = XmlSerialization.Deserialize<ModAbout>(mod.AboutXmlPath, "ModMetadata");
+      if (about != null)
+      {
+        about.WorkshopHandle = ItemDetail.PublishedFileId;
+        about.SaveXml(mod.AboutXmlPath);
+        return false;
+      }
+      return true;
+    }
+
     [HarmonyPatch(typeof(WorkshopMenu), "SelectMod"), HarmonyPostfix]
     static void WorkshopMenuSelectMod(WorkshopMenu __instance, WorkshopModListItem modItem)
     {
