@@ -498,13 +498,16 @@ namespace StationeersLaunchPad
         if (!result.HasValue || result.Value.ResultCount == 0)
           break;
 
-        items.AddRange(result.Value.Entries);
+        // filter out deleted items
+        items.AddRange(result.Value.Entries.Where(item => item.Result != Result.FileNotFound));
       }
 
       var needsUpdate = items.Where(item => item.NeedsUpdate || !Directory.Exists(item.Directory)).ToList();
       if (needsUpdate.Count > 0)
       {
         Logger.Global.Log($"Updating {needsUpdate.Count} workshop items");
+        foreach (var item in needsUpdate)
+          Logger.Global.Log($"- {item.Title}({item.Id})");
         await UniTask.WhenAll(needsUpdate.Select(item => item.DownloadAsync().AsUniTask()));
       }
 
