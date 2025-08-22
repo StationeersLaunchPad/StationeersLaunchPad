@@ -1,4 +1,5 @@
 using Assets.Scripts;
+using Assets.Scripts.Networking;
 using Assets.Scripts.Networking.Transports;
 using Assets.Scripts.Serialization;
 using Assets.Scripts.UI;
@@ -7,9 +8,11 @@ using Cysharp.Threading.Tasks;
 using HarmonyLib;
 using Steamworks;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Reflection.Emit;
 using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
@@ -244,6 +247,36 @@ namespace StationeersLaunchPad
       // If its already initialized, just skip instead of erroring
       // We initialize this before the game does, but we still want the game to think it initialized itself
       return !SteamClient.IsValid;
+    }
+
+    [HarmonyPatch(typeof(NetworkManager), nameof(NetworkManager.Init), typeof(TransportType)), HarmonyTranspiler]
+    static IEnumerable<CodeInstruction> NetworkManager_Init(IEnumerable<CodeInstruction> instructions)
+    {
+      var matcher = new CodeMatcher(instructions);
+      matcher.MatchStartForward(new CodeInstruction(OpCodes.Newobj, typeof(MetaServerTransport).GetConstructor(Type.EmptyTypes)));
+      if (!matcher.IsValid)
+      {
+        Logger.Global.LogError("Could not patch NetworkManager.Init. Steam integration may not work properly");
+        return instructions;
+      }
+      matcher.RemoveInstruction();
+      matcher.Insert(CodeInstruction.Call(() => GetMetaServerTransport()));
+      return matcher.Instructions();
+    }
+
+    private static MetaServerTransport metaServerTransport;
+    public static MetaServerTransport GetMetaServerTransport()
+    {
+      if (metaServerTransport == null)
+          metaServerTransport = new();
+      return metaServerTransport;
+    }
+
+    [HarmonyPatch(typeof(MetaServerTransport), nameof(MetaServerTransport.InitClient)), HarmonyPrefix]
+    static bool MetaServerTransport_InitClient(MetaServerTransport __instance)
+    {
+      // don't double initialize
+      return !__instance.IsInitialised;
     }
 
     [HarmonyPatch(typeof(GameString), "op_Implicit", new Type[] { typeof(GameString) }), HarmonyPrefix]

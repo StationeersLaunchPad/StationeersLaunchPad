@@ -352,11 +352,12 @@ namespace StationeersLaunchPad
     {
       if (string.IsNullOrEmpty(Settings.CurrentData.SavePath))
         Settings.CurrentData.SavePath = StationSaveUtils.DefaultPath;
-      if (!SteamClient.IsValid && !SteamDisabled)
+      if (!SteamDisabled)
       {
         try
         {
-          SteamClient.Init(SteamTransport.APP_ID);
+          var transport = LaunchPadPatches.GetMetaServerTransport();
+          transport.InitClient();
         }
         catch (Exception ex)
         {
