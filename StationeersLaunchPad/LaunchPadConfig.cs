@@ -110,7 +110,7 @@ namespace StationeersLaunchPad
         3,
         new ConfigDescription(
           "How many seconds to wait before loading mods, then loading the game",
-          new AcceptableValueRange<int>(3, 30)
+          new AcceptableValueRange<int>(0, 30)
         )
       );
       AutoSortOnStart = config.Bind(
