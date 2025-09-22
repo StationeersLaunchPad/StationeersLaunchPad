@@ -52,6 +52,7 @@ namespace StationeersLaunchPad
     public static ConfigEntry<bool> AutoScrollLogs;
     public static ConfigEntry<LogSeverity> LogSeverities;
     public static ConfigEntry<bool> CompactLogs;
+    public static ConfigEntry<bool> LinuxPathPatch;
 
     public static SortedConfigFile SortedConfig;
 
@@ -183,6 +184,13 @@ namespace StationeersLaunchPad
           "This setting is automatically managed and should probably not be manually changed. Perform one-time download of LaunchPadBooster to update from version that didn't include it."
         )
       );
+      LinuxPathPatch = config.Bind(
+        new ConfigDefinition("Internal", "LinuxPathPatch"),
+        Path.DirectorySeparatorChar != '\\',
+        new ConfigDescription(
+          "Patch xml mod data loading to properly handle linux path separators"
+        )
+      );
 
       SortedConfig = new SortedConfigFile(config);
     }
@@ -207,6 +215,9 @@ namespace StationeersLaunchPad
 
       // steam is always disabled on dedicated servers
       SteamDisabled = DisableSteam.Value || GameManager.IsBatchMode;
+
+      if (LinuxPathPatch.Value)
+        LaunchPadPlugin.RunLinuxPathPatch();
 
       await Load();
 

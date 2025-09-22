@@ -29,6 +29,8 @@ namespace StationeersLaunchPad
     public const string pluginName = "StationeersLaunchPad";
     public const string pluginVersion = "0.2.11";
 
+    private static Harmony harmony;
+
     void Awake()
     {
       if (Harmony.HasAnyPatches(pluginGuid))
@@ -46,7 +48,7 @@ namespace StationeersLaunchPad
       // referencing LaunchPadConfig fields in this method will force the class to initialize before the method starts
       // we need to add the resolve hook above before LaunchPadConfig initializes so the steamworks types will be valid on linux
 
-      var harmony = new Harmony(pluginGuid);
+      harmony = new Harmony(pluginGuid);
       harmony.PatchAll();
 
       var unityLogger = Debug.unityLogger as UnityEngine.Logger;
@@ -56,6 +58,11 @@ namespace StationeersLaunchPad
       PlayerLoopHelper.Initialize(ref playerLoop);
 
       LaunchPadConfig.Run(Config);
+    }
+
+    public static void RunLinuxPathPatch()
+    {
+      harmony.CreateClassProcessor(typeof(LinuxPathPatch), true).Patch();
     }
   }
 
@@ -300,6 +307,33 @@ namespace StationeersLaunchPad
             StationSaveUtils.ExeDirectory.FullName,
           LaunchPadConfig.SavePath);
       return false;
+    }
+  }
+
+  // no HarmonyPatch on class so it isn't auto-run
+  static class LinuxPathPatch
+  {
+    [HarmonyPatch(typeof(WorldManager), "LoadDataFilesAtPath", typeof(string)), HarmonyTranspiler]
+    static IEnumerable<CodeInstruction> WorldManager_LoadDataFilesAtPath(IEnumerable<CodeInstruction> instructions)
+    {
+      var matcher = new CodeMatcher(instructions);
+
+      while (true)
+      {
+        matcher.MatchStartForward(new CodeInstruction(OpCodes.Ldstr));
+        if (matcher.IsInvalid)
+          break;
+        var curStr = matcher.Instruction.operand as string;
+        if (curStr.Contains('\\'))
+        {
+          var replaced = curStr.Replace('\\', Path.DirectorySeparatorChar);
+          matcher.Instruction.operand = replaced;
+          Logger.Global.LogDebug($"WorldManager.LoadDataFilesAtPath patched: {curStr} => {replaced}");
+        }
+        matcher.Advance(1);
+      }
+
+      return matcher.Instructions();
     }
   }
 }
