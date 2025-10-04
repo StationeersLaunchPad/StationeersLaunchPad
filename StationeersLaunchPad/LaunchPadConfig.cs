@@ -812,7 +812,7 @@ namespace StationeersLaunchPad
             var root = mod.Wrapped.DirectoryPath;
             foreach (var file in Directory.GetFiles(root, "*", SearchOption.AllDirectories))
             {
-              var entryPath = Path.Combine("mods", dirName, file.Substring(root.Length + 1));
+              var entryPath = Path.Combine("mods", dirName, file.Substring(root.Length + 1)).Replace('\\', '/');
               archive.CreateEntryFromFile(file, entryPath);
             }
             config.Mods.Add(new LocalModData(dirName, true));
