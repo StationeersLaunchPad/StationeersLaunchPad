@@ -6,6 +6,7 @@ using Assets.Scripts.UI;
 using BepInEx;
 using Cysharp.Threading.Tasks;
 using HarmonyLib;
+using Networking;
 using Steamworks;
 using System;
 using System.Collections.Generic;
@@ -18,6 +19,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.LowLevel;
+using Util.Commands;
 using GameString = Assets.Scripts.Localization2.GameString;
 
 namespace StationeersLaunchPad
@@ -306,6 +308,33 @@ namespace StationeersLaunchPad
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Personal), "My Games") :
             StationSaveUtils.ExeDirectory.FullName,
           LaunchPadConfig.SavePath);
+      return false;
+    }
+
+    [HarmonyPatch(typeof(CommandLine), nameof(CommandLine.TryGetArg)), HarmonyPrefix]
+    static bool CommandLine_TryGetArg(ref bool __result, string arg, out string value)
+    {
+      if (CommandLine.CommandLineArgs == null)
+      {
+        value = null;
+        __result = false;
+        return false;
+      }
+      for (var i = 0; i < CommandLine.CommandLineArgs.Length; i++)
+      {
+        if (CommandLine.CommandLineArgs[i] == arg)
+        {
+          // make sure we check to make sure we are in array bounds
+          if (CommandLine.CommandLineArgs.Length < i + 1)
+            break;
+
+          value = CommandLine.CommandLineArgs[i + 1].Trim();
+          __result = true;
+          return false;
+        }
+      }
+      value = null;
+      __result = false;
       return false;
     }
   }
