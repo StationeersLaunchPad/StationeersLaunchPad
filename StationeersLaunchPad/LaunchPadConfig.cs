@@ -320,7 +320,8 @@ namespace StationeersLaunchPad
         Logger.Global.LogInfo("Loading Details");
         await LoadDetails();
 
-        SortByDeps();
+        if (AutoSort)
+          SortByDeps();
 
         Logger.Global.LogInfo("Mod Config Initialized");
 
