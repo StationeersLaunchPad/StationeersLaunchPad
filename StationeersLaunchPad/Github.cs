@@ -23,21 +23,20 @@ namespace StationeersLaunchPad
     {
       try
       {
-        using (var request = UnityWebRequest.Get(url))
+        using var request = UnityWebRequest.Get(url);
+
+        request.timeout = 10; // 10 seconds because we are only fetching a json file
+
+        Logger.Global.LogDebug($"Fetching {version} release info");
+        var result = await request.SendWebRequest();
+
+        if (result.result != UnityWebRequest.Result.Success)
         {
-          request.timeout = 10; // 10 seconds because we are only fetching a json file
-
-          Logger.Global.LogDebug($"Fetching {version} release info");
-          var result = await request.SendWebRequest();
-
-          if (result.result != UnityWebRequest.Result.Success)
-          {
-            Logger.Global.LogError($"Failed to fetch {version} release info! result: {result.result}, error: {result.error}");
-            return null;
-          }
-
-          return JsonConvert.DeserializeObject<Release>(result.downloadHandler.text);
+          Logger.Global.LogError($"Failed to fetch {version} release info! result: {result.result}, error: {result.error}");
+          return null;
         }
+
+        return JsonConvert.DeserializeObject<Release>(result.downloadHandler.text);
       }
       catch (Exception ex)
       {
@@ -49,27 +48,26 @@ namespace StationeersLaunchPad
 
     public static async UniTask<ZipArchive> FetchZipArchive(Asset asset)
     {
-      using (var downloadRequest = UnityWebRequest.Get(asset.BrowserDownloadUrl))
+      using var downloadRequest = UnityWebRequest.Get(asset.BrowserDownloadUrl);
+
+      downloadRequest.timeout = 45; // max of 45 seconds to download the zip file
+
+      Logger.Global.LogDebug($"Downloading {asset.Name}");
+      var downloadResult = await downloadRequest.SendWebRequest();
+
+      if (downloadResult.result != UnityWebRequest.Result.Success)
       {
-        downloadRequest.timeout = 45; // max of 45 seconds to download the zip file
-
-        Logger.Global.LogDebug($"Downloading {asset.Name}");
-        var downloadResult = await downloadRequest.SendWebRequest();
-
-        if (downloadResult.result != UnityWebRequest.Result.Success)
-        {
-          Logger.Global.LogError($"Failed to download {asset.Name}! result: {downloadResult.result}, error: {downloadResult.error}");
-          return null;
-        }
-
-        var data = downloadRequest.downloadHandler.data;
-        Logger.Global.LogDebug($"Downloaded {data.Length} bytes");
-        var stream = new MemoryStream(data.Length);
-        stream.Write(data, 0, data.Length);
-        stream.Position = 0;
-
-        return new ZipArchive(stream);
+        Logger.Global.LogError($"Failed to download {asset.Name}! result: {downloadResult.result}, error: {downloadResult.error}");
+        return null;
       }
+
+      var data = downloadRequest.downloadHandler.data;
+      Logger.Global.LogDebug($"Downloaded {data.Length} bytes");
+      var stream = new MemoryStream(data.Length);
+      stream.Write(data, 0, data.Length);
+      stream.Position = 0;
+
+      return new ZipArchive(stream);
     }
 
     public class Release
@@ -126,7 +124,6 @@ namespace StationeersLaunchPad
       var text = description
         .Replace($"{RepoUrl}/pull/", "#")
         .Replace($"{RepoUrl}/compare/", "")
-        .TrimEnd('v', 'V', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.')
         .Split('\n')
         .ToList();
 

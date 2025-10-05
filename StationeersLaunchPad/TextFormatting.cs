@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -25,8 +24,11 @@ namespace StationeersLaunchPad
         if (r1.Length != r2.Length)
           return false;
         for (var i = 0; i < r1.Length; i++)
+        {
           if (text[r1.Start + i] != text[r2.Start + i])
             return false;
+        }
+
         return true;
       }
       bool rangeIs(Range range, string str)
@@ -34,8 +36,11 @@ namespace StationeersLaunchPad
         if (range.Length != str.Length)
           return false;
         for (var i = 0; i < range.Length; i++)
+        {
           if (text[range.Start + i] != str[i])
             return false;
+        }
+
         return true;
       }
       bool closeTag(Range name)
@@ -63,10 +68,7 @@ namespace StationeersLaunchPad
         openTags.Push(name);
         closeTags.Push(close);
       }
-      string rangeString(Range range)
-      {
-        return text.Substring(range.Start, range.Length);
-      }
+      string rangeString(Range range) => text.Substring(range.Start, range.Length);
 
       var ignoreWs = false;
       var codeBlocks = 0;
@@ -114,7 +116,9 @@ namespace StationeersLaunchPad
               tryOpenTag(el.TagName, "h2", "<size=150%><color=#5aa9d6>", "</color></size>") ||
               tryOpenTag(el.TagName, "h3", "<size=133%><color=#5aa9d6>", "</color></size>")
             )
+            {
               break;
+            }
             else if (rangeIs(el.TagName, "url"))
             {
               res.Append($"<link=\"{rangeString(el.TagValue)}\"><color=#ebebeb><u>");
@@ -153,9 +157,14 @@ namespace StationeersLaunchPad
                 appendRange(el.Full);
             }
             else if (!closeTag(el.TagName))
+            {
               appendRange(el.Full);
+            }
             else if (rangeIs(el.TagName, "code"))
+            {
               codeBlocks--;
+            }
+
             break;
         }
 
@@ -169,15 +178,13 @@ namespace StationeersLaunchPad
       return res.ToString();
     }
 
-    private static bool IsConsumed(char c)
-    {
-      return c == '\r';
-    }
+    private static bool IsConsumed(char c) => c == '\r';
 
     // consume all characters we aren't going to copy
     private static void Consume(string text, ref int index)
     {
-      while (index < text.Length && IsConsumed(text[index])) index++;
+      while (index < text.Length && IsConsumed(text[index]))
+        index++;
     }
 
     private static Element ParseElement(string text, ref int index)
@@ -241,11 +248,13 @@ namespace StationeersLaunchPad
       {
         // if we didn't hit ws/equals, send the whole thing as raw text
         if (tagEnd == -1)
+        {
           return new Element
           {
             Full = new Range { Start = start, End = index },
             Type = ElementType.Text,
           };
+        }
         // otherwise send up to the end of the tag name
         index = tagEnd;
         return new Element

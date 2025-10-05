@@ -25,7 +25,7 @@ namespace StationeersLaunchPad
       get; private set;
     }
 
-    public int TotalCount
+    public ulong TotalCount
     {
       get; private set;
     }
@@ -37,14 +37,16 @@ namespace StationeersLaunchPad
 
     public int Length => this.Lines.Length;
 
-    public object HashCode
+    public LogLine this[int index]
     {
-      get;
-      private set;
+      get
+      {
+        lock (this._lock)
+        {
+          return index < 0 || index >= this.Count ? throw new IndexOutOfRangeException() : this.Lines[(this.Start + index) % this.Lines.Length];
+        }
+      }
     }
-
-    public LogLine this[int index] => this.Lines[(index + this.Start) % this.Lines.Length];
-
     public LogBuffer(int size = LogBuffer.DEFAULT_BUFFER_SIZE)
     {
       this.Size = size;
@@ -77,23 +79,30 @@ namespace StationeersLaunchPad
 
     private void AddLine(LogLine line)
     {
-      lock (_lock)
+      lock (this._lock)
       {
-        if (this.Count == this.Lines.Length)
+        if (this.Count < this.Length)
         {
-          this.Lines[this.Start] = line;
-          this.Start = (this.Start + 1) % this.Lines.Length;
+          var index = (this.Start + this.Count) % this.Length;
+          this.Lines[index] = line;
+          this.Count++;
         }
         else
         {
-          this.Lines[this.Count] = line;
-          this.Count++;
+          this.Lines[this.Start] = line;
+          this.Start = (this.Start + 1) % this.Length;
         }
 
         this.TotalCount++;
       }
     }
 
-    public override string ToString() => string.Join("\n", this.Lines.ToList());
+    public override string ToString()
+    {
+      lock (this._lock)
+      {
+        return string.Join("\n", Enumerable.Range(0, this.Count).Select(i => this[i]));
+      }
+    }
   }
 }

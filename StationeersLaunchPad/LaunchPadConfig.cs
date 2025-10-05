@@ -1,8 +1,7 @@
-using Assets.Scripts;
+﻿using Assets.Scripts;
 using Assets.Scripts.Networking.Transports;
 using Assets.Scripts.Serialization;
-using Assets.Scripts.Util;
-using BepInEx;
+using BepInEx.Bootstrap;
 using BepInEx.Configuration;
 using Cysharp.Threading.Tasks;
 using Mono.Cecil;
@@ -18,7 +17,6 @@ using System.Linq;
 using System.Reflection;
 using System.Xml.Serialization;
 using UnityEngine;
-using BepInEx.Bootstrap;
 
 namespace StationeersLaunchPad
 {
@@ -57,7 +55,7 @@ namespace StationeersLaunchPad
     public static SortedConfigFile SortedConfig;
 
     public static SplashBehaviour SplashBehaviour;
-    public static List<ModInfo> Mods = new();
+    public static List<ModInfo> Mods = [];
 
     public static LoadState LoadState = LoadState.Initializing;
     public static LoadStrategyType LoadStrategyType = LoadStrategyType.Linear;
@@ -238,29 +236,31 @@ namespace StationeersLaunchPad
           LaunchPadAlertGUI.DefaultSize,
           LaunchPadAlertGUI.DefaultPosition,
           ("Continue Loading", () =>
-          {
-            AutoLoad = true;
+            {
+              AutoLoad = true;
 
-            return true;
-          }
-        ),
+              return true;
+            }
+          ),
           ("Restart Game", () =>
-          {
-            var startInfo = new ProcessStartInfo();
-            startInfo.FileName = Paths.ExecutablePath;
-            startInfo.WorkingDirectory = Paths.GameRootPath;
-            startInfo.UseShellExecute = false;
+            {
+              var startInfo = new ProcessStartInfo
+              {
+                FileName = LaunchPadPaths.ExecutablePath,
+                WorkingDirectory = LaunchPadPaths.GameRootPath,
+                UseShellExecute = false
+              };
 
-            // remove environment variables that new process will inherit
-            startInfo.Environment.Remove("DOORSTOP_INITIALIZED");
-            startInfo.Environment.Remove("DOORSTOP_DISABLE");
+              // remove environment variables that new process will inherit
+              startInfo.Environment.Remove("DOORSTOP_INITIALIZED");
+              startInfo.Environment.Remove("DOORSTOP_DISABLE");
 
-            Process.Start(startInfo);
-            Application.Quit();
+              Process.Start(startInfo);
+              Application.Quit();
 
-            return false;
-          }
-        ),
+              return false;
+            }
+          ),
           ("Close", () => true)
         );
       }
@@ -301,12 +301,12 @@ namespace StationeersLaunchPad
         LoadState = LoadState.Initializing;
 
         Logger.Global.LogInfo("Initializing...");
-        await UniTask.Run(() => Initialize());
+        await UniTask.Run(Initialize);
 
         LoadState = LoadState.Searching;
 
         Logger.Global.LogInfo("Listing Local Mods");
-        await UniTask.Run(() => LoadLocalItems());
+        await UniTask.Run(LoadLocalItems);
 
         if (!SteamDisabled)
         {
@@ -315,13 +315,13 @@ namespace StationeersLaunchPad
         }
 
         Logger.Global.LogInfo("Loading Mod Order");
-        await UniTask.Run(() => LoadConfig());
+        await UniTask.Run(LoadConfig);
 
         Logger.Global.LogInfo("Loading Details");
         await LoadDetails();
 
         if (AutoSort)
-          SortByDeps();
+          SortDependencies();
 
         Logger.Global.LogInfo("Mod Config Initialized");
 
@@ -380,28 +380,27 @@ namespace StationeersLaunchPad
           SteamDisabled = true;
         }
       }
-      Mods.Add(new ModInfo { Source = ModSource.Core });
     }
 
     private static void LoadConfig()
     {
-      var path = WorkshopMenu.ConfigPath;
-      var config = new ModConfig();
-      if (File.Exists(path))
-        config = XmlSerialization.Deserialize<ModConfig>(path);
+      var config = File.Exists(LaunchPadPaths.ConfigPath)
+            ? XmlSerialization.Deserialize<ModConfig>(LaunchPadPaths.ConfigPath)
+            : new ModConfig();
       config.CreateCoreMod();
 
-      var modsByPath = new Dictionary<string, ModInfo>(StringComparer.OrdinalIgnoreCase);
-      foreach (var mod in Mods)
+      // Build lookup for existing mods by normalized path
+      var modsByPath = new Dictionary<string, ModInfo>(Mods.Count, StringComparer.OrdinalIgnoreCase);
+      for (var i = 0; i < Mods.Count; i++)
       {
+        var mod = Mods[i];
         if (mod == null)
         {
-          Logger.Global.LogWarning("Found Null mod in mods list.");
+          Logger.Global.LogWarning("Found null mod in mods list.");
           continue;
         }
 
-        //Speical case for core path
-        if (mod.Source == ModSource.Core && string.IsNullOrEmpty(mod.Path))
+        if (mod.Source == ModSource.Core)
         {
           modsByPath["Core"] = mod;
           continue;
@@ -412,68 +411,101 @@ namespace StationeersLaunchPad
           Logger.Global.LogWarning($"Mod has empty path: {mod.GetType().Name}");
           continue;
         }
-        var normalizedPath = NormalizePath(mod.Path);
-        modsByPath[normalizedPath] = mod;
+
+        var normalizedPath = mod.Path.NormalizePath();
+        if (!string.IsNullOrEmpty(normalizedPath))
+          modsByPath[normalizedPath] = mod;
+        else
+          Logger.Global.LogWarning($"Invalid normalized mod path for {mod.DisplayName}");
       }
 
       var localBasePath = SteamTransport.WorkshopType.Mod.GetLocalDirInfo().FullName;
-      var newMods = new List<ModInfo>();
+      var newMods = new List<ModInfo>(Mods.Count);
 
-      foreach (var modcfg in config.Mods)
+      // Process config mods in order
+      for (var i = 0; i < config.Mods.Count; i++)
       {
-        if (modcfg == null)
+        var data = config.Mods[i];
+        var modPath = data.DirectoryPath.Value;
+        if (data == null)
         {
           Logger.Global.LogWarning("Skipping null modcfg in config.");
           continue;
         }
 
-        if (modcfg is CoreModData && string.IsNullOrEmpty(modcfg.DirectoryPath))
+        // Core mod special case
+        if (data is CoreModData && string.IsNullOrEmpty(modPath))
         {
           if (modsByPath.TryGetValue("Core", out var coreMod))
           {
-            coreMod.Enabled = modcfg.Enabled;
+            coreMod.Enabled = data.Enabled;
             newMods.Add(coreMod);
             modsByPath.Remove("Core");
           }
           continue;
         }
 
-        var modPath = (string) modcfg.DirectoryPath;
+        if (string.IsNullOrEmpty(modPath))
+        {
+          Logger.Global.LogWarning($"Config entry missing DirectoryPath for {data.GetType().Name}");
+          continue;
+        }
+
+        // Ensure absolute normalized path
         if (!Path.IsPathRooted(modPath))
           modPath = Path.Combine(localBasePath, modPath);
 
-        var normalizedModPath = NormalizePath(modPath);
+        var normalizedModPath = modPath.NormalizePath();
         if (string.IsNullOrEmpty(normalizedModPath))
         {
-          Logger.Global.LogWarning($"Invalid path in mod config: {modcfg.GetType().Name}");
+          Logger.Global.LogWarning($"Invalid path in mod config: {data.GetType().Name}");
           continue;
         }
 
         if (modsByPath.TryGetValue(normalizedModPath, out var mod))
         {
-          mod.Enabled = modcfg.Enabled;
+          mod.Enabled = data.Enabled;
           newMods.Add(mod);
           modsByPath.Remove(normalizedModPath);
         }
-        else if (modcfg.Enabled)
+        else if (data.Enabled)
         {
-          Logger.Global.LogWarning($"enabled mod not found at {modPath}");
+          Logger.Global.LogWarning($"Enabled mod not found at {modPath}");
         }
       }
-      foreach (var mod in modsByPath.Values)
+
+      // Add any remaining mods not in config (newly discovered)
+      if (modsByPath.Count > 0)
       {
-        Logger.Global.LogDebug($"new mod added at {mod.Path}");
-        newMods.Add(mod);
-        mod.Enabled = true;
+        foreach (var kvp in modsByPath)
+        {
+          var mod = kvp.Value;
+          Logger.Global.LogDebug($"New mod added at {mod.Path}");
+          mod.Enabled = true;
+          newMods.Add(mod);
+        }
       }
+
       Mods = newMods;
+
       SaveConfig();
     }
 
-    private static string NormalizePath(string path)
+    public static string NormalizePath(this string path) => path?.Replace("\\", "/").Trim().ToLowerInvariant() ?? string.Empty;
+
+    private static void LoadCoreMod() => Mods.Add(new ModInfo
     {
-      return path?.Replace("\\", "/").Trim().ToLowerInvariant() ?? string.Empty;
-    }
+      Enabled = true,
+      About = new ModAbout()
+      {
+        Name = "Stationeers",
+        Description = "This mod contains Stationeers' assemblies and data.",
+        Author = Application.companyName,
+        Version = GameManager.GetGameVersion(),
+      },
+      Source = ModSource.Core,
+      Wrapped = SteamTransport.ItemWrapper.WrapLocalItem(new FileInfo(LaunchPadPaths.ExecutablePath), SteamTransport.WorkshopType.Mod),
+    });
 
     private static void LoadLocalItems()
     {
@@ -502,186 +534,259 @@ namespace StationeersLaunchPad
 
     private static async UniTask LoadWorkshopItems()
     {
-      var items = new List<Item>();
-      for (var page = 1; ; page++)
+      var allItems = new List<Item>();
+      var page = 1;
+      const int batchSize = 5; // number of pages to fetch in parallel
+
+      while (true)
       {
-        var query = Query.Items.WithTag("Mod");
-        using var result = await query.AllowCachedResponse(0).WhereUserSubscribed().GetPageAsync(page);
+        // Prepare batch of pages
+        var pageTasks = new List<UniTask<Item[]>>();
+        for (var i = 0; i < batchSize; i++)
+        {
+          var currentPage = page + i;
+          pageTasks.Add(FetchWorkshopPage(currentPage));
+        }
 
-        if (!result.HasValue || result.Value.ResultCount == 0)
-          break;
+        var results = await UniTask.WhenAll(pageTasks);
+        var hasItems = false;
+        foreach (var items in results)
+        {
+          if (items.Length > 0)
+          {
+            allItems.AddRange(items);
+            hasItems = true;
+          }
+        }
 
-        // filter out deleted items
-        items.AddRange(result.Value.Entries.Where(item => item.Result != Result.FileNotFound));
+        if (!hasItems)
+          break; // no more pages
+
+        page += batchSize;
       }
 
-      var needsUpdate = items.Where(item => item.NeedsUpdate || !Directory.Exists(item.Directory)).ToList();
+      // Determine which items need updates
+      var needsUpdate = allItems.Where(item => item.NeedsUpdate || !Directory.Exists(item.Directory)).ToList();
+
       if (needsUpdate.Count > 0)
       {
         Logger.Global.Log($"Updating {needsUpdate.Count} workshop items");
         foreach (var item in needsUpdate)
           Logger.Global.Log($"- {item.Title}({item.Id})");
+
         await UniTask.WhenAll(needsUpdate.Select(item => item.DownloadAsync().AsUniTask()));
       }
 
-      foreach (var item in items)
+      // Add all workshop mods
+      foreach (var item in allItems)
       {
-        Mods.Add(new ModInfo()
+        Mods.Add(new ModInfo
         {
           Source = ModSource.Workshop,
           Wrapped = SteamTransport.ItemWrapper.WrapWorkshopItem(item, "About\\About.xml"),
-          WorkshopItem = item,
+          WorkshopItem = item
         });
       }
+    }
+
+    // Helper to fetch a single workshop page
+    private static async UniTask<Item[]> FetchWorkshopPage(int page)
+    {
+      var query = Query.Items.WithTag("Mod");
+      using var result = await query.AllowCachedResponse(0).WhereUserSubscribed().GetPageAsync(page);
+
+      return !result.HasValue || result.Value.ResultCount == 0
+        ?  []
+        : [.. result.Value.Entries.Where(item => item.Result != Result.FileNotFound)];
     }
 
     private static async UniTask LoadDetails()
     {
-      await UniTask.WhenAll(Mods.Select(mod => UniTask.Run(() => LoadModDetails(mod))));
+      await UniTask.WhenAll(Mods.Select(LoadModDetails));
     }
 
-    private static void LoadModDetails(ModInfo mod)
+    private static async UniTask LoadModDetails(ModInfo mod)
     {
-      if (mod.Source == ModSource.Core)
-        return;
+      // Load About.xml once
+      mod.About ??= XmlSerialization.Deserialize<ModAbout>(mod.Wrapped.FilePathFullName, "ModMetadata") ??
+          new ModAbout
+          {
+            Name = $"[Invalid About.xml] {mod.Name}",
+            Author = "",
+            Version = "",
+            Description = "",
+          };
 
-      mod.About = XmlSerialization.Deserialize<ModAbout>(mod.Wrapped.FilePathFullName, "ModMetadata") ??
-        new ModAbout
-        {
-          Name = $"[Invalid About.xml] {mod.Wrapped.DirectoryName}",
-          Author = "",
-          Version = "",
-          Description = "",
-        };
+      var dllFiles = Directory.GetFiles(mod.Path, "*.dll", SearchOption.AllDirectories);
+      var assemblies = await UniTask.WhenAll(dllFiles.Select(LoadAssembly));
+      mod.Assemblies.AddRange(assemblies);
 
-      foreach (var file in Directory.GetFiles(mod.Wrapped.DirectoryPath, "*.dll", SearchOption.AllDirectories))
-      {
-        var def = AssemblyDefinition.ReadAssembly(file, TypeLoader.ReaderParameters);
-        mod.Assemblies.Add(new()
+      var assetFiles = Directory.GetFiles(mod.Path, "*.assets", SearchOption.AllDirectories);
+      mod.AssetBundles.AddRange(assetFiles);
+    }
+
+    private static UniTask<AssemblyInfo> LoadAssembly(string file) =>
+        UniTask.RunOnThreadPool(() => new AssemblyInfo
         {
           Path = file,
-          Definition = def,
-          Name = def.Name.Name,
+          Definition = AssemblyDefinition.ReadAssembly(file, TypeLoader.ReaderParameters)
         });
-      }
 
-      foreach (var file in Directory.GetFiles(mod.Wrapped.DirectoryPath, "*.assets", SearchOption.AllDirectories))
-      {
-        mod.AssetBundles.Add(file);
-      }
-    }
 
-    public static void SortByDeps()
+    public static void SortDependencies()
     {
-      var beforeDeps = new Dictionary<int, List<int>>();
+      var beforeDeps = new Dictionary<int, HashSet<int>>();
       var modsById = new Dictionary<ulong, int>();
-      void addDep(int from, int to)
-      {
-        if (from == to)
-          return;
-        var list = beforeDeps.GetValueOrDefault(from) ?? new();
-        if (!list.Contains(to))
-          list.Add(to);
-        beforeDeps[from] = list;
-      }
+
+      // Build mod index and lookup table
       for (var i = 0; i < Mods.Count; i++)
       {
         var mod = Mods[i];
         mod.SortIndex = i;
+
         if (!mod.Enabled)
         {
           mod.DepsWarned = false;
           continue;
         }
 
-        if (mod.Source == ModSource.Core)
-          modsById[1] = mod.SortIndex;
-        else if (mod.About.WorkshopHandle != 0)
-          modsById[mod.About.WorkshopHandle] = i;
+        if (mod.WorkshopHandle != 0)
+          modsById[mod.WorkshopHandle] = i;
       }
-      foreach (var mod in Mods)
+
+      // Helper to add dependency edge
+      void AddDep(int from, int to)
       {
+        if (from == to)
+          return;
+
+        if (!beforeDeps.TryGetValue(from, out var set))
+        {
+          set = [];
+          beforeDeps[from] = set;
+        }
+
+        set.Add(to);
+      }
+
+      // Build dependency graph
+      for (var i = 0; i < Mods.Count; i++)
+      {
+        var mod = Mods[i];
         if (!mod.Enabled)
           continue;
-        if (mod.Source == ModSource.Core)
-          continue;
-        bool missingDeps = false;
-        foreach (var dep in mod.About.Dependencies ?? new())
-          if (!modsById.ContainsKey(dep.Id))
+
+        var about = mod.About;
+
+        // Warn about missing dependencies
+        if (about.Dependencies != null)
+        {
+          for (var j = 0; j < about.Dependencies.Count; j++)
           {
-            missingDeps = true;
-            if (!mod.DepsWarned)
+            var dep = about.Dependencies[j];
+            if (!modsById.ContainsKey(dep.Id))
             {
-              Logger.Global.LogWarning($"{mod.Source} {mod.DisplayName} is missing dependency with workshop id {dep.Id}");
-              var found = false;
-              foreach (var mod2 in Mods)
+              if (!mod.DepsWarned)
               {
-                if (mod2.About?.WorkshopHandle == dep.Id)
+                mod.DepsWarned = true;
+                Logger.Global.LogWarning($"{mod.Source} {mod.DisplayName} is missing dependency with workshop id {dep.Id}");
+
+                var found = false;
+                for (var k = 0; k < Mods.Count; k++)
                 {
-                  if (!found)
-                    Logger.Global.LogWarning("Possible matches:");
-                  found = true;
-                  Logger.Global.LogWarning($"- {mod2.Source} {mod2.DisplayName}");
+                  var dependency = Mods[k];
+                  if (dependency.WorkshopHandle == dep.Id)
+                  {
+                    if (!found)
+                      Logger.Global.LogWarning("Possible matches:");
+                    found = true;
+                    Logger.Global.LogWarning($"- {dependency.Source} {dependency.DisplayName}");
+                  }
                 }
+                if (!found)
+                  Logger.Global.LogWarning("No possible matches installed");
               }
-              if (!found)
-                Logger.Global.LogWarning("No possible matches installed");
             }
           }
-        mod.DepsWarned = missingDeps;
-
-        // LoadBefore and LoadAfter inherited from StationeersMods are the opposite of what you would expect.
-        // LoadBefore is other mods that should be loaded before this one.
-        // LoadAfter is other mods that should be loaded after this one.
-        foreach (var before in mod.About.LoadBefore ?? new())
-          if (modsById.TryGetValue(before.Id, out var beforeIndex))
-            addDep(mod.SortIndex, beforeIndex); // before before mod
-        foreach (var after in mod.About.LoadAfter ?? new())
-          if (modsById.TryGetValue(after.Id, out var afterIndex))
-            addDep(afterIndex, mod.SortIndex); // mod before after
-      }
-
-      var visited = new bool[Mods.Count];
-      var circularList = new List<int>();
-      bool checkCircular(int index)
-      {
-        if (visited[index])
-        {
-          circularList.Add(index);
-          return true;
         }
-        visited[index] = true;
-        foreach (var before in beforeDeps.GetValueOrDefault(index) ?? new())
+
+        // LoadBefore (mods that should load before this one)
+        var loadBefore = about.LoadBefore;
+        if (loadBefore != null)
         {
-          if (checkCircular(before))
+          for (var j = 0; j < loadBefore.Count; j++)
           {
-            circularList.Add(index);
-            return true;
+            var before = loadBefore[j];
+            if (modsById.TryGetValue(before.Id, out var beforeIndex))
+              AddDep(mod.SortIndex, beforeIndex);
           }
         }
-        visited[index] = false;
-        return false;
-      }
 
-      var foundCircular = false;
-      foreach (var mod in Mods)
-      {
-        if (!mod.Enabled)
-          continue;
-
-        if (checkCircular(mod.SortIndex))
+        // LoadAfter (mods that should load after this one)
+        var loadAfter = about.LoadAfter;
+        if (loadAfter != null)
         {
-          foundCircular = true;
-          break;
+          for (var j = 0; j < loadAfter.Count; j++)
+          {
+            var after = loadAfter[j];
+            if (modsById.TryGetValue(after.Id, out var afterIndex))
+              AddDep(afterIndex, mod.SortIndex);
+          }
         }
       }
 
-      if (foundCircular)
+      //  Stable topological sort
+      var resultEnabled = new List<ModInfo>();
+      var state = new int[Mods.Count]; // 0=unvisited, 1=visiting, 2=done
+      var stack = new Stack<int>();
+      var hasCycle = false;
+
+      bool Visit(int idx)
+      {
+        if (state[idx] == 2)
+          return true;
+        if (state[idx] == 1)
+        {
+          stack.Push(idx);
+          hasCycle = true;
+          return false;
+        }
+
+        state[idx] = 1;
+        stack.Push(idx);
+
+        if (beforeDeps.TryGetValue(idx, out var deps))
+        {
+          // Iterate in ascending SortIndex order for stability
+          // (HashSet has no inherent order, so we sort temporarily)
+          var sorted = deps.OrderBy(d => d); // creates a temp iterator once per mod
+          foreach (var dep in sorted)
+          {
+            if (!Visit(dep))
+              return false;
+          }
+        }
+
+        state[idx] = 2;
+        stack.Pop();
+        resultEnabled.Add(Mods[idx]);
+        return true;
+      }
+
+      // Visit in original order to keep independent mods stable
+      for (var i = 0; i < Mods.Count && !hasCycle; i++)
+      {
+        var mod = Mods[i];
+        if (mod.Enabled && state[i] == 0)
+          Visit(i);
+      }
+
+      if (hasCycle)
       {
         Logger.Global.LogError("Circular dependency found in enabled mods:");
-        for (var i = circularList.Count - 1; i >= 0; i--)
+        foreach (var idx in stack)
         {
-          var mod = Mods[circularList[i]];
+          var mod = Mods[idx];
           Logger.Global.LogError($"- {mod.Source} {mod.DisplayName}");
         }
         AutoLoad = false;
@@ -689,55 +794,28 @@ namespace StationeersLaunchPad
         return;
       }
 
-      // loop over all mods repeatedly, adding any who are either disabled or have all their dependencies met.
-      // this makes this an n^2 sort worst case. while we could likely do better on this complexity, this approach is simple and
-      // has a negligible runtime in up to hundreds of mods.
-      var added = new bool[Mods.Count];
-      var newOrder = new List<ModInfo>();
-      bool areDepsAdded(int index)
+      // Merge back while preserving disabled mod order
+      var result = new List<ModInfo>(Mods.Count);
+      var enabledIndex = 0;
+      for (var i = 0; i < Mods.Count; i++)
       {
-        if (!beforeDeps.TryGetValue(index, out var befores))
-          return true; // has no deps
-
-        foreach (var bindex in befores)
-          if (!added[bindex])
-            return false;
-
-        return true;
-      }
-
-      while (true)
-      {
-        var delayed = false;
-        var progress = false;
-        foreach (var mod in Mods)
+        var mod = Mods[i];
+        if (!mod.Enabled)
         {
-          if (added[mod.SortIndex])
-            continue;
-          if (!mod.Enabled || areDepsAdded(mod.SortIndex))
-          {
-            added[mod.SortIndex] = true;
-            newOrder.Add(mod);
-            progress = true;
-            if (delayed)
-              break; // if we skipped any this iteration, stop as soon as we add a new mod so we don't push others too far forward
-          }
-          else
-            delayed = true;
+          result.Add(mod);
         }
-        if (!progress)
-          break;
+        else
+        {
+          if (enabledIndex < resultEnabled.Count)
+            result.Add(resultEnabled[enabledIndex++]);
+        }
       }
 
-      // at this point just add any mods we haven't added yet. we already checked for circular dependencies above so this should
-      // only do anything if there is a bug above.
-      foreach (var mod in Mods)
-      {
-        if (!added[mod.SortIndex])
-          newOrder.Add(mod);
-      }
+      // Add any leftover enabled mods
+      while (enabledIndex < resultEnabled.Count)
+        result.Add(resultEnabled[enabledIndex++]);
 
-      Mods = newOrder;
+      Mods = result;
     }
 
     public static void SaveConfig()
@@ -754,11 +832,11 @@ namespace StationeersLaunchPad
         });
       }
 
-      if (!config.SaveXml(WorkshopMenu.ConfigPath))
-        throw new Exception($"failed to save {WorkshopMenu.ConfigPath}");
+      if (!config.SaveXml(LaunchPadPaths.ConfigPath))
+        throw new Exception($"failed to save {LaunchPadPaths.ConfigPath}");
     }
 
-    private async static UniTask LoadMods()
+    private static async UniTask LoadMods()
     {
       ElapsedStopwatch.Restart();
       LoadState = LoadState.Loading;
@@ -774,7 +852,7 @@ namespace StationeersLaunchPad
       await loadStrategy.LoadMods();
 
       ElapsedStopwatch.Stop();
-      Logger.Global.LogWarning($"Took {ElapsedStopwatch.Elapsed.ToString(@"m\:ss\.fff")} to load mods.");
+      Logger.Global.LogWarning($"Took {ElapsedStopwatch.Elapsed:m\\:ss\\.fff} to load mods.");
 
       LoadState = LoadState.Loaded;
     }
@@ -795,38 +873,41 @@ namespace StationeersLaunchPad
     {
       try
       {
-        var pkgpath = Path.Combine(StationSaveUtils.DefaultPath, $"modpkg_{DateTime.Now:yyyy-MM-dd_HH-mm-ss-fff}.zip");
-        using (var archive = ZipFile.Open(pkgpath, ZipArchiveMode.Create))
+        var pkgPath = Path.Combine(StationSaveUtils.DefaultPath, $"modpkg_{DateTime.Now:yyyy-MM-dd_HH-mm-ss-fff}.zip");
+
+        using var archive = ZipFile.Open(pkgPath, ZipArchiveMode.Create);
+        var config = new ModConfig();
+
+        foreach (var mod in Mods)
         {
-          var config = new ModConfig();
-          foreach (var mod in Mods)
-          {
-            if (!mod.Enabled)
-              continue;
-            if (mod.Source == ModSource.Core)
-            {
-              config.Mods.Add(new CoreModData());
-              continue;
-            }
+          if (!mod.Enabled)
+            continue;
 
-            var dirName = $"{mod.Source}_{mod.Wrapped.DirectoryName}";
-            var root = mod.Wrapped.DirectoryPath;
-            foreach (var file in Directory.GetFiles(root, "*", SearchOption.AllDirectories))
-            {
-              var entryPath = Path.Combine("mods", dirName, file.Substring(root.Length + 1)).Replace('\\', '/');
-              archive.CreateEntryFromFile(file, entryPath);
-            }
-            config.Mods.Add(new LocalModData(dirName, true));
+          if (mod.Source == ModSource.Core)
+          {
+            config.Mods.Add(new CoreModData());
+            continue;
           }
 
-          var configEntry = archive.CreateEntry("modconfig.xml");
-          using (var stream = configEntry.Open())
+          var dirName = $"{mod.Source}_{mod.Wrapped.DirectoryName}";
+          var root = mod.Wrapped.DirectoryPath;
+          var rootLength = root.Length + 1;
+
+          foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
           {
-            var serializer = new XmlSerializer(typeof(ModConfig));
-            serializer.Serialize(stream, config);
+            var entryPath = Path.Combine("mods", dirName, file.Substring(rootLength)).Replace('\\', '/');
+            archive.CreateEntryFromFile(file, entryPath);
           }
+
+          config.Mods.Add(new LocalModData(dirName, true));
         }
-        Process.Start("explorer", $"/select,\"{pkgpath}\"");
+
+        var configEntry = archive.CreateEntry("modconfig.xml");
+        using var stream = configEntry.Open();
+        var serializer = new XmlSerializer(typeof(ModConfig));
+        serializer.Serialize(stream, config);
+
+        Process.Start("explorer", $"/select,\"{pkgPath}\"");
       }
       catch (Exception ex)
       {

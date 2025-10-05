@@ -11,10 +11,7 @@ namespace StationeersLaunchPad
   {
     public static bool IsActive = false;
 
-    public static void Draw()
-    {
-      ImGuiHelper.Draw(() => DrawConfigEditor());
-    }
+    public static void Draw() => ImGuiHelper.Draw(DrawConfigEditor);
 
     public static void DrawWorkshopConfig(ModData modData)
     {
@@ -92,7 +89,6 @@ namespace StationeersLaunchPad
 
     public static bool DrawConfigEntry(ConfigEntryBase entry, bool fill = true)
     {
-      var changed = false;
       ImGui.PushID(entry.Definition.Key);
       ImGui.BeginGroup();
 
@@ -102,7 +98,7 @@ namespace StationeersLaunchPad
         ImGui.SetNextItemWidth(-float.Epsilon);
 
       var value = entry.BoxedValue;
-      changed = value switch
+      var changed = value switch
       {
         Color => DrawColorEntry(entry as ConfigEntry<Color>),
         Vector2 => DrawVector2Entry(entry as ConfigEntry<Vector2>),

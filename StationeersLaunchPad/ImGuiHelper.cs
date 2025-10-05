@@ -9,10 +9,7 @@ namespace StationeersLaunchPad
   public static class ImGuiHelper
   {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void Text(string text)
-    {
-      ImGui.TextUnformatted(text);
-    }
+    public static void Text(string text) => ImGui.TextUnformatted(text);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void TextColored(string text, Vector4 color)
@@ -32,7 +29,7 @@ namespace StationeersLaunchPad
       var width = ImGui.CalcTextSize(text).x;
       ImGui.SetCursorPosX(maxCorner.x - padding - width);
       var minCorner = ImGui.GetCursorPos();
-      ImGui.GetWindowDrawList().AddRectFilled(minCorner, maxCorner, ImGui.ColorConvertFloat4ToU32(new Vector4(0, 0, 0, 1)));
+      ImGui.GetWindowDrawList().AddRectFilled(minCorner, maxCorner, ImGui.ColorConvertFloat4ToU32(new Vector4(0, 0, 0, 0)));
       Text(text);
     }
 
@@ -46,7 +43,7 @@ namespace StationeersLaunchPad
       var width = ImGui.CalcTextSize(text).x;
       ImGui.SetCursorPosX(maxCorner.x - padding - width);
       var minCorner = ImGui.GetCursorPos();
-      ImGui.GetWindowDrawList().AddRectFilled(minCorner, maxCorner, ImGui.ColorConvertFloat4ToU32(new Vector4(0, 0, 0, 1)));
+      ImGui.GetWindowDrawList().AddRectFilled(minCorner, maxCorner, ImGui.ColorConvertFloat4ToU32(new Vector4(0, 0, 0, 0)));
       TextColored(text, color);
     }
 
@@ -68,35 +65,20 @@ namespace StationeersLaunchPad
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void TextWrapped(string text)
-    {
-      ImGui.TextWrapped(text);
-    }
+    public static void TextWrapped(string text) => ImGui.TextWrapped(text);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void TextDisabled(string text)
-    {
-      TextColored(text, TextDisabledColor);
-    }
+    public static void TextDisabled(string text) => TextColored(text, TextDisabledColor);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void TextWarning(string text)
-    {
-      TextColored(text, Yellow);
-    }
+    public static void TextWarning(string text) => TextColored(text, Yellow);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void TextError(string text)
-    {
-      TextColored(text, Red);
-    }
+    public static void TextError(string text) => TextColored(text, Red);
 
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void TextSuccess(string text)
-    {
-      TextColored(text, Green);
-    }
+    public static void TextSuccess(string text) => TextColored(text, Green);
 
     public static void Separator(float widthMult = 0.5f, float thickness = 1.0f, bool left = false)
     {
@@ -117,10 +99,7 @@ namespace StationeersLaunchPad
       ImGui.SetCursorScreenPos(new Vector2(cursor.x, cursor.y + lineHeight));
     }
 
-    public static void SeparatorLeft(float widthMult = 0.5f, float thickness = 1.0f)
-    {
-      Separator(widthMult, thickness, true);
-    }
+    public static void SeparatorLeft(float widthMult = 0.5f, float thickness = 1.0f) => Separator(widthMult, thickness, true);
 
     public static void Draw(Action drawFunc)
     {
@@ -215,12 +194,12 @@ namespace StationeersLaunchPad
         ImGui.SameLine();
     }
 
-    public static bool DrawIfHovering(Func<bool> func) => ImGui.IsWindowHovered() ? func?.Invoke() ?? false : false;
-    public static bool DrawIfMouseClicked(ImGuiMouseButton button, Func<bool> func) => ImGui.IsMouseClicked(button) ? func?.Invoke() ?? false : false;
-    public static bool DrawIfMouseDoubleClicked(ImGuiMouseButton button, Func<bool> func) => ImGui.IsMouseDoubleClicked(button) ? func?.Invoke() ?? false : false;
-    public static bool DrawIfMouseDown(ImGuiMouseButton button, Func<bool> func) => ImGui.IsMouseDown(button) ? func?.Invoke() ?? false : false;
-    public static bool DrawIfMouseUp(ImGuiMouseButton button, Func<bool> func) => ImGui.IsMouseReleased(button) ? func?.Invoke() ?? false : false;
-    public static bool DrawIfDragging(ImGuiMouseButton button, Func<bool> func) => ImGui.IsMouseDragging(button) ? func?.Invoke() ?? false : false;
+    public static bool DrawIfHovering(Func<bool> func) => ImGui.IsWindowHovered() && (func?.Invoke() ?? false);
+    public static bool DrawIfMouseClicked(ImGuiMouseButton button, Func<bool> func) => ImGui.IsMouseClicked(button) && (func?.Invoke() ?? false);
+    public static bool DrawIfMouseDoubleClicked(ImGuiMouseButton button, Func<bool> func) => ImGui.IsMouseDoubleClicked(button) && (func?.Invoke() ?? false);
+    public static bool DrawIfMouseDown(ImGuiMouseButton button, Func<bool> func) => ImGui.IsMouseDown(button) && (func?.Invoke() ?? false);
+    public static bool DrawIfMouseUp(ImGuiMouseButton button, Func<bool> func) => ImGui.IsMouseReleased(button) && (func?.Invoke() ?? false);
+    public static bool DrawIfDragging(ImGuiMouseButton button, Func<bool> func) => ImGui.IsMouseDragging(button) && (func?.Invoke() ?? false);
     public static bool DrawIfChild(bool child, Func<bool> func, Func<bool> childFunc) => child ? childFunc?.Invoke() ?? false : func?.Invoke() ?? false;
 
     public static Color White => new Color(0.0f, 0.0f, 0.0f, 1.0f);

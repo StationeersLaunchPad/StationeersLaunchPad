@@ -3,9 +3,9 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Reflection;
 
-namespace StationeersLaunchPad {
+namespace StationeersLaunchPad
+{
   public enum LoadStrategyType
   {
     // loads in 3 steps:
@@ -30,28 +30,26 @@ namespace StationeersLaunchPad {
 
   public abstract class LoadStrategy
   {
-    public Stopwatch ElapsedStopwatch = new();
-    public List<ModInfo> Mods => LaunchPadConfig.Mods.Where((mod) => mod.Enabled && mod.Source != ModSource.Core).ToList();
+    private readonly Stopwatch _stopwatch = new();
+    protected List<ModInfo> EnabledMods = [];
 
     public async UniTask LoadMods()
     {
-      Logger.Global.LogDebug($"Assemblies loading...");
-      this.ElapsedStopwatch.Restart();
-      await this.LoadAssemblies();
-      this.ElapsedStopwatch.Stop();
-      Logger.Global.LogWarning($"Assembly loading took {this.ElapsedStopwatch.Elapsed.ToString(@"m\:ss\.fff")}");
+      // Cache enabled mods only once
+      this.EnabledMods = [.. LaunchPadConfig.Mods.Where(m => m.Enabled)];
 
-      Logger.Global.LogDebug($"Assets loading...");
-      this.ElapsedStopwatch.Restart();
-      await this.LoadAssets();
-      this.ElapsedStopwatch.Stop();
-      Logger.Global.LogWarning($"Asset loading took {this.ElapsedStopwatch.Elapsed.ToString(@"m\:ss\.fff")}");
+      await this.MeasurePhase("Assemblies", this.LoadAssemblies);
+      await this.MeasurePhase("Assets", this.LoadAssets);
+      await this.MeasurePhase("Entrypoints", this.LoadEntryPoints);
+    }
 
-      Logger.Global.LogDebug($"Loading entrypoints...");
-      this.ElapsedStopwatch.Restart();
-      await this.LoadEntryPoints();
-      this.ElapsedStopwatch.Stop();
-      Logger.Global.LogWarning($"Loading entrypoints took {this.ElapsedStopwatch.Elapsed.ToString(@"m\:ss\.fff")}");
+    private async UniTask MeasurePhase(string name, Func<UniTask> phase)
+    {
+      Logger.Global.LogDebug($"{name} loading...");
+      this._stopwatch.Restart();
+      await phase();
+      this._stopwatch.Stop();
+      Logger.Global.LogWarning($"{name} loading took {this._stopwatch.Elapsed:m\\:ss\\.fff}");
     }
 
     public void LoadFailed(LoadedMod mod, Exception ex)
@@ -59,7 +57,6 @@ namespace StationeersLaunchPad {
       mod.Logger.LogException(ex);
       mod.LoadFailed = true;
       mod.LoadFinished = false;
-
       LaunchPadConfig.AutoLoad = false;
     }
 
@@ -72,18 +69,16 @@ namespace StationeersLaunchPad {
   {
     public override async UniTask LoadAssemblies()
     {
-      foreach (var info in this.Mods)
+      foreach (var info in this.EnabledMods)
       {
-        var mod = info.Loaded ?? new LoadedMod(info);
+        var mod = info.Loaded ?? new LoadedMod(info, info.Source == ModSource.Core ? Logger.Global : null);
         if (mod.LoadedAssemblies || mod.LoadFailed || mod.LoadFinished)
           continue;
-        else
-          info.Loaded = mod;
+
+        info.Loaded = mod;
 
         if (!ModLoader.LoadedMods.Contains(mod))
-        {
           ModLoader.LoadedMods.Add(mod);
-        }
 
         try
         {
@@ -97,12 +92,12 @@ namespace StationeersLaunchPad {
       }
     }
 
-    public async override UniTask LoadAssets()
+    public override async UniTask LoadAssets()
     {
-      foreach (var info in this.Mods)
+      foreach (var info in this.EnabledMods)
       {
         var mod = info.Loaded;
-        if (mod == null || mod.LoadedAssets || mod.LoadFailed || mod.LoadFinished)
+        if (info.Source == ModSource.Core || mod == null || mod.LoadedAssets || mod.LoadFailed || mod.LoadFinished)
           continue;
 
         try
@@ -117,12 +112,12 @@ namespace StationeersLaunchPad {
       }
     }
 
-    public async override UniTask LoadEntryPoints()
+    public override async UniTask LoadEntryPoints()
     {
-      foreach (var info in this.Mods)
+      foreach (var info in this.EnabledMods)
       {
         var mod = info.Loaded;
-        if (mod == null || mod.LoadedEntryPoints || mod.LoadFailed || mod.LoadFinished)
+        if (info.Source == ModSource.Core || mod == null || mod.LoadedEntryPoints || mod.LoadFailed || mod.LoadFinished)
           continue;
 
         try
@@ -144,69 +139,99 @@ namespace StationeersLaunchPad {
   {
     public override async UniTask LoadAssemblies()
     {
-      await UniTask.WhenAll(this.Mods.Select(async (info) =>
+      var tasks = new List<UniTask>();
+
+      foreach (var info in this.EnabledMods)
       {
-        var mod = info.Loaded ?? new LoadedMod(info);
-        if (mod.LoadedAssemblies || mod.LoadFailed || mod.LoadFinished)
-          return;
-        else
-          info.Loaded = mod;
+        tasks.Add(this.LoadAssemblyInternal(info));
+      }
 
-        if (!ModLoader.LoadedMods.Contains(mod))
-          ModLoader.LoadedMods.Add(mod);
-
-        try
-        {
-          await mod.LoadAssembliesParallel();
-          mod.LoadedAssemblies = true;
-        }
-        catch (Exception ex)
-        {
-          this.LoadFailed(mod, ex);
-        }
-      }));
+      await UniTask.WhenAll(tasks);
     }
 
-    public async override UniTask LoadAssets()
+    private async UniTask LoadAssemblyInternal(ModInfo info)
     {
-      await UniTask.WhenAll(this.Mods.Select(async (info) =>
+      var mod = info.Loaded ?? new LoadedMod(info, info.Source == ModSource.Core ? Logger.Global : null);
+      if (mod.LoadedAssemblies || mod.LoadFailed || mod.LoadFinished)
+        return;
+
+      info.Loaded = mod;
+
+      if (!ModLoader.LoadedMods.Contains(mod))
+        ModLoader.LoadedMods.Add(mod);
+
+      try
       {
+        await mod.LoadAssembliesParallel();
+        mod.LoadedAssemblies = true;
+      }
+      catch (Exception ex)
+      {
+        this.LoadFailed(mod, ex);
+      }
+    }
+
+    public override async UniTask LoadAssets()
+    {
+      var tasks = new List<UniTask>();
+
+      foreach (var info in this.EnabledMods)
+      {
+        if (info.Source == ModSource.Core)
+          continue;
+
         var mod = info.Loaded;
         if (mod == null || mod.LoadedAssets || mod.LoadFailed || mod.LoadFinished)
-          return;
+          continue;
 
-        try
-        {
-          await mod.LoadAssetsSerial();
-          mod.LoadedAssets = true;
-        }
-        catch (Exception ex)
-        {
-          this.LoadFailed(mod, ex);
-        }
-      }));
+        tasks.Add(this.LoadAssetsInternal(mod));
+      }
+
+      await UniTask.WhenAll(tasks);
     }
 
-    public async override UniTask LoadEntryPoints()
+    private async UniTask LoadAssetsInternal(LoadedMod mod)
     {
-      await UniTask.WhenAll(this.Mods.Select(async (info) =>
+      try
+      {
+        await mod.LoadAssetsSerial();
+        mod.LoadedAssets = true;
+      }
+      catch (Exception ex)
+      {
+        this.LoadFailed(mod, ex);
+      }
+    }
+
+    public override async UniTask LoadEntryPoints()
+    {
+      var tasks = new List<UniTask>();
+
+      foreach (var info in this.EnabledMods)
       {
         var mod = info.Loaded;
-        if (mod == null || mod.LoadedEntryPoints || mod.LoadFailed || mod.LoadFinished)
-          return;
+        if (info.Source == ModSource.Core || mod == null || mod.LoadedEntryPoints || mod.LoadFailed || mod.LoadFinished)
+          continue;
 
-        try
-        {
-          await mod.FindEntrypoints();
-          mod.PrintEntrypoints();
-          mod.LoadEntrypoints();
-          mod.LoadedEntryPoints = true;
-        }
-        catch (Exception ex)
-        {
-          this.LoadFailed(mod, ex);
-        }
-      }));
+        tasks.Add(this.LoadEntrypointInternal(mod));
+      }
+
+      await UniTask.WhenAll(tasks);
+    }
+
+    private async UniTask LoadEntrypointInternal(LoadedMod mod)
+    {
+      try
+      {
+        await mod.FindEntrypoints();
+        mod.PrintEntrypoints();
+        mod.LoadEntrypoints();
+        mod.LoadedEntryPoints = true;
+      }
+      catch (Exception ex)
+      {
+        this.LoadFailed(mod, ex);
+      }
     }
   }
 }

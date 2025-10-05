@@ -68,6 +68,6 @@ namespace StationeersLaunchPad
       this.CompactString = $"[{this.Prefix}]: {fullStackTrace}";
     }
 
-    public override string ToString() => FullString;
+    public override string ToString() => this.FullString;
   }
 }

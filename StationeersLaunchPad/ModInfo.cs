@@ -1,11 +1,11 @@
+using Assets.Scripts.Networking.Transports;
+using Steamworks.Ugc;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Xml;
 using System.Xml.Serialization;
-using Assets.Scripts.Networking.Transports;
-using Steamworks.Ugc;
 using UnityEngine;
 
 namespace StationeersLaunchPad
@@ -27,48 +27,29 @@ namespace StationeersLaunchPad
 
     public ModAbout About;
 
-    public string Path => this.Source == ModSource.Core ? "" : this.Wrapped.DirectoryPath;
+    public string Name => this.Wrapped.DirectoryName;
+    public string Path => this.Source == ModSource.Core ? LaunchPadPaths.ManagedPath : this.Wrapped.DirectoryPath;
     public string AboutPath => System.IO.Path.Combine(this.Path, "About");
     public string AboutXmlPath => System.IO.Path.Combine(this.AboutPath, "About.xml");
     public string ThumbnailPath => System.IO.Path.Combine(this.AboutPath, "thumb.png");
     public string PreviewPath => System.IO.Path.Combine(this.AboutPath, "preview.png");
 
-    public List<AssemblyInfo> Assemblies = new();
-    public List<string> AssetBundles = new();
+    public List<AssemblyInfo> Assemblies = [];
+    public List<string> AssetBundles = [];
 
     public LoadedMod Loaded;
 
-    public string DisplayName
-    {
-      get
-      {
-        if (this.Source == ModSource.Core)
-          return "Core";
-        if (this.About == null)
-          return this.Path;
-        return this.About.Name;
-      }
-    }
+    public string DisplayName => this.About == null ? this.Name : this.About.Name;
 
-    public ulong WorkshopHandle
+    public ulong WorkshopHandle => this.Source switch
     {
-      get => this.Source switch
-      {
-        ModSource.Core => 1,
-        ModSource.Workshop => this.Wrapped.Id,
-        _ => this.About?.WorkshopHandle ?? ulong.MaxValue,
-      };
-    }
+      ModSource.Core => 1,
+      ModSource.Workshop => this.Wrapped.Id,
+      _ => this.About?.WorkshopHandle ?? 0,
+    };
 
     public bool SortBefore(ModInfo other)
-    {
-      if (other.About?.LoadBefore?.Find(v => v.Id == this.WorkshopHandle) != null)
-        return true;
-      var selfAfter = this.About?.LoadAfter;
-      if (this.About?.LoadAfter?.Find(v => v.Id == other.WorkshopHandle) != null)
-        return true;
-      return false;
-    }
+      => other.About?.LoadBefore?.Find(v => v.Id == this.WorkshopHandle) != null || this.About?.LoadAfter?.Find(v => v.Id == other.WorkshopHandle) != null;
 
     public (bool, string) IsWorkshopValid()
     {
@@ -102,7 +83,7 @@ namespace StationeersLaunchPad
     {
       try
       {
-        Process.Start("explorer.exe", $"\"{this.Wrapped.DirectoryPath}\"");
+        Process.Start("explorer.exe", $"\"{this.Path}\"");
       }
       catch (Exception ex)
       {
@@ -114,7 +95,7 @@ namespace StationeersLaunchPad
     {
       try
       {
-        Application.OpenURL($"steam://url/CommunityFilePage/{WorkshopHandle}");
+        Application.OpenURL($"steam://url/CommunityFilePage/{this.WorkshopHandle}");
       }
       catch (Exception ex)
       {

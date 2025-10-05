@@ -31,18 +31,15 @@ namespace StationeersLaunchPad
 
     private static Harmony harmony;
 
-    void Awake()
+    private void Awake()
     {
       if (Harmony.HasAnyPatches(pluginGuid))
         return;
 
       // If the windows steamworks assembly is not found, try to replace it with the linux one
-      AppDomain.CurrentDomain.AssemblyResolve += (_, args) =>
-      {
-        if (args.Name == "Facepunch.Steamworks.Win64")
-          return AppDomain.CurrentDomain.GetAssemblies().First(assembly => assembly.GetName().Name == "Facepunch.Steamworks.Posix");
-        return null;
-      };
+      AppDomain.CurrentDomain.AssemblyResolve += (_, args) => args.Name == "Facepunch.Steamworks.Win64"
+          ? AppDomain.CurrentDomain.GetAssemblies().First(assembly => assembly.GetName().Name == "Facepunch.Steamworks.Posix")
+          : null;
 
       // *** DO NOT REFERENCE LaunchPadConfig FIELDS IN THIS METHOD ***
       // referencing LaunchPadConfig fields in this method will force the class to initialize before the method starts
@@ -57,20 +54,17 @@ namespace StationeersLaunchPad
       var playerLoop = PlayerLoop.GetCurrentPlayerLoop();
       PlayerLoopHelper.Initialize(ref playerLoop);
 
-      LaunchPadConfig.Run(Config);
+      LaunchPadConfig.Run(this.Config);
     }
 
-    public static void RunLinuxPathPatch()
-    {
-      harmony.CreateClassProcessor(typeof(LinuxPathPatch), true).Patch();
-    }
+    public static void RunLinuxPathPatch() => harmony.CreateClassProcessor(typeof(LinuxPathPatch), true).Patch();
   }
 
   [HarmonyPatch]
-  static class LaunchPadPatches
+  internal static class LaunchPadPatches
   {
     [HarmonyPatch(typeof(SplashBehaviour), "Awake"), HarmonyPrefix]
-    static bool SplashAwake(SplashBehaviour __instance)
+    private static bool SplashAwake(ref SplashBehaviour __instance)
     {
       LaunchPadConfig.SplashBehaviour = __instance;
       Application.targetFrameRate = 60;
@@ -80,7 +74,7 @@ namespace StationeersLaunchPad
     }
 
     [HarmonyPatch(typeof(SplashBehaviour), nameof(SplashBehaviour.Draw)), HarmonyPrefix]
-    static bool SplashDraw()
+    private static bool SplashDraw()
     {
       if (GameManager.IsBatchMode)
         return true;
@@ -103,15 +97,13 @@ namespace StationeersLaunchPad
     }
 
     [HarmonyPatch(typeof(WorldManager), "LoadDataFiles"), HarmonyPostfix]
-    static void LoadDataFiles()
-    {
+    private static void LoadDataFiles() =>
       // Some global menus (printer recipe selection, hash generator selection) load strings
       // before mod xml files are loaded in. This forces a reload of all those strings.
       Localization.OnLanguageChanged.Invoke();
-    }
 
     [HarmonyPatch(typeof(SteamUGC), nameof(SteamUGC.DeleteFileAsync)), HarmonyPrefix]
-    static bool DeleteFileAsync(ref Task<bool> __result)
+    private static bool DeleteFileAsync(ref Task<bool> __result)
     {
       // don't remove workshop items when the owner unsubscribes
       __result = Task.Run(() => true);
@@ -122,10 +114,10 @@ namespace StationeersLaunchPad
     // first we prefix patch PublishMod to save the changelog
     // then we prefix patch Workshop_PublishItemAsync to add the saved changelog
     // we check the directory path of the mod matches just to be sure something weird didnt happen
-    static string SavedChangeLog = "";
-    static string SavedPath = "";
+    private static string SavedChangeLog = "";
+    private static string SavedPath = "";
     [HarmonyPatch(typeof(WorkshopMenu), "PublishMod"), HarmonyPrefix]
-    static void PublishMod(WorkshopModListItem ____selectedModItem)
+    private static void PublishMod(WorkshopModListItem ____selectedModItem)
     {
       var mod = ____selectedModItem?.Data;
       if (mod == null)
@@ -140,28 +132,28 @@ namespace StationeersLaunchPad
     }
 
     [HarmonyPatch(typeof(SteamTransport), nameof(SteamTransport.Workshop_PublishItemAsync)), HarmonyPrefix]
-    static void Workshop_PublishItemAsync(SteamTransport.WorkShopItemDetail detail)
+    private static void Workshop_PublishItemAsync(SteamTransport.WorkShopItemDetail detail)
     {
       if (detail != null && detail.Path == SavedPath)
         detail.ChangeNote = SavedChangeLog;
     }
 
     [HarmonyPatch(typeof(WorkshopMenu), "SaveWorkShopFileHandle"), HarmonyPrefix]
-    static bool WorkshopMenu_SaveWorkShopFileHandle(SteamTransport.WorkShopItemDetail ItemDetail, ModData mod)
+    private static bool WorkshopMenu_SaveWorkShopFileHandle(SteamTransport.WorkShopItemDetail ItemDetail, ModData mod)
     {
       // If we can deserialize it as our extended mod metadata, use that instead
       var about = XmlSerialization.Deserialize<ModAbout>(mod.AboutXmlPath, "ModMetadata");
       if (about != null)
       {
         about.WorkshopHandle = ItemDetail.PublishedFileId;
-        about.SaveXml(mod.AboutXmlPath);
+        _ = about.SaveXml(mod.AboutXmlPath);
         return false;
       }
       return true;
     }
 
     [HarmonyPatch(typeof(WorkshopMenu), "SelectMod"), HarmonyPostfix]
-    static void WorkshopMenuSelectMod(WorkshopMenu __instance, WorkshopModListItem modItem)
+    private static void WorkshopMenuSelectMod(WorkshopMenu __instance, WorkshopModListItem modItem)
     {
       if (modItem == null)
         return;
@@ -199,7 +191,7 @@ namespace StationeersLaunchPad
     }
 
     [HarmonyPatch(typeof(WorkshopMenu), nameof(WorkshopMenu.ManagerAwake)), HarmonyPostfix]
-    static void WorkshopMenuAwake(WorkshopMenu __instance)
+    private static void WorkshopMenuAwake(WorkshopMenu __instance)
     {
       var handler = __instance.DescriptionText.gameObject.AddComponent<WorkshopMenuLinkHandler>();
       handler.DescriptionText = __instance.DescriptionText;
@@ -221,7 +213,7 @@ namespace StationeersLaunchPad
 
     private static FieldInfo workshopMenuSelectedField;
     [HarmonyPatch(typeof(OrbitalSimulation), nameof(OrbitalSimulation.Draw)), HarmonyPrefix]
-    static void WorkshopMenuDrawConfig()
+    private static void WorkshopMenuDrawConfig()
     {
       if (LaunchPadConsoleGUI.IsActive)
         LaunchPadConsoleGUI.Draw();
@@ -249,45 +241,40 @@ namespace StationeersLaunchPad
     }
 
     [HarmonyPatch(typeof(SteamClient), nameof(SteamClient.Init)), HarmonyPrefix]
-    static bool SteamClient_Init(uint appid, bool asyncCallbacks)
-    {
+    private static bool SteamClient_Init(uint appid, bool asyncCallbacks) =>
       // If its already initialized, just skip instead of erroring
       // We initialize this before the game does, but we still want the game to think it initialized itself
-      return !SteamClient.IsValid;
-    }
+      !SteamClient.IsValid;
 
     [HarmonyPatch(typeof(NetworkManager), nameof(NetworkManager.Init), typeof(TransportType)), HarmonyTranspiler]
-    static IEnumerable<CodeInstruction> NetworkManager_Init(IEnumerable<CodeInstruction> instructions)
+    private static IEnumerable<CodeInstruction> NetworkManager_Init(IEnumerable<CodeInstruction> instructions)
     {
       var matcher = new CodeMatcher(instructions);
-      matcher.MatchStartForward(new CodeInstruction(OpCodes.Newobj, typeof(MetaServerTransport).GetConstructor(Type.EmptyTypes)));
+      _ = matcher.MatchStartForward(new CodeInstruction(OpCodes.Newobj, typeof(MetaServerTransport).GetConstructor(Type.EmptyTypes)));
       if (!matcher.IsValid)
       {
         Logger.Global.LogError("Could not patch NetworkManager.Init. Steam integration may not work properly");
         return instructions;
       }
-      matcher.RemoveInstruction();
-      matcher.Insert(CodeInstruction.Call(() => GetMetaServerTransport()));
+      _ = matcher.RemoveInstruction();
+      _ = matcher.Insert(CodeInstruction.Call(() => GetMetaServerTransport()));
       return matcher.Instructions();
     }
 
     private static MetaServerTransport metaServerTransport;
     public static MetaServerTransport GetMetaServerTransport()
     {
-      if (metaServerTransport == null)
-          metaServerTransport = new();
+      metaServerTransport ??= new();
       return metaServerTransport;
     }
 
     [HarmonyPatch(typeof(MetaServerTransport), nameof(MetaServerTransport.InitClient)), HarmonyPrefix]
-    static bool MetaServerTransport_InitClient(MetaServerTransport __instance)
-    {
+    private static bool MetaServerTransport_InitClient(MetaServerTransport __instance) =>
       // don't double initialize
-      return !__instance.IsInitialised;
-    }
+      !__instance.IsInitialised;
 
     [HarmonyPatch(typeof(GameString), "op_Implicit", new Type[] { typeof(GameString) }), HarmonyPrefix]
-    static bool GameString_op_Implicit(ref string __result, GameString gameString)
+    private static bool GameString_op_Implicit(ref string __result, GameString gameString)
     {
       __result = gameString?.DisplayString ?? string.Empty;
 
@@ -295,7 +282,7 @@ namespace StationeersLaunchPad
     }
 
     [HarmonyPatch(typeof(StationSaveUtils), nameof(StationSaveUtils.DefaultPath), MethodType.Getter), HarmonyPrefix]
-    static bool StationSaveUtils_DefaultPath(ref string __result)
+    private static bool StationSaveUtils_DefaultPath(ref string __result)
     {
       if (string.IsNullOrEmpty(LaunchPadConfig.SavePath))
         return true;
@@ -311,16 +298,16 @@ namespace StationeersLaunchPad
   }
 
   // no HarmonyPatch on class so it isn't auto-run
-  static class LinuxPathPatch
+  internal static class LinuxPathPatch
   {
     [HarmonyPatch(typeof(WorldManager), "LoadDataFilesAtPath", typeof(string)), HarmonyTranspiler]
-    static IEnumerable<CodeInstruction> WorldManager_LoadDataFilesAtPath(IEnumerable<CodeInstruction> instructions)
+    private static IEnumerable<CodeInstruction> WorldManager_LoadDataFilesAtPath(IEnumerable<CodeInstruction> instructions)
     {
       var matcher = new CodeMatcher(instructions);
 
       while (true)
       {
-        matcher.MatchStartForward(new CodeInstruction(OpCodes.Ldstr));
+        _ = matcher.MatchStartForward(new CodeInstruction(OpCodes.Ldstr));
         if (matcher.IsInvalid)
           break;
         var curStr = matcher.Instruction.operand as string;
@@ -330,7 +317,7 @@ namespace StationeersLaunchPad
           matcher.Instruction.operand = replaced;
           Logger.Global.LogDebug($"WorldManager.LoadDataFilesAtPath patched: {curStr} => {replaced}");
         }
-        matcher.Advance(1);
+        _ = matcher.Advance(1);
       }
 
       return matcher.Instructions();
