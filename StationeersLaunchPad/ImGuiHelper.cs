@@ -32,7 +32,7 @@ namespace StationeersLaunchPad
       var width = ImGui.CalcTextSize(text).x;
       ImGui.SetCursorPosX(maxCorner.x - padding - width);
       var minCorner = ImGui.GetCursorPos();
-      ImGui.GetWindowDrawList().AddRectFilled(minCorner, maxCorner, ImGui.ColorConvertFloat4ToU32(new Vector4(0, 0, 0, 1)));
+      ImGui.GetWindowDrawList().AddRectFilled(minCorner, maxCorner, ImGui.ColorConvertFloat4ToU32(Transparent));
       Text(text);
     }
 
@@ -46,7 +46,7 @@ namespace StationeersLaunchPad
       var width = ImGui.CalcTextSize(text).x;
       ImGui.SetCursorPosX(maxCorner.x - padding - width);
       var minCorner = ImGui.GetCursorPos();
-      ImGui.GetWindowDrawList().AddRectFilled(minCorner, maxCorner, ImGui.ColorConvertFloat4ToU32(new Vector4(0, 0, 0, 1)));
+      ImGui.GetWindowDrawList().AddRectFilled(minCorner, maxCorner, ImGui.ColorConvertFloat4ToU32(Transparent));
       TextColored(text, color);
     }
 
@@ -224,6 +224,7 @@ namespace StationeersLaunchPad
     public static bool DrawIfChild(bool child, Func<bool> func, Func<bool> childFunc) => child ? childFunc?.Invoke() ?? false : func?.Invoke() ?? false;
 
     public static Color White => new Color(0.0f, 0.0f, 0.0f, 1.0f);
+
     public static Color Red = new Color(1.0f, 0.0f, 0.0f, 1.0f);
     public static Color Green => new Color(0.0f, 1.0f, 0.0f, 1.0f);
     public static Color Blue => new Color(0.0f, 0.0f, 1.0f, 1.0f);

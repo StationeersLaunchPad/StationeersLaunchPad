@@ -15,7 +15,7 @@ namespace StationeersLaunchPad
     }
 
     private static LogSeverity logSeverity => LaunchPadConfig.LogSeverities.Value;
-    private static int lastLineCount = 0;
+    private static ulong lastLineCount = 0;
     internal static bool shouldScroll = false;
     public static void DrawConsole()
     {
@@ -23,19 +23,17 @@ namespace StationeersLaunchPad
       ImGui.BeginChild("##logs", ImGuiWindowFlags.HorizontalScrollbar);
 
       var logger = LaunchPadLoaderGUI.SelectedLogger ?? Logger.Global;
-      var buffer = logger.Buffer;
-      var lines = buffer.Lines;
-      var lineCount = buffer.TotalCount;
+      var lineCount = logger.TotalCount;
 
       if (lastLineCount != lineCount)
       {
-        lastLineCount = lineCount;
+        lastLineCount = logger.TotalCount;
         shouldScroll = LaunchPadConfig.AutoScroll;
       }
 
-      foreach (var line in lines)
+      for (var i = 0; i < logger.Count; i++)
       {
-        DrawConsoleLine(line);
+        DrawConsoleLine(logger[i]);
       }
 
       if (shouldScroll)

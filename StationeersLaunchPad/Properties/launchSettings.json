@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "Stationeers": {
+      "commandName": "Executable",
+      "executablePath": "$(StationeersDirectory)\\rocketstation.exe",
+      "workingDirectory": "$(StationeersDirectory)\\"
+    }
+  }
+}
