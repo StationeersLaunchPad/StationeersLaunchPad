@@ -247,8 +247,8 @@ namespace StationeersLaunchPad
           ("Restart Game", () =>
           {
             var startInfo = new ProcessStartInfo();
-            startInfo.FileName = Paths.ExecutablePath;
-            startInfo.WorkingDirectory = Paths.GameRootPath;
+            startInfo.FileName = LaunchPadPaths.ExecutablePath;
+            startInfo.WorkingDirectory = LaunchPadPaths.GameRootPath;
             startInfo.UseShellExecute = false;
 
             // remove environment variables that new process will inherit
@@ -362,8 +362,8 @@ namespace StationeersLaunchPad
 
     private static void Initialize()
     {
-      if (string.IsNullOrEmpty(Settings.CurrentData.SavePath))
-        Settings.CurrentData.SavePath = StationSaveUtils.DefaultPath;
+      Settings.CurrentData.SavePath = LaunchPadPaths.SavePath;
+
       if (!SteamDisabled)
       {
         try
@@ -385,10 +385,9 @@ namespace StationeersLaunchPad
 
     private static void LoadConfig()
     {
-      var path = WorkshopMenu.ConfigPath;
-      var config = new ModConfig();
-      if (File.Exists(path))
-        config = XmlSerialization.Deserialize<ModConfig>(path);
+      var config = File.Exists(LaunchPadPaths.ConfigPath)
+            ? XmlSerialization.Deserialize<ModConfig>(LaunchPadPaths.ConfigPath)
+            : new ModConfig();
       config.CreateCoreMod();
 
       var modsByPath = new Dictionary<string, ModInfo>(StringComparer.OrdinalIgnoreCase);
@@ -537,39 +536,38 @@ namespace StationeersLaunchPad
 
     private static async UniTask LoadDetails()
     {
-      await UniTask.WhenAll(Mods.Select(mod => UniTask.Run(() => LoadModDetails(mod))));
+      await UniTask.WhenAll(Mods.Select(LoadModDetails));
     }
 
-    private static void LoadModDetails(ModInfo mod)
+    private static async UniTask LoadModDetails(ModInfo mod)
     {
       if (mod.Source == ModSource.Core)
         return;
 
-      mod.About = XmlSerialization.Deserialize<ModAbout>(mod.Wrapped.FilePathFullName, "ModMetadata") ??
-        new ModAbout
-        {
-          Name = $"[Invalid About.xml] {mod.Wrapped.DirectoryName}",
-          Author = "",
-          Version = "",
-          Description = "",
-        };
+      // Load About.xml once
+      mod.About ??= XmlSerialization.Deserialize<ModAbout>(mod.Wrapped.FilePathFullName, "ModMetadata") ??
+          new ModAbout
+          {
+            Name = $"[Invalid About.xml] {mod.Name}",
+            Author = "",
+            Version = "",
+            Description = "",
+          };
 
-      foreach (var file in Directory.GetFiles(mod.Wrapped.DirectoryPath, "*.dll", SearchOption.AllDirectories))
-      {
-        var def = AssemblyDefinition.ReadAssembly(file, TypeLoader.ReaderParameters);
-        mod.Assemblies.Add(new()
+      var dllFiles = Directory.GetFiles(mod.Path, "*.dll", SearchOption.AllDirectories);
+      var assemblies = await UniTask.WhenAll(dllFiles.Select(LoadAssembly));
+      mod.Assemblies.AddRange(assemblies);
+
+      var assetFiles = Directory.GetFiles(mod.Path, "*.assets", SearchOption.AllDirectories);
+      mod.AssetBundles.AddRange(assetFiles);
+    }
+
+    private static UniTask<AssemblyInfo> LoadAssembly(string file) =>
+        UniTask.RunOnThreadPool(() => new AssemblyInfo
         {
           Path = file,
-          Definition = def,
-          Name = def.Name.Name,
+          Definition = AssemblyDefinition.ReadAssembly(file, TypeLoader.ReaderParameters)
         });
-      }
-
-      foreach (var file in Directory.GetFiles(mod.Wrapped.DirectoryPath, "*.assets", SearchOption.AllDirectories))
-      {
-        mod.AssetBundles.Add(file);
-      }
-    }
 
     public static void SortByDeps()
     {
@@ -754,7 +752,7 @@ namespace StationeersLaunchPad
         });
       }
 
-      if (!config.SaveXml(WorkshopMenu.ConfigPath))
+      if (!config.SaveXml(LaunchPadPaths.ConfigPath))
         throw new Exception($"failed to save {WorkshopMenu.ConfigPath}");
     }
 
@@ -795,7 +793,7 @@ namespace StationeersLaunchPad
     {
       try
       {
-        var pkgpath = Path.Combine(StationSaveUtils.DefaultPath, $"modpkg_{DateTime.Now:yyyy-MM-dd_HH-mm-ss-fff}.zip");
+        var pkgpath = Path.Combine(LaunchPadPaths.SavePath, $"modpkg_{DateTime.Now:yyyy-MM-dd_HH-mm-ss-fff}.zip");
         using (var archive = ZipFile.Open(pkgpath, ZipArchiveMode.Create))
         {
           var config = new ModConfig();

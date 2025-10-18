@@ -28,7 +28,7 @@ namespace StationeersLaunchPad
           if (dir == null || !dir.Exists)
             return null;
 
-          var pluginDir = new DirectoryInfo(Paths.PluginPath);
+          var pluginDir = new DirectoryInfo(LaunchPadPaths.PluginPath);
           var parent = dir;
           var nested = false;
           // ensure install path is inside bepinex plugins

@@ -1,6 +1,8 @@
-﻿using ImGuiNET;
+﻿using BepInEx;
+using ImGuiNET;
 using System;
 using System.Linq;
+using UI.ImGuiUi.Debug;
 using UnityEngine;
 
 namespace StationeersLaunchPad
@@ -234,7 +236,7 @@ namespace StationeersLaunchPad
         if (draggingMod != null && !dragged)
         {
           SelectedInfo = draggingMod;
-          if (SelectedInfo?.Source == ModSource.Core)
+          if (SelectedInfo != null && SelectedInfo.Source == ModSource.Core)
             SelectedInfo = null;
           openInfo = SelectedInfo != null;
         }
@@ -420,6 +422,7 @@ namespace StationeersLaunchPad
         ImGuiHelper.TextDisabled("Selected a mod to view detailed info");
         return;
       }
+
       var about = SelectedInfo.About;
       var workshopId = SelectedInfo.Wrapped.Id;
       if (workshopId == 0)
@@ -430,47 +433,144 @@ namespace StationeersLaunchPad
       if (ImGui.Button("Open Local Folder"))
         SelectedInfo.OpenLocalFolder();
 
-      if (workshopId != 0)
+      if (workshopId > 1)
       {
         ImGui.SameLine();
         if (ImGui.Button("Open Workshop Page"))
           SelectedInfo.OpenWorkshopPage();
       }
 
+      ImGui.Spacing();
       ImGuiHelper.Text("Source:");
       ImGui.SameLine();
       ImGuiHelper.Text(SelectedInfo.Source.ToString());
 
-      ImGuiHelper.Text("Path:");
-      ImGui.SameLine();
-      ImGuiHelper.Text(SelectedInfo.Path);
+      if (!string.IsNullOrEmpty(SelectedInfo.Path))
+      {
+        ImGui.Spacing();
+        ImGuiHelper.Text("Path:");
+        ImGui.SameLine();
+        ImGuiHelper.Text(SelectedInfo.Path);
+      }
 
       if (about == null)
       {
+        ImGui.Spacing();
         ImGuiHelper.TextDisabled("Missing About.xml");
         return;
       }
 
-      if (workshopId != 0)
+      if (SelectedInfo.WorkshopHandle > 1)
       {
+        ImGui.Spacing();
         ImGuiHelper.Text("Workshop ID:");
         ImGui.SameLine();
-        ImGuiHelper.Text($"{workshopId}");
+        ImGuiHelper.Text($"{SelectedInfo.WorkshopHandle}");
       }
 
-      ImGuiHelper.Text("Author:");
-      ImGui.SameLine();
-      ImGuiHelper.Text(about.Author ?? "");
+      if (!string.IsNullOrEmpty(about.Author))
+      {
+        ImGui.Spacing();
+        ImGuiHelper.Text("Author:");
+        ImGui.SameLine();
+        ImGuiHelper.Text(about.Author.Trim());
+      }
 
-      ImGuiHelper.Text("Version:");
-      ImGui.SameLine();
-      ImGuiHelper.Text(about.Version ?? "");
+      if (!string.IsNullOrEmpty(about.Version))
+      {
+        ImGui.Spacing();
+        ImGuiHelper.Text("Version:");
+        ImGui.SameLine();
+        ImGuiHelper.Text(about.Version.Trim());
+      }
 
-      ImGuiHelper.Text("ChangeLog:");
-      ImGuiHelper.Text(about.ChangeLog ?? "");
+      if (!string.IsNullOrEmpty(about.ChangeLog))
+      {
+        ImGui.Spacing();
+        ImGuiHelper.Text("Changelog:");
+        var split = about.ChangeLog.Split('\n');
+        foreach (var line in split)
+        {
+          if (line.IsNullOrWhiteSpace())
+            continue;
 
-      ImGuiHelper.Text("Description:");
-      ImGuiHelper.Text(about.Description ?? "");
+          ImGuiHelper.Text(line);
+        }
+      }
+
+      if (!string.IsNullOrEmpty(about.Description))
+      {
+        ImGui.Spacing();
+        ImGuiHelper.Text("Description:");
+        var split = about.Description.Split('\n');
+        foreach (var line in split)
+        {
+          if (line.IsNullOrWhiteSpace())
+            continue;
+
+          ImGuiHelper.Text(line);
+        }
+      }
+
+      if (about.Tags != null && about.Tags.Count > 0)
+      {
+        ImGui.Spacing();
+        ImGuiHelper.Text("Tags:");
+        foreach (var tag in about.Tags)
+        {
+          ImGui.Spacing();
+          ImGuiHelper.Text($"\t{tag.Trim()}");
+        }
+      }
+
+      if (about.Dependencies != null && about.Dependencies.Count > 0)
+      {
+        ImGui.Spacing();
+        ImGuiHelper.Text("Dependencies:");
+        foreach (var dependency in about.Dependencies)
+        {
+          ImGui.Spacing();
+          ImGuiHelper.Text($"\tId: {dependency.Id}, Version: {dependency.Version ?? "any"}");
+        }
+      }
+
+      if (about.LoadBefore != null && about.LoadBefore.Count > 0)
+      {
+        ImGui.Spacing();
+        ImGuiHelper.Text("Load Before:");
+        foreach (var m in about.LoadBefore)
+        {
+          ImGui.Spacing();
+          ImGuiHelper.Text($"\tId: {m.Id}, Version: {m.Version ?? "any"}");
+        }
+      }
+
+      if (about.LoadAfter != null && about.LoadAfter.Count > 0)
+      {
+        ImGui.Spacing();
+        ImGuiHelper.Text("Load After:");
+        foreach (var m in about.LoadAfter)
+        {
+          ImGui.Spacing();
+          ImGuiHelper.Text($"\tId: {m.Id}, Version: {m.Version ?? "any"}");
+        }
+      }
+
+      ImGui.Spacing();
+      ImGuiHelper.Text("Assemblies:");
+      if (SelectedInfo != null && SelectedInfo.Assemblies.Count > 0)
+      {
+        foreach (var assembly in SelectedInfo.Assemblies)
+        {
+          ImGui.Spacing();
+          ImGuiHelper.Text($"\tName: {assembly.Name}");
+          ImGuiHelper.Text($"\tPath: {assembly.Path}");
+        }
+      }
+      else
+      {
+        ImGuiHelper.Text($"No assemblies found.");
+      }
     }
 
     public static bool IsLoadState(params LoadState[] expected) => expected.Contains(LaunchPadConfig.LoadState);
