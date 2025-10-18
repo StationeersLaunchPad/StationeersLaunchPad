@@ -502,37 +502,72 @@ namespace StationeersLaunchPad
 
     private static async UniTask LoadWorkshopItems()
     {
-      var items = new List<Item>();
-      for (var page = 1; ; page++)
+      var allItems = new List<Item>();
+      var page = 1;
+      const int batchSize = 5; // number of pages to fetch in parallel
+
+      while (true)
       {
-        var query = Query.Items.WithTag("Mod");
-        using var result = await query.AllowCachedResponse(0).WhereUserSubscribed().GetPageAsync(page);
+        // Prepare batch of pages
+        var pageTasks = new List<UniTask<Item[]>>();
+        for (var i = 0; i < batchSize; i++)
+        {
+          var currentPage = page + i;
+          pageTasks.Add(FetchWorkshopPage(currentPage));
+        }
 
-        if (!result.HasValue || result.Value.ResultCount == 0)
-          break;
+        var results = await UniTask.WhenAll(pageTasks);
+        var hasItems = false;
+        foreach (var items in results)
+        {
+          if (items.Length > 0)
+          {
+            allItems.AddRange(items);
+            hasItems = true;
+          }
+        }
 
-        // filter out deleted items
-        items.AddRange(result.Value.Entries.Where(item => item.Result != Result.FileNotFound));
+        if (!hasItems)
+          break; // no more pages
+
+        page += batchSize;
       }
 
-      var needsUpdate = items.Where(item => item.NeedsUpdate || !Directory.Exists(item.Directory)).ToList();
+      // Determine which items need updates
+      var needsUpdate = allItems.Where(item => item.NeedsUpdate || !Directory.Exists(item.Directory)).ToList();
       if (needsUpdate.Count > 0)
       {
         Logger.Global.Log($"Updating {needsUpdate.Count} workshop items");
-        foreach (var item in needsUpdate)
-          Logger.Global.Log($"- {item.Title}({item.Id})");
+        if (Debug)
+        {
+          foreach (var item in needsUpdate)
+            Logger.Global.LogDebug($"- {item.Title} ({item.Id})");
+        }
+
         await UniTask.WhenAll(needsUpdate.Select(item => item.DownloadAsync().AsUniTask()));
       }
 
-      foreach (var item in items)
+      // Add all workshop mods
+      foreach (var item in allItems)
       {
-        Mods.Add(new ModInfo()
+        Mods.Add(new ModInfo
         {
           Source = ModSource.Workshop,
           Wrapped = SteamTransport.ItemWrapper.WrapWorkshopItem(item, "About\\About.xml"),
-          WorkshopItem = item,
+          WorkshopItem = item
         });
       }
+    }
+
+    // Helper to fetch a single workshop page
+    private static async UniTask<Item[]> FetchWorkshopPage(int page)
+    {
+      var query = Query.Items.WithTag("Mod");
+      using var result = await query.AllowCachedResponse(0).WhereUserSubscribed().GetPageAsync(page);
+
+      return !result.HasValue || result.Value.ResultCount == 0
+        ? Array.Empty<Item>()
+        : result.Value.Entries.Where(item => item.Result != Result.FileNotFound).ToArray();
     }
 
     private static async UniTask LoadDetails()
