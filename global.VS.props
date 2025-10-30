@@ -9,7 +9,7 @@
     <StationeersLibraryDirectory>$(StationeersDirectory)rocketstation_Data\Managed\</StationeersLibraryDirectory>
     <UserDir>$(HOMEDRIVE)$(HOMEPATH)</UserDir>
     <MyStationeersDir>$(UserDir)\Documents\My Games\Stationeers\</MyStationeersDir>
-    <PluginPath>$(StationeersDirectory)Bepinex\plugins\StationeersLaunchPad</PluginPath>
+    <PluginPath>$(StationeersDirectory)BepInEx\plugins\StationeersLaunchPad</PluginPath>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <LanguageTargets>$(MSBuildToolsPath)\Microsoft.CSharp.targets</LanguageTargets>
