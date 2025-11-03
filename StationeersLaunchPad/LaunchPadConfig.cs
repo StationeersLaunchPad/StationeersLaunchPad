@@ -369,6 +369,7 @@ namespace StationeersLaunchPad
         {
           var transport = LaunchPadPatches.GetMetaServerTransport();
           transport.InitClient();
+          SteamDisabled = !SteamClient.IsValid;
         }
         catch (Exception ex)
         {
