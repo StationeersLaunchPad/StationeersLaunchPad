@@ -23,14 +23,13 @@ namespace StationeersLaunchPad
 {
   public enum LoadState
   {
+    Updating,
     Initializing,
     Searching,
-    Updating,
     Configuring,
     Loading,
     Loaded,
     Running,
-    Updated,
     Failed,
   }
 
@@ -69,7 +68,6 @@ namespace StationeersLaunchPad
     public static bool CheckUpdate = false;
     public static bool AutoUpdate = false;
     public static bool AutoLoad = true;
-    public static bool HasUpdated = false;
     public static bool SteamDisabled = false;
     public static bool AutoScroll = false;
     public static LogSeverity Severities;
@@ -222,50 +220,6 @@ namespace StationeersLaunchPad
 
       await Load();
 
-      while (LoadState < LoadState.Updating)
-        await UniTask.Yield();
-
-      if (HasUpdated)
-      {
-        if (GameManager.IsBatchMode)
-        {
-          Logger.Global.LogWarning("LaunchPad has updated. Exiting");
-          Application.Quit();
-        }
-
-        AutoLoad = false;
-
-        await LaunchPadAlertGUI.Show("Restart Recommended", "StationeersLaunchPad has been updated, it is recommended to restart the game.",
-          LaunchPadAlertGUI.DefaultSize,
-          LaunchPadAlertGUI.DefaultPosition,
-          ("Continue Loading", () =>
-          {
-            AutoLoad = true;
-
-            return true;
-          }
-        ),
-          ("Restart Game", () =>
-          {
-            var startInfo = new ProcessStartInfo();
-            startInfo.FileName = LaunchPadPaths.ExecutablePath;
-            startInfo.WorkingDirectory = LaunchPadPaths.GameRootPath;
-            startInfo.UseShellExecute = false;
-
-            // remove environment variables that new process will inherit
-            startInfo.Environment.Remove("DOORSTOP_INITIALIZED");
-            startInfo.Environment.Remove("DOORSTOP_DISABLE");
-
-            Process.Start(startInfo);
-            Application.Quit();
-
-            return false;
-          }
-        ),
-          ("Close", () => true)
-        );
-      }
-
       if (!AutoLoad && GameManager.IsBatchMode)
       {
         Logger.Global.LogError("An error occurred during initialization. Exiting");
@@ -299,6 +253,30 @@ namespace StationeersLaunchPad
     {
       try
       {
+        if (CheckUpdate && PostUpdateCleanup.Value)
+          LaunchPadUpdater.RunPostUpdateCleanup();
+
+        if (CheckUpdate && OneTimeBoosterInstall.Value)
+          await LaunchPadUpdater.RunOneTimeBoosterInstall();
+
+        if (CheckUpdate)
+        {
+          LoadState = LoadState.Updating;
+          if (await RunUpdate())
+          {
+            if (GameManager.IsBatchMode)
+            {
+              Logger.Global.LogWarning("LaunchPad has updated. Exiting");
+              Application.Quit();
+            }
+
+            AutoLoad = false;
+            LoadState = LoadState.Updating;
+
+            await PostUpdateRestartDialog();
+          }
+        }
+
         LoadState = LoadState.Initializing;
 
         Logger.Global.LogInfo("Initializing...");
@@ -319,26 +297,12 @@ namespace StationeersLaunchPad
         await UniTask.Run(() => LoadConfig());
 
         Logger.Global.LogInfo("Loading Details");
-        await LoadDetails();
+        LoadDetails();
 
         if (AutoSort)
           SortByDeps();
 
         Logger.Global.LogInfo("Mod Config Initialized");
-
-        if (CheckUpdate && PostUpdateCleanup.Value)
-          LaunchPadUpdater.RunPostUpdateCleanup();
-
-        if (CheckUpdate && OneTimeBoosterInstall.Value)
-          await LaunchPadUpdater.RunOneTimeBoosterInstall();
-
-        if (CheckUpdate)
-        {
-          LoadState = LoadState.Updating;
-
-          Logger.Global.LogInfo("Checking Version");
-          await LaunchPadUpdater.CheckVersion();
-        }
 
         LoadState = LoadState.Configuring;
       }
@@ -568,12 +532,12 @@ namespace StationeersLaunchPad
         : result.Value.Entries.Where(item => item.Result != Result.FileNotFound).ToArray();
     }
 
-    private static async UniTask LoadDetails()
+    private static void LoadDetails()
     {
-      await UniTask.WhenAll(Mods.Select(LoadModDetails));
+      Mods.ForEach(LoadModDetails);
     }
 
-    private static async UniTask LoadModDetails(ModInfo mod)
+    private static void LoadModDetails(ModInfo mod)
     {
       if (mod.Source == ModSource.Core)
         return;
@@ -805,9 +769,64 @@ namespace StationeersLaunchPad
       await loadStrategy.LoadMods();
 
       ElapsedStopwatch.Stop();
-      Logger.Global.LogWarning($"Took {ElapsedStopwatch.Elapsed.ToString(@"m\:ss\.fff")} to load mods.");
+      Logger.Global.LogWarning($"Took {ElapsedStopwatch.Elapsed:m\\:ss\\.fff} to load mods.");
 
       LoadState = LoadState.Loaded;
+    }
+
+    private async static UniTask<bool> RunUpdate()
+    {
+      Logger.Global.LogInfo("Checking Version");
+      var release = await LaunchPadUpdater.GetUpdateRelease();
+      if (release == null || !await LaunchPadUpdater.CheckShouldUpdate(release))
+        return false;
+
+      if (!await LaunchPadUpdater.UpdateToRelease(release))
+        return false;
+
+      Logger.Global.LogError($"StationeersLaunchPad updated to {release.TagName}, please restart your game!");
+      PostUpdateCleanup.Value = true;
+      return true;
+    }
+
+    private static void RestartGame()
+    {
+      var startInfo = new ProcessStartInfo
+      {
+        FileName = LaunchPadPaths.ExecutablePath,
+        WorkingDirectory = LaunchPadPaths.GameRootPath,
+        UseShellExecute = false
+      };
+
+      // remove environment variables that new process will inherit
+      startInfo.Environment.Remove("DOORSTOP_INITIALIZED");
+      startInfo.Environment.Remove("DOORSTOP_DISABLE");
+
+      Process.Start(startInfo);
+      Application.Quit();
+    }
+
+    private static UniTask PostUpdateRestartDialog()
+    {
+      bool continueLoading()
+      {
+        AutoLoad = true;
+        return true;
+      }
+      bool restartGame()
+      {
+        RestartGame();
+        return false;
+      }
+      return LaunchPadAlertGUI.Show(
+        "Restart Recommended",
+        "StationeersLaunchPad has been updated, it is recommended to restart the game.",
+        LaunchPadAlertGUI.DefaultSize,
+        LaunchPadAlertGUI.DefaultPosition,
+        ("Continue Loading", continueLoading),
+        ("Restart Game", restartGame),
+        ("Close", () => true)
+      );
     }
 
     private static void StartGame()

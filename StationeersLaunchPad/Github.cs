@@ -12,6 +12,7 @@ namespace StationeersLaunchPad
   public class Github
   {
     public const string RepoUrl = "https://github.com/StationeersLaunchPad/StationeersLaunchPad";
+    public const string BoosterRepoUrl = "https://github.com/StationeersLaunchPad/LaunchPadBooster";
     public const string ReleaseUrlBase = "https://api.github.com/repos/StationeersLaunchPad/StationeersLaunchPad/releases";
     public static string TagReleaseUrl(string tag) => $"{ReleaseUrlBase}/tags/{tag}";
     public static string LatestReleaseUrl => $"{ReleaseUrlBase}/latest";
@@ -126,6 +127,7 @@ namespace StationeersLaunchPad
       var text = description
         .Replace($"{RepoUrl}/pull/", "#")
         .Replace($"{RepoUrl}/compare/", "")
+        .Replace($"{BoosterRepoUrl}/pull/", "LaunchPadBooster#")
         .TrimEnd('v', 'V', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.')
         .Split('\n')
         .ToList();

@@ -53,14 +53,13 @@ namespace StationeersLaunchPad
 
     public static void DrawLoadingState() => ImGuiHelper.Text(LaunchPadConfig.LoadState switch
     {
+      LoadState.Updating => "Checking for Update",
       LoadState.Initializing => "Initializing",
       LoadState.Searching => "Finding Mods",
-      LoadState.Updating => "Checking for Updating",
       LoadState.Configuring => $"Loading Mods in {autoTime}s",
       LoadState.Loading => "Loading Mods",
       LoadState.Loaded => $"Starting game in {autoTime}s",
       LoadState.Running => "Game Running",
-      LoadState.Updated => "Updated",
       LoadState.Failed => "Loading Failed",
       _ => throw new ArgumentOutOfRangeException(),
     });
@@ -74,6 +73,13 @@ namespace StationeersLaunchPad
       ImGuiHelper.TextDisabled(LaunchPadPlugin.pluginVersion);
       ImGuiHelper.DrawSameLine(() => ImGuiHelper.TextDisabled("|"), true);
 
+      if (LaunchPadConfig.CheckUpdate)
+      {
+        ImGuiHelper.TextColored("Update", LoadStateColor(LoadState.Updating));
+        ImGuiHelper.ItemTooltip("Checking for updates to StationeersLaunchPad.");
+        ImGuiHelper.DrawSameLine(() => ImGuiHelper.TextDisabled(">"), true);
+      }
+
       ImGuiHelper.TextColored("Initalize", LoadStateColor(LoadState.Initializing));
       ImGuiHelper.ItemTooltip("State when LaunchPad is initalizing core components.");
       ImGuiHelper.DrawSameLine(() => ImGuiHelper.TextDisabled(">"), true);
@@ -81,13 +87,6 @@ namespace StationeersLaunchPad
       ImGuiHelper.TextColored("Locate Mods", LoadStateColor(LoadState.Searching));
       ImGuiHelper.ItemTooltip("State when LaunchPad is searching for mods.");
       ImGuiHelper.DrawSameLine(() => ImGuiHelper.TextDisabled(">"), true);
-
-      if (LaunchPadConfig.CheckUpdate)
-      {
-        ImGuiHelper.TextColored("Check Updates", LoadStateColor(LoadState.Updating));
-        ImGuiHelper.ItemTooltip("State when LaunchPad is checking for updates.");
-        ImGuiHelper.DrawSameLine(() => ImGuiHelper.TextDisabled(">"), true);
-      }
 
       if (LaunchPadConfig.LoadState == LoadState.Configuring)
       {
@@ -166,7 +165,6 @@ namespace StationeersLaunchPad
 
         default:
         case LoadState.Running:
-        case LoadState.Updated:
         case LoadState.Failed:
           break;
       }

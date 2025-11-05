@@ -1,5 +1,6 @@
 ﻿using Assets.Scripts.Serialization;
 using BepInEx;
+using System.IO;
 using UnityEngine;
 
 namespace StationeersLaunchPad
@@ -13,5 +14,37 @@ namespace StationeersLaunchPad
     public static string StreamingAssetsPath => Application.streamingAssetsPath;
     public static string SavePath => string.IsNullOrEmpty(Settings.CurrentData.SavePath) ? StationSaveUtils.DefaultPath : Settings.CurrentData.SavePath;
     public static string ConfigPath => WorkshopMenu.ConfigPath;
+
+    private static DirectoryInfo _cachedInstallDir;
+    public static DirectoryInfo InstallDir
+    {
+      get
+      {
+        if (_cachedInstallDir == null)
+        {
+          var dir = Directory.GetParent(typeof(LaunchPadPaths).Assembly.Location);
+          if (dir == null || !dir.Exists)
+            return null;
+
+          var pluginDir = new DirectoryInfo(PluginPath);
+          var parent = dir;
+          var nested = false;
+          // ensure install path is inside bepinex plugins
+          while (parent != null)
+          {
+            if (parent.FullName == pluginDir.FullName)
+            {
+              nested = true;
+              break;
+            }
+            parent = parent.Parent;
+          }
+          if (!nested)
+            return null;
+          _cachedInstallDir = dir;
+        }
+        return _cachedInstallDir;
+      }
+    }
   }
 }

@@ -9,51 +9,15 @@ using UnityEngine;
 
 namespace StationeersLaunchPad
 {
-  // similar to jixxed's updater
   public static class LaunchPadUpdater
   {
-    public static bool AllowUpdate;
-
-    private static List<UpdateAction> UpdateActions = new();
-
-    private static DirectoryInfo _cachedInstallDir;
-    private static DirectoryInfo InstallDir
-    {
-      get
-      {
-        if (_cachedInstallDir == null)
-        {
-          var dir = Directory.GetParent(typeof(LaunchPadUpdater).Assembly.Location);
-          if (dir == null || !dir.Exists)
-            return null;
-
-          var pluginDir = new DirectoryInfo(LaunchPadPaths.PluginPath);
-          var parent = dir;
-          var nested = false;
-          // ensure install path is inside bepinex plugins
-          while (parent != null)
-          {
-            if (parent.FullName == pluginDir.FullName)
-            {
-              nested = true;
-              break;
-            }
-            parent = parent.Parent;
-          }
-          if (!nested)
-            return null;
-          _cachedInstallDir = dir;
-        }
-        return _cachedInstallDir;
-      }
-    }
     private static string TargetAssetName(Github.Release release) => $"StationeersLaunchPad-{(GameManager.IsBatchMode ? "server" : "client")}-{release.TagName}.zip";
 
     public static void RunPostUpdateCleanup()
     {
       try
       {
-        var installDir = InstallDir;
+        var installDir = LaunchPadPaths.InstallDir;
         if (installDir == null)
         {
           Logger.Global.LogWarning("Invalid install dir. skipping post update cleanup");
@@ -80,7 +44,7 @@ namespace StationeersLaunchPad
     {
       try
       {
-        var installDir = InstallDir;
+        var installDir = LaunchPadPaths.InstallDir;
         if (installDir == null)
         {
           Logger.Global.LogWarning("Invalid install dir. skipping booster install");
@@ -135,192 +99,103 @@ namespace StationeersLaunchPad
       }
     }
 
-    public static async UniTask CheckVersion()
+    public static async UniTask<Github.Release> GetUpdateRelease()
     {
-      if (InstallDir == null)
+      if (LaunchPadPaths.InstallDir == null)
       {
         Logger.Global.LogWarning("Invalid install dir. Skipping update check");
-        return;
+        return null;
       }
 
       var latestRelease = await Github.FetchLatestRelease();
       // If we failed to get a release for whatever reason, just bail
       if (latestRelease == null)
-        return;
+        return null;
 
       var latestVersion = new Version(latestRelease.TagName.TrimStart('V', 'v'));
       var currentVersion = new Version(LaunchPadPlugin.pluginVersion.TrimStart('V', 'v'));
 
       if (latestVersion <= currentVersion)
       {
-        Logger.Global.LogInfo($"Plugin is up-to-date.");
-        return;
+        Logger.Global.LogInfo($"StationeersLaunchPad is up-to-date.");
+        return null;
       }
 
-      Logger.Global.LogWarning($"Plugin is NOT up-to-date.");
-
-      await CheckShouldUpdate(latestRelease);
-      if (!AllowUpdate)
-        return;
-
-      try
-      {
-        await PerformUpdate(latestRelease);
-
-        LaunchPadConfig.HasUpdated = true;
-        LaunchPadConfig.PostUpdateCleanup.Value = true;
-        Logger.Global.LogError($"Mod loader has been updated to version {latestVersion}, please restart your game!");
-      }
-      catch (Exception ex)
-      {
-        Logger.Global.LogException(ex);
-        Logger.Global.LogError("An error occurred during update. Rolling back");
-        RevertUpdate();
-      }
+      Logger.Global.LogWarning($"StationeersLaunchPad has an update available.");
+      return latestRelease;
     }
 
-    private static async UniTask CheckShouldUpdate(Github.Release release)
+    public static async UniTask<bool> CheckShouldUpdate(Github.Release release)
     {
       if (LaunchPadConfig.AutoUpdate)
       {
-        AllowUpdate = true;
-        return;
+        return true;
       }
       // if autoupdate is not enabled on server, just move on after the out-of-date message
       if (GameManager.IsBatchMode)
-        return;
+        return false;
+
+      var doUpdate = false;
+      bool acceptUpdate()
+      {
+        doUpdate = true;
+        return true;
+      }
+      bool openGithub()
+      {
+        Application.OpenURL(release.HtmlUrl);
+        return false;
+      }
+      bool rejectUpdate()
+      {
+        doUpdate = false;
+        return true;
+      }
 
       var description = Github.FormatDescription(release.Description);
-      await LaunchPadAlertGUI.Show("Update Available", $"Update version {release.TagName} is available, would you like to automatically download and update?\n\n{description}",
+      await LaunchPadAlertGUI.Show("Update Available", $"StationeersLaunchPad {release.TagName} is available, would you like to automatically download and update?\n\n{description}",
         new Vector2(800, 400),
         LaunchPadAlertGUI.DefaultPosition,
-        ("Yes", () => {
-          AllowUpdate = true; return true;
-        }),
-        ("Open GitHub", () => {
-          AllowUpdate = false;
-          Application.OpenURL(release.HtmlUrl);
-          return false;
-        }),
-        ("No", () => {
-          AllowUpdate = false; return true;
-        })
+        ("Yes", acceptUpdate),
+        ("View release info", openGithub),
+        ("No", rejectUpdate)
       );
+      return doUpdate;
     }
 
-    private static async UniTask PerformUpdate(Github.Release release)
+    public static async UniTask<bool> UpdateToRelease(Github.Release release)
     {
       var assetName = TargetAssetName(release);
       var asset = release.Assets.Find(a => a.Name == assetName);
       if (asset == null)
       {
         Logger.Global.LogError($"Failed to find {assetName} in release. Skipping update");
-        return;
+        return false;
       }
 
       using (var archive = await Github.FetchZipArchive(asset))
       {
-        foreach (var entry in archive.Entries)
+        var sequence = UpdateSequence.Make(
+          LaunchPadPaths.InstallDir,
+          archive,
+          filter: e => e.Name.EndsWith(".dll"),
+          mapPath: e => e.Name
+        );
+
+        var result = sequence.Execute();
+        switch (result)
         {
-          if (!entry.Name.EndsWith(".dll"))
-            continue;
-
-          var path = Path.Combine(InstallDir.FullName, $"{entry.Name}");
-          UpdateAction action = File.Exists(path) ? new ReplaceFileUpdateAction(path) : new NewFileUpdateAction(path);
-          UpdateActions.Add(action);
-
-          action.PerformUpdate(entry);
+          case UpdateResult.Success:
+            return true;
+          case UpdateResult.Rollback:
+            Logger.Global.LogError("Update failed. Changes were rolled back");
+            return false;
+          case UpdateResult.FailedRollback:
+            Logger.Global.LogError("Update failed. Rolling back update failed. StationeersLaunchPad may be in an invalid state.");
+            return false;
+          default:
+            throw new InvalidOperationException($"Invalid update result {result}");
         }
-      }
-
-      LaunchPadConfig.LoadState = LoadState.Updated;
-    }
-
-    private static void RevertUpdate()
-    {
-      try
-      {
-        foreach (var action in UpdateActions)
-        {
-          action.RevertUpdate();
-        }
-
-        Logger.Global.LogWarning($"Mod loader has reverted update changes due to an error.");
-      }
-      catch (Exception ex)
-      {
-        Logger.Global.LogException(ex);
-        Logger.Global.LogError("Error rolling back update. StationeersLaunchPad install may be in an invalid state.");
-      }
-    }
-
-    private abstract class UpdateAction
-    {
-      public abstract void PerformUpdate(ZipArchiveEntry entry);
-      public abstract void RevertUpdate();
-    }
-
-    private class NewFileUpdateAction : UpdateAction
-    {
-      private string path;
-      public NewFileUpdateAction(string path) => this.path = path;
-
-      public override void PerformUpdate(ZipArchiveEntry entry)
-      {
-        Logger.Global.LogDebug($"Extracting new file to {this.path}");
-        entry.ExtractToFile(this.path);
-      }
-
-      public override void RevertUpdate()
-      {
-        if (File.Exists(this.path))
-        {
-          Logger.Global.LogDebug($"Removing new file {this.path}");
-          File.Delete(this.path);
-        }
-      }
-    }
-
-    private class ReplaceFileUpdateAction : UpdateAction
-    {
-      private string path;
-      public ReplaceFileUpdateAction(string path) => this.path = path;
-
-      private string backupPath => $"{this.path}.bak";
-
-      public override void PerformUpdate(ZipArchiveEntry entry)
-      {
-        Logger.Global.LogDebug($"Replacing file {this.path}");
-
-        if (File.Exists(this.backupPath))
-        {
-          Logger.Global.LogDebug($"Removing old backup {this.backupPath}");
-          File.Delete(this.backupPath);
-        }
-
-        Logger.Global.LogDebug($"Backing up existing file to {this.backupPath}");
-        File.Move(this.path, this.backupPath);
-
-        Logger.Global.LogDebug($"Extracting new file to {this.path}");
-        entry.ExtractToFile(this.path);
-      }
-
-      public override void RevertUpdate()
-      {
-        if (!File.Exists(this.backupPath))
-        {
-          // nothing to do
-          return;
-        }
-
-        if (File.Exists(this.path))
-        {
-          Logger.Global.LogDebug($"Removing new file {this.path}");
-          File.Delete(this.path);
-        }
-
-        Logger.Global.LogDebug($"Restoring backup file {this.backupPath}");
-        File.Move(this.backupPath, this.path);
       }
     }
   }
