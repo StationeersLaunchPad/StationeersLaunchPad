@@ -62,6 +62,8 @@ namespace StationeersLaunchPad
     public static LoadStrategyType LoadStrategyType = LoadStrategyType.Linear;
     public static LoadStrategyMode LoadStrategyMode = LoadStrategyMode.Serial;
 
+    public static bool PatchesFailed = false;
+
     public static bool Debug = false;
     public static bool AutoSort = true;
     public static bool CheckUpdate = false;
@@ -205,7 +207,7 @@ namespace StationeersLaunchPad
       AutoSort = AutoSortOnStart.Value;
       CheckUpdate = CheckForUpdate.Value;
       AutoUpdate = AutoUpdateOnStart.Value;
-      AutoLoad = AutoLoadOnStart.Value || GameManager.IsBatchMode; // always autoload on server
+      AutoLoad = (AutoLoadOnStart.Value && !PatchesFailed) || GameManager.IsBatchMode; // always autoload on server
       LoadStrategyType = StrategyType.Value;
       LoadStrategyMode = StrategyMode.Value;
       SavePath = SavePathOverride.Value;
@@ -216,7 +218,7 @@ namespace StationeersLaunchPad
       SteamDisabled = DisableSteam.Value || GameManager.IsBatchMode;
 
       if (LinuxPathPatch.Value)
-        LaunchPadPlugin.RunLinuxPathPatch();
+        LaunchPadPatches.RunLinuxPathPatch();
 
       await Load();
 
@@ -367,7 +369,7 @@ namespace StationeersLaunchPad
       {
         try
         {
-          var transport = LaunchPadPatches.GetMetaServerTransport();
+          var transport = SteamPatches.GetMetaServerTransport();
           transport.InitClient();
           SteamDisabled = !SteamClient.IsValid;
         }
