@@ -44,8 +44,8 @@ namespace StationeersLaunchPad
 
       ImGuiHelper.DrawIfHovering(() =>
       {
-        ImGuiHelper.TextTooltip("Click to copy logs.");
-        if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
+        ImGuiHelper.TextTooltip("Right-click to copy logs.");
+        if (ImGui.IsMouseClicked(ImGuiMouseButton.Right))
         {
           logger.CopyToClipboard();
           logger.Log("Logs copied to clipboard.");

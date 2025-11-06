@@ -776,17 +776,26 @@ namespace StationeersLaunchPad
 
     private async static UniTask<bool> RunUpdate()
     {
-      Logger.Global.LogInfo("Checking Version");
-      var release = await LaunchPadUpdater.GetUpdateRelease();
-      if (release == null || !await LaunchPadUpdater.CheckShouldUpdate(release))
-        return false;
+      try
+      {
+        Logger.Global.LogInfo("Checking Version");
+        var release = await LaunchPadUpdater.GetUpdateRelease();
+        if (release == null || !await LaunchPadUpdater.CheckShouldUpdate(release))
+          return false;
 
-      if (!await LaunchPadUpdater.UpdateToRelease(release))
-        return false;
+        if (!await LaunchPadUpdater.UpdateToRelease(release))
+          return false;
 
-      Logger.Global.LogError($"StationeersLaunchPad updated to {release.TagName}, please restart your game!");
-      PostUpdateCleanup.Value = true;
-      return true;
+        Logger.Global.LogError($"StationeersLaunchPad updated to {release.TagName}, please restart your game!");
+        PostUpdateCleanup.Value = true;
+        return true;
+      }
+      catch (Exception ex)
+      {
+        Logger.Global.LogError("An error occurred during update.");
+        Logger.Global.LogException(ex);
+        return false;
+      }
     }
 
     private static void RestartGame()
