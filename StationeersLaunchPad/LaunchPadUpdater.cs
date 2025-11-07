@@ -47,7 +47,7 @@ namespace StationeersLaunchPad
         if (installDir == null)
         {
           Logger.Global.LogWarning("Invalid install dir. skipping booster install");
-          return true;
+          return false;
         }
         const string boosterName = "LaunchPadBooster.dll";
         var boosterPath = Path.Combine(installDir.FullName, boosterName);
