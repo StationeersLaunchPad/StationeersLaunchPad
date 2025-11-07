@@ -32,9 +32,7 @@ namespace StationeersLaunchPad
       // referencing LaunchPadConfig fields in this method will force the class to initialize before the method starts
       // we need to add the resolve hook above before LaunchPadConfig initializes so the steamworks types will be valid on linux
 
-      LaunchPadPatches.harmony = new(pluginGuid);
-      if (!LaunchPadPatches.RunPatches())
-        return;
+      var patchSuccess = LaunchPadPatches.RunPatches(new Harmony(pluginGuid));
 
       var unityLogger = Debug.unityLogger as UnityEngine.Logger;
       unityLogger.logHandler = new LogWrapper(unityLogger.logHandler);
@@ -42,7 +40,7 @@ namespace StationeersLaunchPad
       var playerLoop = PlayerLoop.GetCurrentPlayerLoop();
       PlayerLoopHelper.Initialize(ref playerLoop);
 
-      LaunchPadConfig.Run(Config);
+      LaunchPadConfig.Run(this.Config, !patchSuccess);
     }
   }
 }

@@ -74,9 +74,9 @@ namespace StationeersLaunchPad
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void TextDisabled(string text)
+    public static void TextDisabled(string text, bool disabled = true)
     {
-      TextColored(text, TextDisabledColor);
+      TextColored(text, disabled ? TextDisabledColor : TextColor);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

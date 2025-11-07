@@ -4,31 +4,19 @@ namespace StationeersLaunchPad
 {
   public static class LaunchPadConsoleGUI
   {
-    public static bool IsActive = false;
-
-    public static void Draw()
-    {
-      if (!IsActive)
-        return;
-
-      ImGuiHelper.Draw(() => DrawConsole());
-    }
-
-    private static LogSeverity logSeverity => LaunchPadConfig.LogSeverities.Value;
     private static ulong lastLineCount = 0;
-    internal static bool shouldScroll = false;
-    public static void DrawConsole()
+    private static Logger lastLogger = null;
+    public static void DrawConsole(Logger logger)
     {
-      LaunchPadConfigGUI.DrawEnumEntry(LaunchPadConfig.LogSeverities, logSeverity);
+      LaunchPadConfigGUI.DrawEnumEntry(Configs.LogSeverities, Configs.LogSeverities.Value);
       ImGui.BeginChild("##logs", ImGuiWindowFlags.HorizontalScrollbar);
 
-      var logger = LaunchPadLoaderGUI.SelectedLogger ?? Logger.Global;
-      var lineCount = logger.TotalCount;
-
-      if (lastLineCount != lineCount)
+      var shouldScroll = false;
+      if (logger != lastLogger || logger.TotalCount != lastLineCount)
       {
+        lastLogger = logger;
         lastLineCount = logger.TotalCount;
-        shouldScroll = LaunchPadConfig.AutoScroll;
+        shouldScroll = Configs.AutoScrollLogs.Value;
       }
 
       for (var i = 0; i < logger.Count; i++)
@@ -60,47 +48,26 @@ namespace StationeersLaunchPad
       if (line == null)
         return;
 
-      var text = LaunchPadConfig.CompactLogs.Value ? line.CompactString : line.FullString;
+      if (!force && !Configs.LogSeverities.Value.HasFlag(line.Severity))
+        return;
+
+      var text = Configs.CompactLogs.Value ? line.CompactString : line.FullString;
       switch (line.Severity)
       {
         case LogSeverity.Debug:
-          // only display debug if user actually wants it
-          if (logSeverity.HasFlag(LogSeverity.Debug))
-          {
-            ImGuiHelper.TextDisabled(text);
-          }
+          ImGuiHelper.TextDisabled(text);
           break;
         case LogSeverity.Information:
-          if (force || logSeverity.HasFlag(LogSeverity.Information))
-          {
-            ImGuiHelper.Text(text);
-          }
+          ImGuiHelper.Text(text);
           break;
         case LogSeverity.Warning:
-          if (force || logSeverity.HasFlag(LogSeverity.Warning))
-          {
-            ImGuiHelper.TextWarning(text);
-          }
+          ImGuiHelper.TextWarning(text);
           break;
-        case LogSeverity.Error:
-          if (force || logSeverity.HasFlag(LogSeverity.Error))
-          {
-            ImGuiHelper.TextError(text);
-          }
-          break;
-        case LogSeverity.Exception:
-          if (force || logSeverity.HasFlag(LogSeverity.Exception))
-          {
-            ImGuiHelper.TextError(text);
-          }
-          break;
-        case LogSeverity.Fatal:
-          if (force || logSeverity.HasFlag(LogSeverity.Fatal))
-          {
-            ImGuiHelper.TextError(text);
-          }
+        case LogSeverity.Error or LogSeverity.Exception or LogSeverity.Fatal:
+          ImGuiHelper.TextError(text);
           break;
       }
+      ;
     }
   }
 }

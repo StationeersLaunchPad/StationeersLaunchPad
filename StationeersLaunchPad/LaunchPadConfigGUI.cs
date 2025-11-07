@@ -9,19 +9,9 @@ namespace StationeersLaunchPad
 {
   internal class LaunchPadConfigGUI
   {
-    public static bool IsActive = false;
-
-    public static void Draw()
-    {
-      ImGuiHelper.Draw(() => DrawConfigEditor());
-    }
-
     public static void DrawWorkshopConfig(ModData modData)
     {
-      if (modData == null)
-        LaunchPadLoaderGUI.SelectedInfo = null;
-      else if (LaunchPadLoaderGUI.SelectedMod == null || LaunchPadLoaderGUI.SelectedInfo.Path != modData.DirectoryPath)
-        LaunchPadLoaderGUI.SelectedInfo = LaunchPadConfig.Mods.Find(mod => mod.Path == modData.DirectoryPath);
+      var modInfo = modData != null ? LaunchPadConfig.Mods.Find(mod => mod.Path == modData.DirectoryPath) : null;
 
       var screenSize = ImguiHelper.ScreenSize;
       var padding = new Vector2(25, 25);
@@ -33,29 +23,30 @@ namespace StationeersLaunchPad
         ImGui.SetNextWindowSize(bottomRight - topLeft);
         ImGui.SetNextWindowPos(topLeft);
         if (ImGui.Begin("Mod Configuration##menuconfig", ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoSavedSettings))
-          DrawConfigEditor();
+          DrawConfigEditor(modInfo);
         ImGui.End();
       });
     }
 
-    public static void DrawConfigEditor()
+    public static void DrawConfigEditor(ModInfo modInfo)
     {
-      if (LaunchPadLoaderGUI.SelectedInfo == null || LaunchPadLoaderGUI.SelectedInfo.Source == ModSource.Core)
+      if (modInfo == null || modInfo.Source == ModSource.Core)
       {
         ImGuiHelper.TextDisabled("Select a mod to edit configuration");
         return;
       }
 
-      if (LaunchPadLoaderGUI.SelectedMod == null)
+      var mod = modInfo.Loaded;
+      if (mod == null)
       {
         ImGuiHelper.TextDisabled("Mod was not enabled at load time or is not configurable.");
         return;
       }
 
-      var configFiles = LaunchPadLoaderGUI.SelectedMod.GetSortedConfigs();
+      var configFiles = mod.GetSortedConfigs();
       if (configFiles == null || configFiles.Count == 0)
       {
-        ImGuiHelper.TextDisabled($"{LaunchPadLoaderGUI.SelectedInfo.DisplayName} does not have any configuration");
+        ImGuiHelper.TextDisabled($"{modInfo.DisplayName} does not have any configuration");
         return;
       }
 
@@ -68,14 +59,14 @@ namespace StationeersLaunchPad
       ImGui.EndChild();
     }
 
-    public static void DrawConfigFile(SortedConfigFile configFile, Func<string, bool> except = null)
+    public static void DrawConfigFile(SortedConfigFile configFile, Func<string, bool> categoryFilter = null)
     {
       ImGuiHelper.Text(configFile.FileName);
       ImGui.PushID(configFile.FileName);
 
       foreach (var category in configFile.Categories)
       {
-        if (except?.Invoke(category.Category) ?? false)
+        if (categoryFilter != null && !categoryFilter(category.Category))
           continue;
 
         if (!ImGui.CollapsingHeader(category.Category, ImGuiTreeNodeFlags.DefaultOpen))

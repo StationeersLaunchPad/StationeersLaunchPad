@@ -29,28 +29,32 @@ namespace StationeersLaunchPad {
 
   public abstract class LoadStrategy
   {
-    public Stopwatch ElapsedStopwatch = new();
     public List<ModInfo> Mods => LaunchPadConfig.Mods.Where((mod) => mod.Enabled && mod.Source != ModSource.Core).ToList();
 
-    public async UniTask LoadMods()
+    private bool failed = false;
+
+    // returns true if all mods loaded successfully
+    public async UniTask<bool> LoadMods()
     {
       Logger.Global.LogDebug($"Assemblies loading...");
-      this.ElapsedStopwatch.Restart();
+      var stopwatch = Stopwatch.StartNew();
       await this.LoadAssemblies();
-      this.ElapsedStopwatch.Stop();
-      Logger.Global.LogWarning($"Assembly loading took {this.ElapsedStopwatch.Elapsed.ToString(@"m\:ss\.fff")}");
+      stopwatch.Stop();
+      Logger.Global.LogWarning($"Assembly loading took {stopwatch.Elapsed:m\\:ss\\.fff}");
 
       Logger.Global.LogDebug($"Assets loading...");
-      this.ElapsedStopwatch.Restart();
+      stopwatch.Restart();
       await this.LoadAssets();
-      this.ElapsedStopwatch.Stop();
-      Logger.Global.LogWarning($"Asset loading took {this.ElapsedStopwatch.Elapsed.ToString(@"m\:ss\.fff")}");
+      stopwatch.Stop();
+      Logger.Global.LogWarning($"Asset loading took {stopwatch.Elapsed:m\\:ss\\.fff}");
 
       Logger.Global.LogDebug($"Loading entrypoints...");
-      this.ElapsedStopwatch.Restart();
+      stopwatch.Restart();
       await this.LoadEntryPoints();
-      this.ElapsedStopwatch.Stop();
-      Logger.Global.LogWarning($"Loading entrypoints took {this.ElapsedStopwatch.Elapsed.ToString(@"m\:ss\.fff")}");
+      stopwatch.Stop();
+      Logger.Global.LogWarning($"Loading entrypoints took {stopwatch.Elapsed:m\\:ss\\.fff}");
+
+      return !this.failed;
     }
 
     public void LoadFailed(LoadedMod mod, Exception ex)
@@ -59,7 +63,7 @@ namespace StationeersLaunchPad {
       mod.LoadFailed = true;
       mod.LoadFinished = false;
 
-      LaunchPadConfig.AutoLoad = false;
+      this.failed = true;
     }
 
     public abstract UniTask LoadAssemblies();

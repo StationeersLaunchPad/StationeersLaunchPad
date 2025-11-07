@@ -22,19 +22,22 @@ namespace StationeersLaunchPad
   [HarmonyPatch]
   static class LaunchPadPatches
   {
-    public static Harmony harmony;
+    private static Harmony harmony;
 
-    public static bool RunPatches()
+    // Returns true if all patches were successfully applied
+    public static bool RunPatches(Harmony harmony)
     {
+      LaunchPadPatches.harmony = harmony;
+
+      var failed = false;
       try
       {
         RunEssentialPatches();
       }
-      catch (Exception ex)
+      catch
       {
         Logger.Global.LogError("An error occurred running essential patches. LaunchPad will not load");
-        Logger.Global.LogException(ex);
-        return false;
+        throw;
       }
 
       try
@@ -45,7 +48,7 @@ namespace StationeersLaunchPad
       {
         Logger.Global.LogError("An error occurred running workshop menu patches. The workshop menu may not function properly");
         Logger.Global.LogException(ex);
-        LaunchPadConfig.PatchesFailed = true;
+        failed = true;
       }
 
       try
@@ -56,7 +59,7 @@ namespace StationeersLaunchPad
       {
         Logger.Global.LogError("An error occurred running steam patches. Workshop mods may not be loaded properly");
         Logger.Global.LogException(ex);
-        LaunchPadConfig.PatchesFailed = true;
+        failed = true;
       }
 
       try
@@ -67,7 +70,7 @@ namespace StationeersLaunchPad
       {
         Logger.Global.LogError("An error occurred running bugfix patches. Some mods may not work properly");
         Logger.Global.LogException(ex);
-        LaunchPadConfig.PatchesFailed = true;
+        failed = true;
       }
 
       try
@@ -78,10 +81,10 @@ namespace StationeersLaunchPad
       {
         Logger.Global.LogError("An error occurred running custom save path patches. The custom save path feature may not work properly");
         Logger.Global.LogException(ex);
-        LaunchPadConfig.PatchesFailed = true;
+        failed = true;
       }
 
-      return true;
+      return !failed;
     }
 
     // these are put in separate methods as all class tokens in a method will be resolved before the method starts
@@ -117,27 +120,15 @@ namespace StationeersLaunchPad
       return false;
     }
 
+    // set when mod loading is finished
+    public static bool GameStarted = false;
     [HarmonyPatch(typeof(SplashBehaviour), nameof(SplashBehaviour.Draw)), HarmonyPrefix]
     static bool SplashDraw()
     {
-      if (GameManager.IsBatchMode)
-        return true;
+      if (!GameManager.IsBatchMode && !GameStarted)
+        LaunchPadConfig.Draw();
 
-      if (LaunchPadLoaderGUI.IsActive)
-        LaunchPadLoaderGUI.Draw();
-
-      if (LaunchPadConsoleGUI.IsActive)
-        LaunchPadConsoleGUI.Draw();
-
-      if (LaunchPadConfigGUI.IsActive)
-        LaunchPadConfigGUI.Draw();
-
-      if (LaunchPadAlertGUI.IsActive)
-        LaunchPadAlertGUI.Draw();
-
-      LaunchPadLoaderGUI.IsActive = LaunchPadConfig.LoadState != LoadState.Running;
-
-      return !LaunchPadLoaderGUI.IsActive && !LaunchPadConsoleGUI.IsActive && !LaunchPadConfigGUI.IsActive && !LaunchPadAlertGUI.IsActive;
+      return GameStarted;
     }
 
     [HarmonyPatch(typeof(WorldManager), "LoadDataFiles"), HarmonyPostfix]
@@ -305,15 +296,6 @@ namespace StationeersLaunchPad
     [HarmonyPatch(typeof(OrbitalSimulation), nameof(OrbitalSimulation.Draw)), HarmonyPrefix]
     static void WorkshopMenuDrawConfig()
     {
-      if (LaunchPadConsoleGUI.IsActive)
-        LaunchPadConsoleGUI.Draw();
-
-      if (LaunchPadConfigGUI.IsActive)
-        LaunchPadConfigGUI.Draw();
-
-      if (LaunchPadAlertGUI.IsActive)
-        LaunchPadAlertGUI.Draw();
-
       if (!WorkshopMenu.Instance.isActiveAndEnabled)
         return;
 
@@ -344,18 +326,22 @@ namespace StationeersLaunchPad
 
   static class CustomSavePathPatches
   {
+    // This is initialized once when the config is loaded and not changed
+    public static string SavePath;
+
     [HarmonyPatch(typeof(StationSaveUtils), nameof(StationSaveUtils.DefaultPath), MethodType.Getter), HarmonyPrefix]
     static bool StationSaveUtils_DefaultPath(ref string __result)
     {
-      if (string.IsNullOrEmpty(LaunchPadConfig.SavePath))
+      if (string.IsNullOrEmpty(SavePath))
         return true;
 
-      __result = Path.IsPathRooted(LaunchPadConfig.SavePath)
-        ? LaunchPadConfig.SavePath
-        : Path.Combine(!GameManager.IsBatchMode ?
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Personal), "My Games") :
-            StationSaveUtils.ExeDirectory.FullName,
-          LaunchPadConfig.SavePath);
+      if (Path.IsPathRooted(SavePath))
+        __result = SavePath;
+      else if (GameManager.IsBatchMode)
+        __result = Path.Combine(StationSaveUtils.ExeDirectory.FullName, SavePath);
+      else
+        __result = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Personal), "My Games", SavePath);
+
       return false;
     }
   }

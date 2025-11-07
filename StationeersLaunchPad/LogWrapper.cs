@@ -6,7 +6,7 @@ namespace StationeersLaunchPad
 {
   public class LogWrapper : ILogHandler
   {
-    public readonly ILogHandler Inner;
+    private readonly ILogHandler Inner;
     public LogWrapper(ILogHandler inner) => this.Inner = inner;
 
     private bool IsLaunchpadLog()
