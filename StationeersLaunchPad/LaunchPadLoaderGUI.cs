@@ -206,7 +206,10 @@ namespace StationeersLaunchPad
           if (ImGui.BeginTabItem("LaunchPad Configuration"))
           {
             DrawExportButton();
-            LaunchPadConfigGUI.DrawConfigFile(Configs.Sorted, category => category != "Internal");
+            var configChanged = LaunchPadConfigGUI.DrawConfigFile(Configs.Sorted, category => category != "Internal");
+            // If we changed launchpad config and haven't loaded mods yet, mark mods changed to apply disable/sort behaviour
+            if (loadState <= LoadState.Configuring && configChanged)
+              changed |= ChangeFlags.Mods;
 
             ImGui.EndTabItem();
           }
