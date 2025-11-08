@@ -64,7 +64,7 @@ namespace StationeersLaunchPad
       return stopAuto;
     }
 
-    public static ChangeFlags DrawManualLoad(LoadState loadState)
+    public static ChangeFlags DrawManualLoad(LoadState loadState, ModList modList)
     {
       var changed = ChangeFlags.None;
 
@@ -110,14 +110,14 @@ namespace StationeersLaunchPad
         ImGuiHelper.ItemTooltip("State when LaunchPad is ready to load mods.");
 
         ImGuiHelper.DrawSameLine(() => ImGuiHelper.TextDisabled(">"), true);
-        if (loadState == LoadState.Loaded)
+        if (loadState == LoadState.Loaded || loadState == LoadState.Failed)
         {
           if (ImGui.SmallButton("Start Game"))
             changed |= ChangeFlags.NextStep;
         }
         else
         {
-          ImGuiHelper.TextDisabled("Start Game", loadState != LoadState.Loaded);
+          ImGuiHelper.TextDisabled("Start Game");
         }
         ImGuiHelper.ItemTooltip("State when LaunchPad is ready to load the game.");
         ImGui.Separator();
@@ -146,7 +146,7 @@ namespace StationeersLaunchPad
               ImGui.Separator();
             }
 
-            if (DrawConfigTable(loadState == LoadState.Configuring))
+            if (DrawConfigTable(modList, loadState == LoadState.Configuring))
               changed |= ChangeFlags.Mods;
             break;
           }
@@ -154,7 +154,7 @@ namespace StationeersLaunchPad
           case LoadState.Loading:
           case LoadState.Loaded:
           {
-            DrawLoadTable();
+            DrawLoadTable(modList);
             break;
           }
 
@@ -220,7 +220,7 @@ namespace StationeersLaunchPad
       return changed;
     }
 
-    private static bool DrawConfigTable(bool edit = false)
+    private static bool DrawConfigTable(ModList modList, bool edit = false)
     {
       var changed = false;
       if (!ImGui.IsMouseDown(ImGuiMouseButton.Left))
@@ -239,7 +239,7 @@ namespace StationeersLaunchPad
       var hoveringIndex = -1;
       var draggingIndex = -1;
       if (draggingMod != null)
-        draggingIndex = LaunchPadConfig.Mods.IndexOf(draggingMod);
+        draggingIndex = modList.IndexOf(draggingMod);
 
       if (!edit)
         ImGui.BeginDisabled();
@@ -250,12 +250,11 @@ namespace StationeersLaunchPad
         ImGui.TableSetupColumn("##type");
         ImGui.TableSetupColumn("##name", ImGuiTableColumnFlags.WidthStretch);
 
-        for (var i = 0; i < LaunchPadConfig.Mods.Count; i++)
+        var idx = 0;
+        foreach (var mod in modList.AllMods)
         {
-          var mod = LaunchPadConfig.Mods[i];
-
           ImGui.TableNextRow();
-          ImGui.PushID(i);
+          ImGui.PushID(idx);
           ImGui.TableNextColumn();
 
           if (ImGui.Checkbox("##enable", ref mod.Enabled))
@@ -265,10 +264,10 @@ namespace StationeersLaunchPad
           ImGui.Selectable($"##rowdrag", mod == draggingMod || (draggingMod == null && mod == selectedInfo), ImGuiSelectableFlags.SpanAllColumns);
           if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenBlockedByActiveItem))
           {
-            hoveringIndex = i;
+            hoveringIndex = idx;
             if (ImGui.IsMouseClicked(ImGuiMouseButton.Left) && draggingMod == null)
             {
-              draggingIndex = i;
+              draggingIndex = idx;
               draggingMod = mod;
             }
           }
@@ -285,6 +284,8 @@ namespace StationeersLaunchPad
               ImGuiHelper.DrawSameLine(() => ImGuiHelper.TextRightDisabled("After"));
 
           ImGui.PopID();
+
+          idx++;
         }
         ImGui.EndTable();
       }
@@ -295,39 +296,25 @@ namespace StationeersLaunchPad
       if (edit && draggingIndex != -1 && hoveringIndex != -1 && draggingIndex != hoveringIndex)
       {
         dragged = true;
-        while (draggingIndex < hoveringIndex)
-        {
-          (LaunchPadConfig.Mods[draggingIndex + 1], LaunchPadConfig.Mods[draggingIndex]) = (LaunchPadConfig.Mods[draggingIndex], LaunchPadConfig.Mods[draggingIndex + 1]);
-          draggingIndex++;
-        }
-
-        while (draggingIndex > hoveringIndex)
-        {
-          (LaunchPadConfig.Mods[draggingIndex - 1], LaunchPadConfig.Mods[draggingIndex]) = (LaunchPadConfig.Mods[draggingIndex], LaunchPadConfig.Mods[draggingIndex - 1]);
-          draggingIndex--;
-        }
-
-        changed = true;
+        if (modList.MoveModTo(draggingMod, hoveringIndex))
+          changed = true;
       }
       return changed;
     }
 
-    private static void DrawLoadTable()
+    private static void DrawLoadTable(ModList modList)
     {
       if (ImGui.BeginTable("##loadtable", 3, ImGuiTableFlags.SizingFixedFit))
       {
         ImGui.TableSetupColumn("##state", 30f);
         ImGui.TableSetupColumn("##type");
         ImGui.TableSetupColumn("##name", ImGuiTableColumnFlags.WidthStretch);
-        for (var i = 0; i < LaunchPadConfig.Mods.Count; i++)
+        var idx = 0;
+        foreach (var info in modList.EnabledMods)
         {
-          var info = LaunchPadConfig.Mods[i];
-          if (info == null || !info.Enabled)
-            continue;
-
           var mod = info.Loaded;
 
-          ImGui.PushID(i);
+          ImGui.PushID(idx);
 
           ImGui.TableNextRow();
           ImGui.TableNextColumn();
@@ -346,6 +333,7 @@ namespace StationeersLaunchPad
           ImGuiHelper.Text(info.DisplayName);
 
           ImGui.PopID();
+          idx++;
         }
       }
       ImGui.EndTable();

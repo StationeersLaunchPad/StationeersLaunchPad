@@ -9,10 +9,8 @@ namespace StationeersLaunchPad
 {
   internal class LaunchPadConfigGUI
   {
-    public static void DrawWorkshopConfig(ModData modData)
+    public static void DrawWorkshopConfig(ModInfo modInfo)
     {
-      var modInfo = modData != null ? LaunchPadConfig.Mods.Find(mod => mod.Path == modData.DirectoryPath) : null;
-
       var screenSize = ImguiHelper.ScreenSize;
       var padding = new Vector2(25, 25);
       var topLeft = new Vector2(screenSize.x - 800f - padding.x, padding.y);
