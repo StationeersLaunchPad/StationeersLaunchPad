@@ -147,7 +147,7 @@ namespace StationeersLaunchPad
         LoadState = LoadState.Searching;
 
         Logger.Global.LogInfo("Listing Local Mods");
-        await UniTask.Run(() => modList.LoadLocalMods());
+        await modList.LoadLocalMods();
 
         if (!SteamDisabled)
         {
@@ -156,7 +156,7 @@ namespace StationeersLaunchPad
         }
 
         Logger.Global.LogInfo("Loading Mod Order");
-        await UniTask.Run(() => modList.LoadConfig());
+        await modList.LoadConfig();
 
         Logger.Global.LogInfo("Loading Details");
         modList.LoadDetails();

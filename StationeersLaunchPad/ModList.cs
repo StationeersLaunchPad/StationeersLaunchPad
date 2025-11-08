@@ -21,8 +21,11 @@ namespace StationeersLaunchPad
 
     public void AddCore() => this.mods.Add(new ModInfo { Source = ModSource.Core });
 
-    public void LoadLocalMods()
+    public async UniTask LoadLocalMods()
     {
+      // list files and load mod data on thread
+      await UniTask.SwitchToThreadPool();
+
       var type = SteamTransport.WorkshopType.Mod;
       var localDir = type.GetLocalDirInfo();
       var fileName = type.GetLocalFileName();
@@ -33,17 +36,23 @@ namespace StationeersLaunchPad
         return;
       }
 
+      var localMods = new List<ModInfo>();
+
       foreach (var dir in localDir.GetDirectories("*", SearchOption.AllDirectories))
       {
         foreach (var file in dir.GetFiles(fileName))
         {
-          this.mods.Add(new ModInfo()
+          localMods.Add(new ModInfo()
           {
             Source = ModSource.Local,
             Wrapped = SteamTransport.ItemWrapper.WrapLocalItem(file, type),
           });
         }
       }
+
+      // only modify mod list on main thread
+      await UniTask.SwitchToMainThread();
+      this.mods.AddRange(localMods);
     }
 
     public async UniTask LoadWorkshopMods()
@@ -67,15 +76,22 @@ namespace StationeersLaunchPad
         mod.LoadDetails();
     }
 
-    public void LoadConfig()
+    public async UniTask LoadConfig()
     {
+      // read config on thread pool
+      await UniTask.SwitchToThreadPool();
+
       var config = File.Exists(LaunchPadPaths.ConfigPath)
             ? XmlSerialization.Deserialize<ModConfig>(LaunchPadPaths.ConfigPath)
             : new ModConfig();
       config.CreateCoreMod();
 
+      // apply config on main thread
+      await UniTask.SwitchToMainThread();
       this.ApplyConfig(config);
 
+      // save config to include any new mods on thread pool
+      await UniTask.SwitchToThreadPool();
       this.SaveConfig();
     }
 
