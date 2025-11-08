@@ -43,6 +43,8 @@ namespace StationeersLaunchPad
 
     public LoadedMod Loaded;
 
+    public string IdString() => this.WorkshopHandle > 0 ? $"Workshop#{this.WorkshopHandle}" : null;
+
     public ulong WorkshopHandle => this.Source switch
     {
       ModSource.Core => 1,

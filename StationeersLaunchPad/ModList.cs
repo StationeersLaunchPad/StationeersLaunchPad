@@ -9,6 +9,11 @@ using System.Linq;
 
 namespace StationeersLaunchPad
 {
+  public enum DisableDuplicateMode
+  {
+    None, KeepLocal, KeepWorkshop
+  }
+
   public class ModList
   {
     private readonly List<ModInfo> mods = new();
@@ -233,6 +238,58 @@ namespace StationeersLaunchPad
         curIndex += dir;
       }
       return anyMove;
+    }
+
+    // returns true if any mods were disabled
+    public bool DisableDuplicates(DisableDuplicateMode mode)
+    {
+      if (mode == DisableDuplicateMode.None)
+        return false;
+      var prefSource = mode switch
+      {
+        DisableDuplicateMode.KeepLocal => ModSource.Local,
+        DisableDuplicateMode.KeepWorkshop => ModSource.Workshop,
+        _ => throw new InvalidOperationException($"Unknown duplicate mode {mode}"),
+      };
+
+      var prefMods = new Dictionary<string, ModInfo>();
+      var disabledMods = new List<ModInfo>();
+      foreach (var mod in this.mods)
+      {
+        if (!mod.Enabled)
+          continue;
+        var id = mod.IdString();
+        if (id == null) // if the mod has no identifying info, nothing to dedupe it with
+          continue;
+        if (!prefMods.TryGetValue(id, out var pref))
+        {
+          prefMods[id] = mod;
+          continue;
+        }
+        var nonPref = mod;
+        if (nonPref.Source == pref.Source)
+        {
+          // if we have 2 conflicting mods in the same source, just pick the first by path
+          if (string.Compare(nonPref.Path, pref.Path) < 0)
+            (nonPref, pref) = (pref, nonPref);
+        }
+        else if (nonPref.Source == prefSource)
+        {
+          // otherwise keep the mod with the preferred source type
+          (nonPref, pref) = (pref, nonPref);
+        }
+        prefMods[id] = pref;
+        nonPref.Enabled = false;
+        disabledMods.Add(nonPref);
+      }
+
+      foreach (var mod in disabledMods)
+      {
+        var pref = prefMods[mod.IdString()];
+        Logger.Global.LogWarning($"{mod.Source} {mod.DisplayName} disabled in favor of {pref.Source} {pref.DisplayName}");
+      }
+
+      return disabledMods.Count > 0;
     }
 
     // returns true if all dependencies of enabled mods are satisfied

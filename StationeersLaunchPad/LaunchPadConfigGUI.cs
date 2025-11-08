@@ -57,10 +57,12 @@ namespace StationeersLaunchPad
       ImGui.EndChild();
     }
 
-    public static void DrawConfigFile(SortedConfigFile configFile, Func<string, bool> categoryFilter = null)
+    public static bool DrawConfigFile(SortedConfigFile configFile, Func<string, bool> categoryFilter = null)
     {
       ImGuiHelper.Text(configFile.FileName);
       ImGui.PushID(configFile.FileName);
+
+      var changed = false;
 
       foreach (var category in configFile.Categories)
       {
@@ -72,16 +74,18 @@ namespace StationeersLaunchPad
 
         foreach (var entry in category.Entries)
         {
-          DrawConfigEntry(entry);
+          if (DrawConfigEntry(entry))
+            changed = true;
         }
       }
 
       ImGui.PopID();
+
+      return changed;
     }
 
     public static bool DrawConfigEntry(ConfigEntryBase entry, bool fill = true)
     {
-      var changed = false;
       ImGui.PushID(entry.Definition.Key);
       ImGui.BeginGroup();
 
@@ -91,7 +95,7 @@ namespace StationeersLaunchPad
         ImGui.SetNextItemWidth(-float.Epsilon);
 
       var value = entry.BoxedValue;
-      changed = value switch
+      var changed = value switch
       {
         Color => DrawColorEntry(entry as ConfigEntry<Color>),
         Vector2 => DrawVector2Entry(entry as ConfigEntry<Vector2>),

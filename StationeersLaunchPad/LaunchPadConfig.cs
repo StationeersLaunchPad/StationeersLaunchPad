@@ -164,6 +164,9 @@ namespace StationeersLaunchPad
         if (!modList.CheckDependencies() && !GameManager.IsBatchMode)
           AutoLoad = false;
 
+        if (modList.DisableDuplicates(Configs.DisableDuplicates.Value) && !GameManager.IsBatchMode)
+          AutoLoad = false;
+
         if (AutoSort && !modList.SortByDeps() && !GameManager.IsBatchMode)
         {
           AutoSort = false;
@@ -223,6 +226,7 @@ namespace StationeersLaunchPad
       if (sortChanged || modsChanged)
       {
         modList.CheckDependencies();
+        modList.DisableDuplicates(Configs.DisableDuplicates.Value);
         if (AutoSort)
           modList.SortByDeps();
         modList.SaveConfig();

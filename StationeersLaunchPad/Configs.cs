@@ -14,6 +14,7 @@ namespace StationeersLaunchPad
     public static ConfigEntry<bool> AutoLoadOnStart;
     public static ConfigEntry<bool> AutoSortOnStart;
     public static ConfigEntry<int> AutoLoadWaitTime;
+    public static ConfigEntry<DisableDuplicateMode> DisableDuplicates;
     public static ConfigEntry<LoadStrategyType> LoadStrategyType;
     public static ConfigEntry<LoadStrategyMode> LoadStrategyMode;
     public static ConfigEntry<bool> DisableSteamOnStart;
@@ -70,8 +71,15 @@ namespace StationeersLaunchPad
       DisableSteamOnStart = config.Bind(
         new ConfigDefinition("Startup", "DisableSteam"),
         false,
-         new ConfigDescription(
+        new ConfigDescription(
           "Don't attempt to load steam workshop mods"
+        )
+      );
+      DisableDuplicates = config.Bind(
+        new ConfigDefinition("Mod Loading", "DisableDuplicates"),
+        DisableDuplicateMode.None,
+        new ConfigDescription(
+          "Automatically disable duplicate mods, keeping the mod with the preferred source"
         )
       );
       LoadStrategyType = config.Bind(
