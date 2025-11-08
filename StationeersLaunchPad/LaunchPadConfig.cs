@@ -150,17 +150,26 @@ namespace StationeersLaunchPad
 
         LoadState = LoadState.Searching;
 
-        Logger.Global.LogInfo("Listing Local Mods");
-        await UniTask.Run(() => LoadLocalItems());
-
-        if (!SteamDisabled)
+        var ignoreOthers = CheckIgnoreOtherFile();
+        if (ignoreOthers)
         {
-          Logger.Global.LogInfo("Listing Workshop Mods");
-          await LoadWorkshopItems();
+          Logger.Global.LogInfo("ignoreOther.txt found - loading only game directory mods");
+          await UniTask.Run(() => LoadGameDirectoryModsOnly());
+        }
+        else
+        {
+          Logger.Global.LogInfo("Listing Local Mods");
+          await UniTask.Run(() => LoadLocalItems());
+
+          if (!SteamDisabled)
+          {
+            Logger.Global.LogInfo("Listing Workshop Mods");
+            await LoadWorkshopItems();
+          }
         }
 
         Logger.Global.LogInfo("Loading Mod Order");
-        await UniTask.Run(() => LoadConfig());
+        await UniTask.Run(() => LoadConfig(ignoreOthers));
 
         Logger.Global.LogInfo("Loading Details");
         LoadDetails();
@@ -252,7 +261,33 @@ namespace StationeersLaunchPad
       Mods.Add(new ModInfo { Source = ModSource.Core });
     }
 
-    private static void LoadConfig()
+    private static bool CheckIgnoreOtherFile()
+    {
+      try
+      {
+        var ignoreFilePath = Path.Combine(Paths.GameRootPath, "mods", "ignoreOther.txt");
+        var exists = File.Exists(ignoreFilePath);
+        if (exists)
+        {
+          Logger.Global.LogInfo($"Found ignoreOther.txt at: {ignoreFilePath}");
+        }
+        return exists;
+      }
+      catch (Exception ex)
+      {
+        Logger.Global.LogError($"Error checking ignoreOther.txt: {ex.Message}");
+        return false;
+      }
+    }
+
+    private static void LoadGameDirectoryModsOnly()
+    {
+      var type = SteamTransport.WorkshopType.Mod;
+      var fileName = type.GetLocalFileName();
+      LoadGameDirectoryMods(type, fileName);
+    }
+
+    private static void LoadConfig(bool ignoreOthers = false)
     {
       var config = File.Exists(LaunchPadPaths.ConfigPath)
             ? XmlSerialization.Deserialize<ModConfig>(LaunchPadPaths.ConfigPath)
@@ -293,6 +328,27 @@ namespace StationeersLaunchPad
         {
           Logger.Global.LogWarning("Skipping null modcfg in config.");
           continue;
+        }
+
+        // Skip Workshop mods if ignoreOthers is enabled
+        if (ignoreOthers && modcfg is WorkshopModData workshopMod)
+        {
+          Logger.Global.LogInfo($"Skipping Workshop mod from config due to ignoreOther.txt: {modcfg.GetType().Name}");
+          continue;
+        }
+
+        // Skip local mods from user directory if ignoreOthers is enabled
+        if (ignoreOthers && modcfg is LocalModData localMod && !string.IsNullOrEmpty(localMod.DirectoryPath))
+        {
+          var gameModsPath = Path.Combine(Paths.GameRootPath, "mods");
+          var normalizedGameModsPath = NormalizePath(gameModsPath);
+          var normalizedLocalModPath = NormalizePath(localMod.DirectoryPath);
+          
+          if (!normalizedLocalModPath.StartsWith(normalizedGameModsPath))
+          {
+            Logger.Global.LogInfo($"Skipping local mod from user directory due to ignoreOther.txt: {localMod.DirectoryPath}");
+            continue;
+          }
         }
 
         if (modcfg is CoreModData && string.IsNullOrEmpty(modcfg.DirectoryPath))
@@ -352,10 +408,38 @@ namespace StationeersLaunchPad
       if (!localDir.Exists)
       {
         Logger.Global.LogWarning("local mod folder not found");
+      }
+      else
+      {
+        foreach (var dir in localDir.GetDirectories("*", SearchOption.AllDirectories))
+        {
+          foreach (var file in dir.GetFiles(fileName))
+          {
+            Mods.Add(new ModInfo()
+            {
+              Source = ModSource.Local,
+              Wrapped = SteamTransport.ItemWrapper.WrapLocalItem(file, type),
+            });
+          }
+        }
+      }
+
+      LoadGameDirectoryMods(type, fileName);
+    }
+
+    private static void LoadGameDirectoryMods(SteamTransport.WorkshopType type, string fileName)
+    {
+      var gameModsDir = new DirectoryInfo(Path.Combine(Paths.GameRootPath, "mods"));
+
+      if (!gameModsDir.Exists)
+      {
+        Logger.Global.LogDebug("game mods folder not found");
         return;
       }
 
-      foreach (var dir in localDir.GetDirectories("*", SearchOption.AllDirectories))
+      Logger.Global.LogInfo($"Loading mods from game directory: {gameModsDir.FullName}");
+
+      foreach (var dir in gameModsDir.GetDirectories("*", SearchOption.AllDirectories))
       {
         foreach (var file in dir.GetFiles(fileName))
         {
