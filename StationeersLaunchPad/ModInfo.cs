@@ -7,8 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Xml;
-using System.Xml.Serialization;
+using System.Linq;
 using UnityEngine;
 
 namespace StationeersLaunchPad
@@ -43,14 +42,14 @@ namespace StationeersLaunchPad
 
     public LoadedMod Loaded;
 
-    public string IdString() => this.WorkshopHandle > 0 ? $"Workshop#{this.WorkshopHandle}" : null;
-
     public ulong WorkshopHandle => this.Source switch
     {
       ModSource.Core => 1,
       ModSource.Workshop => this.Wrapped.Id,
       _ => this.About?.WorkshopHandle ?? 0,
     };
+
+    public string Guid => this.Source == ModSource.Core ? "core" : this.About?.Guid ?? "";
 
     public void LoadDetails()
     {
@@ -66,6 +65,31 @@ namespace StationeersLaunchPad
             Version = "",
             Description = "",
           };
+
+      foreach (var dep in this.About.DependsOn ?? new())
+      {
+        if (!dep.IsValid)
+        {
+          Logger.Global.LogWarning($"{this.Source} {this.DisplayName} has invalid dependencies");
+          break;
+        }
+      }
+      foreach (var dep in this.About.OrderBefore ?? new())
+      {
+        if (!dep.IsValid)
+        {
+          Logger.Global.LogWarning($"{this.Source} {this.DisplayName} has invalid ordering constraints");
+          break;
+        }
+      }
+      foreach (var dep in this.About.OrderAfter ?? new())
+      {
+        if (!dep.IsValid)
+        {
+          Logger.Global.LogWarning($"{this.Source} {this.DisplayName} has invalid ordering constraints");
+          break;
+        }
+      }
 
       var dllFiles = Directory.GetFiles(this.Path, "*.dll", SearchOption.AllDirectories);
       foreach (var file in dllFiles)
@@ -83,15 +107,21 @@ namespace StationeersLaunchPad
 
     public bool SortBefore(ModInfo other)
     {
-      if (other.About?.LoadBefore?.Find(v => v.Id == this.WorkshopHandle) != null)
+      if (other.About?.OrderAfter?.Any(v => this.Satisfies(v)) ?? false)
         return true;
-      var selfAfter = this.About?.LoadAfter;
-      if (this.About?.LoadAfter?.Find(v => v.Id == other.WorkshopHandle) != null)
+      if (this.About?.OrderBefore?.Any(v => other.Satisfies(v)) ?? false)
         return true;
       return false;
     }
 
-    public bool Satisfies(ModVersion version) => this.WorkshopHandle == version.Id;
+    public bool Satisfies(ModReference modRef)
+    {
+      if (modRef.WorkshopHandle != 0 && this.WorkshopHandle == modRef.WorkshopHandle)
+        return true;
+      if (!string.IsNullOrEmpty(modRef.Guid) && this.Guid == modRef.Guid)
+        return true;
+      return false;
+    }
 
     public (bool, string) IsWorkshopValid()
     {
@@ -151,59 +181,5 @@ namespace StationeersLaunchPad
     Core,
     Local,
     Workshop
-  }
-
-  [XmlRoot("ModMetadata")]
-  public class ModAbout
-  {
-    [XmlElement]
-    public string Name;
-
-    [XmlElement]
-    public string Author;
-
-    [XmlElement]
-    public string Version;
-
-    [XmlElement]
-    public string Description;
-
-    [XmlIgnore]
-    private string _inGameDescription;
-
-    [XmlElement("InGameDescription", IsNullable = true)]
-    public XmlCDataSection InGameDescription
-    {
-      get => !string.IsNullOrEmpty(this._inGameDescription) ? new XmlDocument().CreateCDataSection(this._inGameDescription) : null;
-      set => this._inGameDescription = value?.Value;
-    }
-
-    [XmlElement(IsNullable = true)]
-    public string ChangeLog;
-
-    [XmlElement]
-    public ulong WorkshopHandle;
-
-    [XmlArray("Tags"), XmlArrayItem("Tag")]
-    public List<string> Tags;
-
-    [XmlArray("Dependencies"), XmlArrayItem("Mod")]
-    public List<ModVersion> Dependencies;
-
-    [XmlArray("LoadBefore"), XmlArrayItem("Mod")]
-    public List<ModVersion> LoadBefore;
-
-    [XmlArray("LoadAfter"), XmlArrayItem("Mod")]
-    public List<ModVersion> LoadAfter;
-  }
-
-  [XmlRoot("Mod")]
-  public class ModVersion
-  {
-    [XmlElement]
-    public string Version;
-
-    [XmlElement]
-    public ulong Id;
   }
 }

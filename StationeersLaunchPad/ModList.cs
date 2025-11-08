@@ -252,18 +252,15 @@ namespace StationeersLaunchPad
         _ => throw new InvalidOperationException($"Unknown duplicate mode {mode}"),
       };
 
-      var prefMods = new Dictionary<string, ModInfo>();
+      var prefMods = new ModSet();
       var disabledMods = new List<ModInfo>();
       foreach (var mod in this.mods)
       {
         if (!mod.Enabled)
           continue;
-        var id = mod.IdString();
-        if (id == null) // if the mod has no identifying info, nothing to dedupe it with
-          continue;
-        if (!prefMods.TryGetValue(id, out var pref))
+        if (!prefMods.TryGetExisting(mod, out var pref) || !pref.Enabled)
         {
-          prefMods[id] = mod;
+          prefMods.Add(mod);
           continue;
         }
         var nonPref = mod;
@@ -278,15 +275,16 @@ namespace StationeersLaunchPad
           // otherwise keep the mod with the preferred source type
           (nonPref, pref) = (pref, nonPref);
         }
-        prefMods[id] = pref;
+        prefMods.Remove(nonPref);
+        prefMods.Add(pref);
         nonPref.Enabled = false;
         disabledMods.Add(nonPref);
       }
 
       foreach (var mod in disabledMods)
       {
-        var pref = prefMods[mod.IdString()];
-        Logger.Global.LogWarning($"{mod.Source} {mod.DisplayName} disabled in favor of {pref.Source} {pref.DisplayName}");
+        if (prefMods.TryGetExisting(mod, out var pref))
+          Logger.Global.LogWarning($"{mod.Source} {mod.DisplayName} disabled in favor of {pref.Source} {pref.DisplayName}");
       }
 
       return disabledMods.Count > 0;
@@ -303,8 +301,10 @@ namespace StationeersLaunchPad
         if (mod.Source == ModSource.Core)
           continue;
         var missingDeps = false;
-        foreach (var dep in mod.About.Dependencies ?? new())
+        foreach (var dep in mod.About.DependsOn ?? new())
         {
+          if (!dep.IsValid)
+            continue;
           if (this.mods.Any(mod2 => mod2 != mod && mod2.Enabled && mod2.Satisfies(dep)))
             continue;
           missingDeps = true;
@@ -312,7 +312,7 @@ namespace StationeersLaunchPad
           if (mod.DepsWarned)
             continue;
 
-          Logger.Global.LogWarning($"{mod.Source} {mod.DisplayName} is missing dependency with workshop id {dep.Id}");
+          Logger.Global.LogWarning($"{mod.Source} {mod.DisplayName} is missing dependency {dep}");
 
           var possible = this.mods.Where(mod2 => mod2 != mod && mod2.Satisfies(dep)).ToList();
           if (possible.Count == 0)
@@ -404,20 +404,20 @@ namespace StationeersLaunchPad
         {
           if (!mod.Enabled || mod.Source == ModSource.Core)
             continue;
-          foreach (var before in mod.About.LoadBefore ?? new())
+          foreach (var modRef in mod.About.OrderBefore ?? new())
           {
             foreach (var mod2 in mods)
             {
-              if (mod2 != mod && mod2.Enabled && mod2.Satisfies(before))
-                graph.AddOrder(mod2, mod);
+              if (mod2 != mod && mod2.Enabled && mod2.Satisfies(modRef))
+                graph.AddOrder(mod, mod2);
             }
           }
-          foreach (var after in mod.About.LoadAfter ?? new())
+          foreach (var modRef in mod.About.OrderAfter ?? new())
           {
             foreach (var mod2 in mods)
             {
-              if (mod2 != mod && mod2.Enabled && mod2.Satisfies(after))
-                graph.AddOrder(mod, mod2);
+              if (mod2 != mod && mod2.Enabled && mod2.Satisfies(modRef))
+                graph.AddOrder(mod2, mod);
             }
           }
         }
@@ -459,6 +459,40 @@ namespace StationeersLaunchPad
           this.AddOrder(before, second);
         foreach (var after in this.Afters[second])
           this.AddOrder(first, after);
+      }
+    }
+
+    private class ModSet
+    {
+      private Dictionary<ulong, ModInfo> byWorkshopHandle = new();
+      private Dictionary<string, ModInfo> byGuid = new();
+      private HashSet<ModInfo> all = new();
+
+      public void Add(ModInfo mod)
+      {
+        if (mod.WorkshopHandle > 1)
+          byWorkshopHandle[mod.WorkshopHandle] = mod;
+        if (!string.IsNullOrEmpty(mod.Guid))
+          byGuid[mod.Guid] = mod;
+        all.Add(mod);
+      }
+
+      public bool TryGetExisting(ModInfo mod, out ModInfo existing)
+      {
+        if (mod.WorkshopHandle > 1 && byWorkshopHandle.TryGetValue(mod.WorkshopHandle, out existing))
+          return true;
+        if (!string.IsNullOrEmpty(mod.Guid) && byGuid.TryGetValue(mod.Guid, out existing))
+          return true;
+        return all.TryGetValue(mod, out existing);
+      }
+
+      public void Remove(ModInfo mod)
+      {
+        if (mod.WorkshopHandle > 1)
+          byWorkshopHandle.Remove(mod.WorkshopHandle);
+        if (!string.IsNullOrEmpty(mod.Guid))
+          byGuid.Remove(mod.Guid);
+        all.Remove(mod);
       }
     }
   }

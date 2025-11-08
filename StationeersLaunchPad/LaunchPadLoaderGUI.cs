@@ -404,16 +404,13 @@ namespace StationeersLaunchPad
       }
 
       var about = selectedInfo.About;
-      var workshopId = selectedInfo.Wrapped.Id;
-      if (workshopId == 0)
-        workshopId = about?.WorkshopHandle ?? 0;
 
       ImGuiHelper.Text(selectedInfo.DisplayName);
 
       if (ImGui.Button("Open Local Folder"))
         selectedInfo.OpenLocalFolder();
 
-      if (workshopId > 1)
+      if (selectedInfo.WorkshopHandle > 1)
       {
         ImGui.SameLine();
         if (ImGui.Button("Open Workshop Page"))
@@ -438,6 +435,14 @@ namespace StationeersLaunchPad
         ImGui.Spacing();
         ImGuiHelper.TextDisabled("Missing About.xml");
         return;
+      }
+
+      if (!string.IsNullOrEmpty(selectedInfo.Guid))
+      {
+        ImGui.Spacing();
+        ImGuiHelper.Text("Guid:");
+        ImGui.SameLine();
+        ImGuiHelper.Text($"{selectedInfo.Guid}");
       }
 
       if (selectedInfo.WorkshopHandle > 1)
@@ -503,36 +508,36 @@ namespace StationeersLaunchPad
         }
       }
 
-      if (about.Dependencies != null && about.Dependencies.Count > 0)
+      if (about.DependsOn != null && about.DependsOn.Count > 0)
       {
         ImGui.Spacing();
-        ImGuiHelper.Text("Dependencies:");
-        foreach (var dependency in about.Dependencies)
+        ImGuiHelper.Text("Depends On:");
+        foreach (var modRef in about.DependsOn)
         {
           ImGui.Spacing();
-          ImGuiHelper.Text($"\tId: {dependency.Id}, Version: {dependency.Version ?? "any"}");
+          ImGuiHelper.Text($"\t{modRef}");
         }
       }
 
-      if (about.LoadBefore != null && about.LoadBefore.Count > 0)
+      if (about.OrderBefore != null && about.OrderBefore.Count > 0)
       {
         ImGui.Spacing();
-        ImGuiHelper.Text("Load Before:");
-        foreach (var m in about.LoadBefore)
+        ImGuiHelper.Text("Order Before:");
+        foreach (var modRef in about.OrderBefore)
         {
           ImGui.Spacing();
-          ImGuiHelper.Text($"\tId: {m.Id}, Version: {m.Version ?? "any"}");
+          ImGuiHelper.Text($"\t{modRef}");
         }
       }
 
-      if (about.LoadAfter != null && about.LoadAfter.Count > 0)
+      if (about.OrderAfter != null && about.OrderAfter.Count > 0)
       {
         ImGui.Spacing();
-        ImGuiHelper.Text("Load After:");
-        foreach (var m in about.LoadAfter)
+        ImGuiHelper.Text("Order After:");
+        foreach (var modRef in about.OrderAfter)
         {
           ImGui.Spacing();
-          ImGuiHelper.Text($"\tId: {m.Id}, Version: {m.Version ?? "any"}");
+          ImGuiHelper.Text($"\t{modRef}");
         }
       }
 

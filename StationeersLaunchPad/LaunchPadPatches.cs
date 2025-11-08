@@ -267,7 +267,7 @@ namespace StationeersLaunchPad
       else
         publishButton.SetText("Update");
 
-      var modIGDescription = modAbout.InGameDescription?.Value;
+      var modIGDescription = modAbout.InGameDescription;
       __instance.DescriptionText.text = !string.IsNullOrEmpty(modIGDescription) ? modIGDescription : TextFormatting.SteamToTMP(modAbout.Description);
     }
 
