@@ -1,4 +1,7 @@
 using Assets.Scripts.Networking.Transports;
+using Assets.Scripts.Serialization;
+using BepInEx.Bootstrap;
+using Mono.Cecil;
 using Steamworks.Ugc;
 using System;
 using System.Collections.Generic;
@@ -47,6 +50,35 @@ namespace StationeersLaunchPad
       _ => this.About?.WorkshopHandle ?? 0,
     };
 
+    public void LoadDetails()
+    {
+      if (this.Source == ModSource.Core)
+        return;
+
+      // Load About.xml once
+      this.About ??= XmlSerialization.Deserialize<ModAbout>(this.Wrapped.FilePathFullName, "ModMetadata") ??
+          new ModAbout
+          {
+            Name = $"[Invalid About.xml] {this.Name}",
+            Author = "",
+            Version = "",
+            Description = "",
+          };
+
+      var dllFiles = Directory.GetFiles(this.Path, "*.dll", SearchOption.AllDirectories);
+      foreach (var file in dllFiles)
+      {
+        this.Assemblies.Add(new AssemblyInfo
+        {
+          Path = file,
+          Definition = AssemblyDefinition.ReadAssembly(file, TypeLoader.ReaderParameters)
+        });
+      }
+
+      var assetFiles = Directory.GetFiles(this.Path, "*.assets", SearchOption.AllDirectories);
+      this.AssetBundles.AddRange(assetFiles);
+    }
+
     public bool SortBefore(ModInfo other)
     {
       if (other.About?.LoadBefore?.Find(v => v.Id == this.WorkshopHandle) != null)
@@ -56,6 +88,8 @@ namespace StationeersLaunchPad
         return true;
       return false;
     }
+
+    public bool Satisfies(ModVersion version) => this.WorkshopHandle == version.Id;
 
     public (bool, string) IsWorkshopValid()
     {

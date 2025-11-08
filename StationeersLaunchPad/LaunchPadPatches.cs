@@ -243,7 +243,7 @@ namespace StationeersLaunchPad
       if (modData == null)
         return;
 
-      var modInfo = LaunchPadConfig.Mods.Find((mod) => mod.Path == modData.DirectoryPath);
+      var modInfo = LaunchPadConfig.MatchMod(modData);
       if (modInfo == null)
         return;
 
@@ -309,7 +309,7 @@ namespace StationeersLaunchPad
       if (modData == null)
         return;
 
-      LaunchPadConfigGUI.DrawWorkshopConfig(modData);
+      LaunchPadConfigGUI.DrawWorkshopConfig(LaunchPadConfig.MatchMod(modData));
     }
   }
 

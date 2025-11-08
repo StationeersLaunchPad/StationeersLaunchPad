@@ -4,7 +4,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 
-namespace StationeersLaunchPad {
+namespace StationeersLaunchPad
+{
   public enum LoadStrategyType
   {
     // loads in 3 steps:
@@ -29,7 +30,14 @@ namespace StationeersLaunchPad {
 
   public abstract class LoadStrategy
   {
-    public List<ModInfo> Mods => LaunchPadConfig.Mods.Where((mod) => mod.Enabled && mod.Source != ModSource.Core).ToList();
+    private readonly ModList modList;
+
+    protected LoadStrategy(ModList modList)
+    {
+      this.modList = modList;
+    }
+
+    protected IEnumerable<ModInfo> Mods => this.modList.EnabledMods.Where(mod => mod.Source != ModSource.Core);
 
     private bool failed = false;
 
@@ -73,6 +81,8 @@ namespace StationeersLaunchPad {
 
   public class LoadStrategyLinearSerial : LoadStrategy
   {
+    public LoadStrategyLinearSerial(ModList modList) : base(modList) { }
+
     public override async UniTask LoadAssemblies()
     {
       foreach (var info in this.Mods)
@@ -145,6 +155,8 @@ namespace StationeersLaunchPad {
 
   public class LoadStrategyLinearParallel : LoadStrategy
   {
+    public LoadStrategyLinearParallel(ModList modList) : base(modList) { }
+
     public override async UniTask LoadAssemblies()
     {
       await UniTask.WhenAll(this.Mods.Select(async (info) =>
