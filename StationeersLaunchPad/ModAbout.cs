@@ -40,7 +40,7 @@ namespace StationeersLaunchPad
     [XmlElement("WorkshopHandle")]
     public ulong WorkshopHandle;
 
-    [XmlElement("Tag")]
+    [XmlArray("Tags"), XmlArrayItem("Tag")]
     public List<string> Tags;
 
     [XmlElement("DependsOn")]
@@ -53,13 +53,6 @@ namespace StationeersLaunchPad
     public List<ModReference> OrderAfter;
 
     // Fields below are old fields whose name and/or format changed. They just proxy to the replacements above
-
-    [XmlArray("Tags"), XmlArrayItem("Tag")]
-    public List<string> _Legacy_Tags
-    {
-      get => Tags; set => Tags = value;
-    }
-    public bool ShouldSerialize_Legacy_Tags() => false;
 
     [XmlArray("Dependencies"), XmlArrayItem("Mod")]
     public List<ModReference> _Legacy_Dependencies
