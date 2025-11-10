@@ -12,8 +12,8 @@ namespace StationeersLaunchPad
     [XmlElement("Name")]
     public string Name;
 
-    [XmlElement("Guid")]
-    public string Guid;
+    [XmlElement("ModID")]
+    public string ModID;
 
     [XmlElement("Author")]
     public string Author;
@@ -79,8 +79,8 @@ namespace StationeersLaunchPad
   [XmlRoot("Mod")]
   public class ModReference
   {
-    [XmlAttribute("Guid")]
-    public string Guid;
+    [XmlAttribute("ModID")]
+    public string ModID;
 
     [XmlAttribute("WorkshopHandle")]
     public ulong WorkshopHandle;
@@ -93,8 +93,8 @@ namespace StationeersLaunchPad
       if (!this.IsValid)
         return "Invalid";
       var sb = new StringBuilder();
-      if (!string.IsNullOrEmpty(this.Guid))
-        sb.AppendFormat("Guid: {0}", this.Guid);
+      if (!string.IsNullOrEmpty(this.ModID))
+        sb.AppendFormat("ModID: {0}", this.ModID);
       if (WorkshopHandle != 0)
         sb.AppendFormat("{0}WorkshopHandle: {1}", sb.Length == 0 ? "" : ", ", this.WorkshopHandle);
       if (!string.IsNullOrEmpty(this.Version))
@@ -102,7 +102,7 @@ namespace StationeersLaunchPad
       return sb.ToString();
     }
 
-    public bool IsValid => WorkshopHandle != 0 || !string.IsNullOrEmpty(Guid);
+    public bool IsValid => WorkshopHandle != 0 || !string.IsNullOrEmpty(ModID);
 
     // Fields below are old fields whose name and/or format changed. They just proxy to the replacements above
 

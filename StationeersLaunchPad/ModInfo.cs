@@ -49,7 +49,7 @@ namespace StationeersLaunchPad
       _ => this.About?.WorkshopHandle ?? 0,
     };
 
-    public string Guid => this.Source == ModSource.Core ? "core" : this.About?.Guid ?? "";
+    public string ModID => this.Source == ModSource.Core ? "core" : this.About?.ModID ?? "";
 
     public void LoadDetails()
     {
@@ -118,7 +118,7 @@ namespace StationeersLaunchPad
     {
       if (modRef.WorkshopHandle != 0 && this.WorkshopHandle == modRef.WorkshopHandle)
         return true;
-      if (!string.IsNullOrEmpty(modRef.Guid) && this.Guid == modRef.Guid)
+      if (!string.IsNullOrEmpty(modRef.ModID) && this.ModID == modRef.ModID)
         return true;
       return false;
     }

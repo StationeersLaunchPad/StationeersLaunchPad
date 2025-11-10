@@ -437,12 +437,12 @@ namespace StationeersLaunchPad
         return;
       }
 
-      if (!string.IsNullOrEmpty(selectedInfo.Guid))
+      if (!string.IsNullOrEmpty(selectedInfo.ModID))
       {
         ImGui.Spacing();
-        ImGuiHelper.Text("Guid:");
+        ImGuiHelper.Text("ModID:");
         ImGui.SameLine();
-        ImGuiHelper.Text($"{selectedInfo.Guid}");
+        ImGuiHelper.Text($"{selectedInfo.ModID}");
       }
 
       if (selectedInfo.WorkshopHandle > 1)
