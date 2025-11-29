@@ -80,7 +80,7 @@ namespace StationeersLaunchPad
       if (!GameManager.IsBatchMode)
       {
         AutoStopwatch.Restart();
-        await UniTask.WaitWhile(() => LoadState == LoadState.Configuring && !AutoLoadReady);
+        await UniTaskX.WaitWhile(() => LoadState == LoadState.Configuring && !AutoLoadReady);
       }
 
       if (LoadState == LoadState.Configuring)
@@ -98,7 +98,7 @@ namespace StationeersLaunchPad
       if (!GameManager.IsBatchMode)
       {
         AutoStopwatch.Restart();
-        await UniTask.WaitWhile(() => LoadState < LoadState.Running && !AutoLoadReady);
+        await UniTaskX.WaitWhile(() => LoadState < LoadState.Running && !AutoLoadReady);
       }
 
       StartGame();
@@ -142,7 +142,7 @@ namespace StationeersLaunchPad
         LoadState = LoadState.Initializing;
 
         Logger.Global.LogInfo("Initializing...");
-        await UniTask.Run(() => Initialize());
+        await UniTask.RunOnThreadPool(() => Initialize());
 
         LoadState = LoadState.Searching;
 
