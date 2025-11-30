@@ -1,10 +1,13 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <!-- System DLL's -->
-    <Reference Include="System.IO.Compression">
-      <HintPath>$(StationeersManagedDirectory)\System.IO.Compression.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
+    <SystemDll Include="$(StationeersManagedDirectory)\mscorlib.dll" />
+    <SystemDll Include="$(StationeersManagedDirectory)\netstandard.dll" />
+    <SystemDll Include="$(StationeersManagedDirectory)\System*.dll" />
+    <SystemRefs Include="@(SystemDll->'%(Filename)')">
+      <HintPath>$(StationeersManagedDirectory)\%(Identity).dll</HintPath>
+    </SystemRefs>
+    <Reference Include="@(SystemRefs)" />
 
     <!-- BepInEx DLL's -->
     <Reference Include="BepInEx">
@@ -62,7 +65,7 @@
       <HintPath>$(StationeersManagedDirectory)\UnityEngine.dll</HintPath>
       <Private>False</Private>
     </Reference>
-	<Reference Include="UnityEngine.CoreModule">
+    <Reference Include="UnityEngine.CoreModule">
       <HintPath>$(StationeersManagedDirectory)\UnityEngine.CoreModule.dll</HintPath>
       <Private>False</Private>
     </Reference>

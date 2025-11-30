@@ -7,6 +7,7 @@
     <LangVersion>9.0</LangVersion>
     <ErrorReport>none</ErrorReport>
     <LanguageTargets>$(MSBuildToolsPath)\Microsoft.CSharp.targets</LanguageTargets>
+    <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
 
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
@@ -32,6 +33,12 @@
     <BIEPluginsDirectory>$(BIEDirectory)\plugins</BIEPluginsDirectory>
 
     <SLPPluginPath>$(BIEPluginsDirectory)\StationeersLaunchPad</SLPPluginPath>
+
+    <NoStandardLibraries>true</NoStandardLibraries>
+    <NoStdLib>true</NoStdLib>
+    <NoConfig>true</NoConfig>
+    <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
+    <NoWarn>$(NoWarn);MSB3277</NoWarn> <!-- unity ships dlls with conflicting references -->
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
