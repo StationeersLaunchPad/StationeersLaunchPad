@@ -64,7 +64,7 @@ namespace StationeersLaunchPad
       return stopAuto;
     }
 
-    public static ChangeFlags DrawManualLoad(LoadState loadState, ModList modList)
+    public static ChangeFlags DrawManualLoad(LoadState loadState, ModList modList, bool autoSort)
     {
       var changed = ChangeFlags.None;
 
@@ -146,7 +146,7 @@ namespace StationeersLaunchPad
               ImGui.Separator();
             }
 
-            if (DrawConfigTable(modList, loadState == LoadState.Configuring))
+            if (DrawConfigTable(modList, loadState == LoadState.Configuring, autoSort))
               changed |= ChangeFlags.Mods;
             break;
           }
@@ -223,7 +223,7 @@ namespace StationeersLaunchPad
       return changed;
     }
 
-    private static bool DrawConfigTable(ModList modList, bool edit = false)
+    private static bool DrawConfigTable(ModList modList, bool edit = false, bool autoSort = false)
     {
       var changed = false;
       if (!ImGui.IsMouseDown(ImGuiMouseButton.Left))
@@ -299,7 +299,7 @@ namespace StationeersLaunchPad
       if (edit && draggingIndex != -1 && hoveringIndex != -1 && draggingIndex != hoveringIndex)
       {
         dragged = true;
-        if (modList.MoveModTo(draggingMod, hoveringIndex))
+        if (modList.MoveModTo(draggingMod, hoveringIndex, autoSort))
           changed = true;
       }
       return changed;
