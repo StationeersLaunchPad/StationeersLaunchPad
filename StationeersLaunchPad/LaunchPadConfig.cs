@@ -205,7 +205,7 @@ namespace StationeersLaunchPad
       }
       else
       {
-        var changed = LaunchPadLoaderGUI.DrawManualLoad(LoadState, modList);
+        var changed = LaunchPadLoaderGUI.DrawManualLoad(LoadState, modList, AutoSort);
         HandleChange(changed);
       }
 
@@ -222,7 +222,7 @@ namespace StationeersLaunchPad
       var sortChanged = changed.HasFlag(LaunchPadLoaderGUI.ChangeFlags.AutoSort);
       var modsChanged = changed.HasFlag(LaunchPadLoaderGUI.ChangeFlags.Mods);
       if (sortChanged)
-        AutoSort = Configs.AutoLoadOnStart.Value;
+        AutoSort = Configs.AutoSortOnStart.Value;
       if (sortChanged || modsChanged)
       {
         modList.CheckDependencies();

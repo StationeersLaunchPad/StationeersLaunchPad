@@ -204,7 +204,7 @@ namespace StationeersLaunchPad
     }
 
     // returns true if the mod was moved (even if it wasn't moved all the way to the target index)
-    public bool MoveModTo(ModInfo mod, int index)
+    public bool MoveModTo(ModInfo mod, int index, bool keepOrder)
     {
       var curIndex = mods.IndexOf(mod);
       if (curIndex == -1)
@@ -223,7 +223,7 @@ namespace StationeersLaunchPad
         var next = idx + dir;
         if (next < 0 || next >= this.mods.Count)
           return false;
-        if (deps.Contains(this.mods[next]) && !shift(next))
+        if (keepOrder && deps.Contains(this.mods[next]) && !shift(next))
           return false;
         (this.mods[idx], this.mods[next]) = (this.mods[next], this.mods[idx]);
         return true;
@@ -366,7 +366,7 @@ namespace StationeersLaunchPad
         }
         if (mod.Enabled && !areDepsAdded(mod))
         {
-          if (firstSkipped != -1)
+          if (firstSkipped == -1)
             firstSkipped = idx;
           idx++;
           continue;
