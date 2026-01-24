@@ -1,6 +1,7 @@
 ﻿using BepInEx;
 using ImGuiNET;
 using System;
+using UnityEngine;
 
 namespace StationeersLaunchPad
 {
@@ -77,49 +78,78 @@ namespace StationeersLaunchPad
       {
         ImGuiHelper.DrawWithPadding2(() => ImGui.Begin("##preloadermanual", ImGuiWindowFlags.NoDecoration | ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoSavedSettings));
 
+        var startCursor = ImGui.GetCursorScreenPos();
+        var startAvail = ImGui.GetContentRegionAvail();
+        string nextStepText = null;
+
+        void DrawBreadcrumbSep() => ImGuiHelper.DrawSameLine(() => ImGuiHelper.TextDisabled(">"), true);
+        void DrawBreadcrumb(string text, LoadState forState, string tooltip, string setNext = null)
+        {
+          var match = forState == loadState;
+          ImGuiHelper.TextDisabled(text, !match);
+          ImGuiHelper.ItemTooltip(tooltip);
+          if (match)
+            nextStepText = setNext;
+        }
+
         ImGuiHelper.TextDisabled(LaunchPadInfo.VERSION);
         ImGuiHelper.DrawSameLine(() => ImGuiHelper.TextDisabled("|"), true);
 
         if (Configs.CheckForUpdate.Value)
         {
-          ImGuiHelper.TextDisabled("Update", loadState != LoadState.Updating);
-          ImGuiHelper.ItemTooltip("Checking for updates to StationeersLaunchPad.");
-          ImGuiHelper.DrawSameLine(() => ImGuiHelper.TextDisabled(">"), true);
+          DrawBreadcrumb("Update", LoadState.Updating, "Checking for updates to StationeersLaunchPad");
+          DrawBreadcrumbSep();
         }
 
-        ImGuiHelper.TextDisabled("Initalize", loadState != LoadState.Initializing);
-        ImGuiHelper.ItemTooltip("State when LaunchPad is initalizing core components.");
-        ImGuiHelper.DrawSameLine(() => ImGuiHelper.TextDisabled(">"), true);
+        DrawBreadcrumb("Initalize", LoadState.Initializing, "Initializing core components");
+        DrawBreadcrumbSep();
 
-        ImGuiHelper.TextDisabled("Locate Mods", loadState != LoadState.Searching);
-        ImGuiHelper.ItemTooltip("State when LaunchPad is searching for mods.");
-        ImGuiHelper.DrawSameLine(() => ImGuiHelper.TextDisabled(">"), true);
+        DrawBreadcrumb("Locate Mods", LoadState.Searching, "Locating installed local and workshop mods");
+        DrawBreadcrumbSep();
 
-        if (loadState == LoadState.Configuring)
+        DrawBreadcrumb("Select Mods", LoadState.Configuring, "Ready to load mods", "Load Mods");
+        DrawBreadcrumbSep();
+
+        DrawBreadcrumb("Loading Mods", LoadState.Loading, "Loading selected mods");
+        DrawBreadcrumbSep();
+
+        if (loadState == LoadState.Failed)
+          DrawBreadcrumb("Loading Failed", LoadState.Failed,
+            "Mods failed to load. Game may not function properly", "Start Game");
+        else
+          DrawBreadcrumb("Mods Loaded", LoadState.Loaded, "Ready to start game", "Start Game");
+
         {
-          if (ImGui.SmallButton("Load Mods"))
+          var style = ImGui.GetStyle();
+          var spacing = style.ItemSpacing.x;
+          var padding = style.FramePadding.x;
+          var right = startCursor.x + startAvail.x / 2f - spacing;
+          var height = ImGui.GetTextLineHeight();
+
+          ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, Vector2.zero);
+          var canNextStep = nextStepText != null;
+          nextStepText ??= "...";
+
+          if (canNextStep)
+          {
+            var flashPos = Mathf.Sin(Time.realtimeSinceStartup * 5f) * 0.5f + 0.5f;
+            var crButton = style.Colors[(int) ImGuiCol.Button];
+            var crButtonActive = style.Colors[(int) ImGuiCol.ButtonActive];
+            ImGui.PushStyleColor(ImGuiCol.Button, Vector4.Lerp(crButton, crButtonActive, flashPos));
+          }
+
+          ImGui.SetCursorScreenPos(new(right - 150f, startCursor.y));
+          ImGui.BeginDisabled(!canNextStep);
+          if (ImGui.Button(nextStepText, new(150f, height)))
           {
             changed |= ChangeFlags.NextStep;
             openLogs = true;
           }
+          ImGui.EndDisabled();
+          if (canNextStep)
+            ImGui.PopStyleColor();
+          ImGui.PopStyleVar();
         }
-        else
-        {
-          ImGuiHelper.TextDisabled("Load Mods", loadState != LoadState.Loading);
-        }
-        ImGuiHelper.ItemTooltip("State when LaunchPad is ready to load mods.");
-
-        ImGuiHelper.DrawSameLine(() => ImGuiHelper.TextDisabled(">"), true);
-        if (loadState == LoadState.Loaded || loadState == LoadState.Failed)
-        {
-          if (ImGui.SmallButton("Start Game"))
-            changed |= ChangeFlags.NextStep;
-        }
-        else
-        {
-          ImGuiHelper.TextDisabled("Start Game");
-        }
-        ImGuiHelper.ItemTooltip("State when LaunchPad is ready to load the game.");
         ImGui.Separator();
 
         ImGui.BeginColumns("##columns", 2, ImGuiOldColumnFlags.NoResize | ImGuiOldColumnFlags.GrowParentContentsSize);
@@ -139,8 +169,84 @@ namespace StationeersLaunchPad
             }
             else
             {
+              ImGui.AlignTextToFramePadding();
+
               if (LaunchPadConfigGUI.DrawConfigEntry(Configs.AutoSortOnStart))
                 changed |= ChangeFlags.AutoSort;
+
+              ImGui.SameLine();
+              ImGuiHelper.TextDisabled("|", true);
+              ImGui.SameLine();
+              ImGuiHelper.Text("Enable:");
+
+              const int hasEnabled = 1;
+              const int hasDisabled = 2;
+              const int hasBoth = hasEnabled | hasDisabled;
+              var allState = 0;
+              var localState = 0;
+              var workshopState = 0;
+
+              foreach (var mod in modList.AllMods)
+              {
+                if (mod.Source is ModSource.Core)
+                  continue;
+                var flag = mod.Enabled ? hasEnabled : hasDisabled;
+                allState |= flag;
+                if (mod.Source is ModSource.Local)
+                  localState |= flag;
+                else
+                  workshopState |= flag;
+              }
+
+              var tgtLocal = hasBoth;
+              var tgtWorkshop = hasBoth;
+
+              bool SelectCheckbox(string label, int curState, out int nextState, bool force = false)
+              {
+                if (curState == 0 && !force)
+                {
+                  nextState = 0;
+                  return false;
+                }
+                ImGui.SameLine();
+                ImGui.PushItemFlag(ImGuiItemFlags.MixedValue, curState == hasBoth);
+                nextState = curState switch
+                {
+                  hasEnabled => hasDisabled,
+                  _ => hasEnabled,
+                };
+                var tempState = (curState & hasEnabled) != 0;
+                var res = ImGui.Checkbox(label, ref tempState);
+                ImGui.PopItemFlag();
+                return res;
+              }
+
+              ImGui.BeginDisabled(allState == 0);
+              if (SelectCheckbox("All##enableAll", allState, out var nextState, force: true))
+                tgtLocal = tgtWorkshop = nextState;
+              if (SelectCheckbox("Local##enableLocal", localState, out nextState))
+                tgtLocal = nextState;
+              if (SelectCheckbox("Workshop##enableWorkshop", workshopState, out nextState))
+                tgtWorkshop = nextState;
+              ImGui.EndDisabled();
+
+              if (tgtLocal != hasBoth || tgtWorkshop != hasBoth)
+              {
+                foreach (var mod in modList.AllMods)
+                {
+                  if (mod.Source is ModSource.Core)
+                    continue;
+                  var tgtFlags = mod.Source is ModSource.Workshop ? tgtWorkshop : tgtLocal;
+                  if (tgtFlags == hasBoth)
+                    continue;
+                  var tgt = (tgtFlags & hasEnabled) != 0;
+                  if (mod.Enabled != tgt)
+                  {
+                    mod.Enabled = tgt;
+                    changed |= ChangeFlags.Mods;
+                  }
+                }
+              }
 
               ImGui.SetCursorPosY(ImGui.GetCursorPosY() - ImGui.GetStyle().ItemSpacing.y);
               ImGui.Separator();
