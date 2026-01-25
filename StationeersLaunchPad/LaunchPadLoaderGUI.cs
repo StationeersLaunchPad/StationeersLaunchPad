@@ -654,8 +654,7 @@ namespace StationeersLaunchPad
         foreach (var assembly in selectedInfo.Assemblies)
         {
           ImGui.Spacing();
-          ImGuiHelper.Text($"\tName: {assembly.Name}");
-          ImGuiHelper.Text($"\tPath: {assembly.Path}");
+          ImGuiHelper.Text($"\t{assembly}");
         }
       }
       else

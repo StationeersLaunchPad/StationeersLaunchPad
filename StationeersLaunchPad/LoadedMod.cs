@@ -1,10 +1,12 @@
 using BepInEx.Configuration;
 using Cysharp.Threading.Tasks;
+using StationeersLaunchPad.Entrypoints;
 using StationeersMods.Interface;
 using StationeersMods.Shared;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using UnityEngine;
 
 namespace StationeersLaunchPad
@@ -17,7 +19,7 @@ namespace StationeersLaunchPad
 
     public Logger Logger;
 
-    public List<LoadedAssembly> Assemblies = new();
+    public List<Assembly> Assemblies = new();
     public List<GameObject> Prefabs = new();
     public List<ExportSettings> Exports = new();
     public ContentHandler ContentHandler;
@@ -40,25 +42,25 @@ namespace StationeersLaunchPad
       this.ContentHandler = new(resource, new List<IResource>().AsReadOnly(), this.Prefabs.AsReadOnly());
     }
 
-    private async UniTask<LoadedAssembly> LoadAssemblySingle(AssemblyInfo assemblyInfo)
+    private UniTask<Assembly> LoadAssemblySingle(string path) => UniTask.RunOnThreadPool(() =>
     {
-      this.Logger.LogDebug($"Loading Assembly {assemblyInfo.Name}");
-      var assembly = await ModLoader.LoadAssembly(assemblyInfo);
-      ModLoader.RegisterAssembly(assembly.Assembly, this);
+      this.Logger.LogDebug($"Loading Assembly {path}");
+      var assembly = Assembly.LoadFrom(path);
+      ModLoader.RegisterAssembly(assembly, this);
       this.Logger.LogInfo($"Loaded Assembly");
       return assembly;
-    }
+    });
 
     public async UniTask LoadAssembliesSerial()
     {
-      foreach (var assemblyInfo in this.Info.Assemblies)
-        this.Assemblies.Add(await this.LoadAssemblySingle(assemblyInfo));
+      foreach (var path in this.Info.Assemblies)
+        this.Assemblies.Add(await this.LoadAssemblySingle(path));
     }
 
     public async UniTask LoadAssembliesParallel()
     {
       var assemblies = await UniTask.WhenAll(
-        this.Info.Assemblies.Select(assemblyInfo => this.LoadAssemblySingle(assemblyInfo))
+        this.Info.Assemblies.Select(path => this.LoadAssemblySingle(path))
       );
       this.Assemblies.AddRange(assemblies);
     }
@@ -93,20 +95,7 @@ namespace StationeersLaunchPad
       {
         this.Logger.LogDebug("Finding Entrypoints");
 
-        // StationeersMods would take any ModBehaviour it found as an entrypoint when there were no ExportSettings
-        // We'll do the same to ensure any mods relying on this still work
-        var smEntries = this.Exports.Count == 0 ?
-            ModLoader.FindAnyStationeersModsEntrypoints(this.Assemblies) :
-            ModLoader.FindExplicitStationeersModsEntrypoints(this.Assemblies);
-
-        if (smEntries.Count == 0)
-          smEntries = ModLoader.FindExportSettingsClassEntrypoints(this.Assemblies, this.Exports);
-
-        this.Entrypoints.AddRange(smEntries);
-
-        this.Entrypoints.AddRange(ModLoader.FindExportSettingsPrefabEntrypoints(this.Exports));
-        this.Entrypoints.AddRange(ModLoader.FindBepInExEntrypoints(this.Assemblies));
-        this.Entrypoints.AddRange(ModLoader.FindDefaultEntrypoints(this.Assemblies));
+        Entrypoints.AddRange(EntrypointSearch.FindEntrypoints(this, Assemblies, Exports));
 
         this.Logger.LogInfo($"Found {this.Entrypoints.Count} Entrypoints");
       });
@@ -175,7 +164,10 @@ namespace StationeersLaunchPad
     }
 
     private bool _configDirty = true;
-    private void DirtyConfig() { this._configDirty = true; }
+    private void DirtyConfig()
+    {
+      this._configDirty = true;
+    }
 
     private List<SortedConfigFile> _cachedSortedConfigs = new();
     private int _cachedTotalConfigs = 0;

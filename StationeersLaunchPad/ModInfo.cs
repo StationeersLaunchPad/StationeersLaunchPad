@@ -1,7 +1,5 @@
 using Assets.Scripts.Networking.Transports;
 using Assets.Scripts.Serialization;
-using BepInEx.Bootstrap;
-using Mono.Cecil;
 using Steamworks.Ugc;
 using System;
 using System.Collections.Generic;
@@ -37,7 +35,7 @@ namespace StationeersLaunchPad
     public string ThumbnailPath => System.IO.Path.Combine(this.AboutPath, "thumb.png");
     public string PreviewPath => System.IO.Path.Combine(this.AboutPath, "preview.png");
 
-    public List<AssemblyInfo> Assemblies = new();
+    public List<string> Assemblies = new();
     public List<string> AssetBundles = new();
 
     public LoadedMod Loaded;
@@ -91,15 +89,8 @@ namespace StationeersLaunchPad
         }
       }
 
-      var dllFiles = Directory.GetFiles(this.Path, "*.dll", SearchOption.AllDirectories);
-      foreach (var file in dllFiles)
-      {
-        this.Assemblies.Add(new AssemblyInfo
-        {
-          Path = file,
-          Definition = AssemblyDefinition.ReadAssembly(file, TypeLoader.ReaderParameters)
-        });
-      }
+      Assemblies.AddRange(Directory.GetFiles(
+        this.Path, "*.dll", SearchOption.AllDirectories));
 
       var assetFiles = Directory.GetFiles(this.Path, "*.assets", SearchOption.AllDirectories);
       this.AssetBundles.AddRange(assetFiles);

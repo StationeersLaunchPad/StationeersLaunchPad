@@ -21,12 +21,6 @@
       <Private>False</Private>
     </Reference>
 
-    <!-- Mono DLL's -->
-    <Reference Include="Mono.Cecil">
-      <HintPath>$(BIECoreDirectory)\Mono.Cecil.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-
     <!-- Game DLL's -->
     <Reference Include="Assembly-CSharp">
       <HintPath>$(StationeersManagedDirectory)\Assembly-CSharp.dll</HintPath>
