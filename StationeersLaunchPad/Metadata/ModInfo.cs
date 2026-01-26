@@ -1,9 +1,10 @@
+using StationeersLaunchPad.Loading;
 using StationeersLaunchPad.Sources;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
-namespace StationeersLaunchPad
+namespace StationeersLaunchPad.Metadata
 {
   public class ModInfo
   {
@@ -24,7 +25,7 @@ namespace StationeersLaunchPad
     public LoadedMod Loaded;
 
     // Definition Accessors
-    public ModAbout About => Def.About;
+    public ModAboutEx About => Def.About;
     public ModSourceType Source => Def.Type;
     public string Name => About.Name;
     public string DirectoryPath => Def.DirectoryPath;

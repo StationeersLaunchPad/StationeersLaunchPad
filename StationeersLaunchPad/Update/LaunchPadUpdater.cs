@@ -7,7 +7,7 @@ using System.IO.Compression;
 using System.Linq;
 using UnityEngine;
 
-namespace StationeersLaunchPad
+namespace StationeersLaunchPad.Update
 {
   public static class LaunchPadUpdater
   {

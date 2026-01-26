@@ -3,8 +3,11 @@ using Assets.Scripts.Serialization;
 using Assets.Scripts.Util;
 using BepInEx.Configuration;
 using Cysharp.Threading.Tasks;
+using StationeersLaunchPad.Loading;
+using StationeersLaunchPad.Metadata;
 using StationeersLaunchPad.Sources;
 using StationeersLaunchPad.UI;
+using StationeersLaunchPad.Update;
 using Steamworks;
 using System;
 using System.Collections;
@@ -34,7 +37,7 @@ namespace StationeersLaunchPad
   {
     public static SplashBehaviour SplashBehaviour;
 
-    private static ModList modList = new();
+    private static ModList modList = ModList.NewEmpty();
 
     private static LoadState LoadState = LoadState.Initializing;
 
@@ -149,10 +152,11 @@ namespace StationeersLaunchPad
         LoadState = LoadState.Searching;
 
         Logger.Global.LogInfo("Listing Mods");
-        modList = new(await ModSource.ListAll(!SteamDisabled));
+        modList = ModList.FromDefs(await ModSource.ListAll(!SteamDisabled));
 
-        Logger.Global.LogInfo("Loading Mod Order");
-        await modList.LoadConfig();
+        Logger.Global.LogInfo("Loading Mod Config");
+        modList.ApplyConfig(ModConfigUtil.LoadConfig());
+        ModConfigUtil.SaveConfig(modList.ToModConfig());
 
         if (!modList.CheckDependencies() && !GameManager.IsBatchMode)
           AutoLoad = false;
@@ -177,7 +181,7 @@ namespace StationeersLaunchPad
           Logger.Global.LogError("Error occurred during initialization. Mods will not be loaded.");
           Logger.Global.LogException(ex);
 
-          modList.Clear();
+          modList = ModList.NewEmpty();
           LoadState = LoadState.Failed;
           AutoLoad = false;
         }
@@ -222,7 +226,7 @@ namespace StationeersLaunchPad
         modList.DisableDuplicates(Configs.DisableDuplicates.Value);
         if (AutoSort)
           modList.SortByDeps();
-        modList.SaveConfig();
+        ModConfigUtil.SaveConfig(modList.ToModConfig());
       }
       var next = changed.HasFlag(LoaderPanel.ChangeFlags.NextStep);
       if (next && LoadState == LoadState.Configuring)

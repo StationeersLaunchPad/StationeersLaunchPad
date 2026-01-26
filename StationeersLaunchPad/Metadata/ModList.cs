@@ -1,65 +1,34 @@
 
 using Assets.Scripts.Networking.Transports;
-using Assets.Scripts.Serialization;
-using Cysharp.Threading.Tasks;
 using StationeersLaunchPad.Sources;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
-namespace StationeersLaunchPad
+namespace StationeersLaunchPad.Metadata
 {
-  public enum DisableDuplicateMode
-  {
-    None, KeepLocal, KeepWorkshop
-  }
-
   public class ModList
   {
-    private readonly List<ModInfo> mods = new();
+    private readonly List<ModInfo> mods;
 
     public IEnumerable<ModInfo> AllMods => this.mods;
     public IEnumerable<ModInfo> EnabledMods => this.mods.Where(mod => mod.Enabled);
     public int IndexOf(ModInfo mod) => this.mods.IndexOf(mod);
 
-    public ModList() { }
-    public ModList(List<ModDefinition> defs)
+    public static ModList NewEmpty() => new();
+    public static ModList FromDefs(List<ModDefinition> defs)
     {
+      var mods = new List<ModInfo>();
       foreach (var def in defs)
         mods.Add(new(def));
+      return new(mods);
     }
 
-    public void Clear() => this.mods.Clear();
+    private ModList() => this.mods = new();
+    private ModList(List<ModInfo> mods) => this.mods = mods;
 
-    public async UniTask LoadConfig()
-    {
-      // read config on thread pool
-      await UniTask.SwitchToThreadPool();
-
-      var config = File.Exists(LaunchPadPaths.ConfigPath)
-            ? XmlSerialization.Deserialize<ModConfig>(LaunchPadPaths.ConfigPath)
-            : new ModConfig();
-      config.CreateCoreMod();
-
-      // apply config on main thread
-      await UniTask.SwitchToMainThread();
-      this.ApplyConfig(config);
-
-      // save config to include any new mods on thread pool
-      await UniTask.SwitchToThreadPool();
-      this.SaveConfig();
-    }
-
-    public void SaveConfig()
-    {
-      var config = this.MakeConfig();
-
-      if (!config.SaveXml(LaunchPadPaths.ConfigPath))
-        throw new Exception($"failed to save {WorkshopMenu.ConfigPath}");
-    }
-
-    private ModConfig MakeConfig()
+    public ModConfig ToModConfig()
     {
       var config = new ModConfig();
       foreach (var mod in mods)
@@ -67,7 +36,7 @@ namespace StationeersLaunchPad
       return config;
     }
 
-    private void ApplyConfig(ModConfig config)
+    public void ApplyConfig(ModConfig config)
     {
       var modsByPath = new Dictionary<string, ModInfo>(StringComparer.OrdinalIgnoreCase);
       foreach (var mod in mods)
@@ -337,106 +306,5 @@ namespace StationeersLaunchPad
 
     private static string NormalizePath(string path) =>
       path?.Replace("\\", "/").Trim().ToLowerInvariant() ?? string.Empty;
-
-    private class OrderGraph
-    {
-      public static OrderGraph Build(List<ModInfo> mods)
-      {
-        var graph = new OrderGraph(mods);
-        foreach (var mod in mods)
-        {
-          if (!mod.Enabled || mod.Source == ModSourceType.Core)
-            continue;
-          foreach (var modRef in mod.About.OrderBefore ?? new())
-          {
-            foreach (var mod2 in mods)
-            {
-              if (mod2 != mod && mod2.Enabled && mod2.Satisfies(modRef))
-                graph.AddOrder(mod, mod2);
-            }
-          }
-          foreach (var modRef in mod.About.OrderAfter ?? new())
-          {
-            foreach (var mod2 in mods)
-            {
-              if (mod2 != mod && mod2.Enabled && mod2.Satisfies(modRef))
-                graph.AddOrder(mod2, mod);
-            }
-          }
-        }
-        return graph;
-      }
-
-      public readonly Dictionary<ModInfo, HashSet<ModInfo>> Befores = new();
-      public readonly Dictionary<ModInfo, HashSet<ModInfo>> Afters = new();
-
-      public bool HasCircular = false;
-
-      private OrderGraph(List<ModInfo> mods)
-      {
-        foreach (var mod in mods)
-        {
-          this.Befores[mod] = new();
-          this.Afters[mod] = new();
-        }
-      }
-
-      public void AddOrder(ModInfo first, ModInfo second)
-      {
-        if (HasCircular)
-          return;
-        // if the second mod is already required before the first, this would add a circular reference
-        if (this.Befores[first].Contains(second))
-        {
-          HasCircular = true;
-          return;
-        }
-
-        // this order is already added
-        if (this.Befores[second].Contains(first))
-          return;
-
-        this.Afters[first].Add(second);
-        this.Befores[second].Add(first);
-        foreach (var before in this.Befores[first])
-          this.AddOrder(before, second);
-        foreach (var after in this.Afters[second])
-          this.AddOrder(first, after);
-      }
-    }
-
-    private class ModSet
-    {
-      private Dictionary<ulong, ModInfo> byWorkshopHandle = new();
-      private Dictionary<string, ModInfo> byModID = new();
-      private HashSet<ModInfo> all = new();
-
-      public void Add(ModInfo mod)
-      {
-        if (mod.WorkshopHandle > 1)
-          byWorkshopHandle[mod.WorkshopHandle] = mod;
-        if (!string.IsNullOrEmpty(mod.ModID))
-          byModID[mod.ModID] = mod;
-        all.Add(mod);
-      }
-
-      public bool TryGetExisting(ModInfo mod, out ModInfo existing)
-      {
-        if (mod.WorkshopHandle > 1 && byWorkshopHandle.TryGetValue(mod.WorkshopHandle, out existing))
-          return true;
-        if (!string.IsNullOrEmpty(mod.ModID) && byModID.TryGetValue(mod.ModID, out existing))
-          return true;
-        return all.TryGetValue(mod, out existing);
-      }
-
-      public void Remove(ModInfo mod)
-      {
-        if (mod.WorkshopHandle > 1)
-          byWorkshopHandle.Remove(mod.WorkshopHandle);
-        if (!string.IsNullOrEmpty(mod.ModID))
-          byModID.Remove(mod.ModID);
-        all.Remove(mod);
-      }
-    }
   }
 }

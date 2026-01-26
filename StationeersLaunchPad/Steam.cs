@@ -1,5 +1,6 @@
 
 using Cysharp.Threading.Tasks;
+using StationeersLaunchPad.Metadata;
 using StationeersLaunchPad.Sources;
 using Steamworks;
 using Steamworks.Ugc;

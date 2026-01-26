@@ -2,6 +2,7 @@
 using Assets.Scripts.Networking.Transports;
 using Assets.Scripts.Serialization;
 using Cysharp.Threading.Tasks;
+using StationeersLaunchPad.Metadata;
 using Steamworks.Ugc;
 using System.Collections.Generic;
 using System.IO;
@@ -20,7 +21,7 @@ namespace StationeersLaunchPad.Sources
 
       foreach (var item in items)
       {
-        var about = XmlSerialization.Deserialize<ModAbout>(
+        var about = XmlSerialization.Deserialize<ModAboutEx>(
           Path.Join(item.Directory, "About/About.xml"), "ModMetadata") ?? new()
           {
             Name = $"[Invalid About.xml] {item.Title}",
@@ -38,7 +39,7 @@ namespace StationeersLaunchPad.Sources
   public class WorkshopModDefinition : ModDefinition
   {
     public readonly Item Item;
-    public WorkshopModDefinition(Item item, ModAbout about) : base(about) =>
+    public WorkshopModDefinition(Item item, ModAboutEx about) : base(about) =>
       Item = item;
 
     public override string Name => Item.Title;

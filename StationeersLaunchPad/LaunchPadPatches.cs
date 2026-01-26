@@ -5,6 +5,7 @@ using Assets.Scripts.Networking.Transports;
 using Assets.Scripts.Serialization;
 using Assets.Scripts.UI;
 using HarmonyLib;
+using StationeersLaunchPad.Metadata;
 using StationeersLaunchPad.Sources;
 using StationeersLaunchPad.UI;
 using Steamworks;
@@ -206,7 +207,7 @@ namespace StationeersLaunchPad
       if (mod == null)
         return;
 
-      var about = XmlSerialization.Deserialize<ModAbout>(mod.AboutXmlPath, "ModMetadata");
+      var about = XmlSerialization.Deserialize<ModAboutEx>(mod.AboutXmlPath, "ModMetadata");
       if (about == null)
         return;
 
@@ -225,7 +226,7 @@ namespace StationeersLaunchPad
     static bool WorkshopMenu_SaveWorkShopFileHandle(SteamTransport.WorkShopItemDetail ItemDetail, ModData mod)
     {
       // If we can deserialize it as our extended mod metadata, use that instead
-      var about = XmlSerialization.Deserialize<ModAbout>(mod.AboutXmlPath, "ModMetadata");
+      var about = XmlSerialization.Deserialize<ModAboutEx>(mod.AboutXmlPath, "ModMetadata");
       if (about != null)
       {
         about.WorkshopHandle = ItemDetail.PublishedFileId;

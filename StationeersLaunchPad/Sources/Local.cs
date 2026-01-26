@@ -2,6 +2,7 @@
 using Assets.Scripts.Networking.Transports;
 using Assets.Scripts.Serialization;
 using Cysharp.Threading.Tasks;
+using StationeersLaunchPad.Metadata;
 using System.Collections.Generic;
 using System.IO;
 
@@ -30,7 +31,7 @@ namespace StationeersLaunchPad.Sources
           foreach (var file in dir.GetFiles(fileName))
           {
             var modDir = dir.Parent;
-            var about = XmlSerialization.Deserialize<ModAbout>(
+            var about = XmlSerialization.Deserialize<ModAboutEx>(
               file.FullName, "ModMetadata") ?? new()
               {
                 Name = $"[Invalid About.xml] {modDir.Name}",
@@ -48,7 +49,7 @@ namespace StationeersLaunchPad.Sources
   public class LocalModDefinition : ModDefinition
   {
     public readonly string ModDirectory;
-    public LocalModDefinition(string modDir, ModAbout about) : base(about) =>
+    public LocalModDefinition(string modDir, ModAboutEx about) : base(about) =>
       ModDirectory = modDir;
     public override string Name => Path.GetDirectoryName(ModDirectory);
     public override ModSourceType Type => ModSourceType.Local;

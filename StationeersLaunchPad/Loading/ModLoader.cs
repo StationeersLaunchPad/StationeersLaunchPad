@@ -6,7 +6,7 @@ using System.Linq;
 using System.Reflection;
 using UnityEngine;
 
-namespace StationeersLaunchPad
+namespace StationeersLaunchPad.Loading
 {
   public static class ModLoader
   {

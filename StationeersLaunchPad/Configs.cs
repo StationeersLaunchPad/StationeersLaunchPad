@@ -1,10 +1,18 @@
 
 using Assets.Scripts;
 using BepInEx.Configuration;
+using StationeersLaunchPad.Loading;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 namespace StationeersLaunchPad
 {
+  public enum DisableDuplicateMode
+  {
+    None, KeepLocal, KeepWorkshop
+  }
+
   public static class Configs
   {
     public static SortedConfigFile Sorted;
@@ -84,14 +92,14 @@ namespace StationeersLaunchPad
       );
       LoadStrategyType = config.Bind(
         new ConfigDefinition("Mod Loading", "LoadStrategyType"),
-        StationeersLaunchPad.LoadStrategyType.Linear,
+        Loading.LoadStrategyType.Linear,
         new ConfigDescription(
           "Linear type loads mods one by one in sequential order. More types of mod loading will be added later."
         )
       );
       LoadStrategyMode = config.Bind(
         new ConfigDefinition("Mod Loading", "LoadStrategyMode"),
-        StationeersLaunchPad.LoadStrategyMode.Serial,
+        Loading.LoadStrategyMode.Serial,
         new ConfigDescription(
           "Parallel mode loads faster for a large number of mods, but may fail in extremely rare cases. Switch to serial mode if running into loading issues."
         )
@@ -147,6 +155,44 @@ namespace StationeersLaunchPad
       );
 
       Sorted = new SortedConfigFile(config);
+    }
+  }
+
+  public class SortedConfigFile
+  {
+    public readonly ConfigFile ConfigFile;
+    public readonly string FileName;
+    public readonly List<SortedConfigCategory> Categories;
+
+    public SortedConfigFile(ConfigFile configFile)
+    {
+      this.ConfigFile = configFile;
+      this.FileName = Path.GetFileName(configFile.ConfigFilePath);
+      var categories = new List<SortedConfigCategory>();
+      foreach (var group in configFile.Select(entry => entry.Value).GroupBy(entry => entry.Definition.Section))
+      {
+        categories.Add(new SortedConfigCategory(
+          configFile,
+          group.Key,
+          group.OrderBy(entry => entry.Definition.Key).ToList()
+        ));
+      }
+      categories.Sort((a, b) => a.Category.CompareTo(b.Category));
+      this.Categories = categories;
+    }
+  }
+
+  public class SortedConfigCategory
+  {
+    public readonly ConfigFile ConfigFile;
+    public readonly string Category;
+    public readonly List<ConfigEntryBase> Entries;
+
+    public SortedConfigCategory(ConfigFile configFile, string category, List<ConfigEntryBase> entries)
+    {
+      this.ConfigFile = configFile;
+      this.Category = category;
+      this.Entries = entries;
     }
   }
 }

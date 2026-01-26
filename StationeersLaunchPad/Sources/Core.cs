@@ -1,5 +1,6 @@
 
 using Cysharp.Threading.Tasks;
+using StationeersLaunchPad.Metadata;
 using System.Collections.Generic;
 
 namespace StationeersLaunchPad.Sources
@@ -14,7 +15,7 @@ namespace StationeersLaunchPad.Sources
 
   public class CoreModDefinition : ModDefinition
   {
-    private static ModAbout GetModAbout()
+    private static ModAboutEx GetModAbout()
     {
       var fromGame = new CoreModData().GetAboutData();
       return new()
