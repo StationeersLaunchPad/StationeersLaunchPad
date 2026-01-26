@@ -39,7 +39,17 @@ namespace StationeersLaunchPad
       if (this.IsLaunchpadLog())
         return;
       if (ModLoader.TryGetExecutingMod(out var mod))
-        mod.Logger.LogInfoFormat(false, format, args);
+        mod.Logger.LogFormat(false, MapSeverity(logType), format, args);
     }
+
+    private static LogSeverity MapSeverity(LogType logType) => logType switch
+    {
+      LogType.Error => LogSeverity.Error,
+      LogType.Assert => LogSeverity.Fatal,
+      LogType.Warning => LogSeverity.Warning,
+      LogType.Log => LogSeverity.Information,
+      LogType.Exception => LogSeverity.Exception,
+      _ => LogSeverity.Information
+    };
   }
 }
