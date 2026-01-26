@@ -2,6 +2,7 @@
 using Assets.Scripts.Networking.Transports;
 using Assets.Scripts.Serialization;
 using Cysharp.Threading.Tasks;
+using StationeersLaunchPad.Sources;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -22,64 +23,14 @@ namespace StationeersLaunchPad
     public IEnumerable<ModInfo> EnabledMods => this.mods.Where(mod => mod.Enabled);
     public int IndexOf(ModInfo mod) => this.mods.IndexOf(mod);
 
+    public ModList() { }
+    public ModList(List<ModDefinition> defs)
+    {
+      foreach (var def in defs)
+        mods.Add(new(def));
+    }
+
     public void Clear() => this.mods.Clear();
-
-    public void AddCore() => this.mods.Add(new ModInfo { Source = ModSource.Core });
-
-    public async UniTask LoadLocalMods()
-    {
-      // list files and load mod data on thread
-      await UniTask.SwitchToThreadPool();
-
-      var type = SteamTransport.WorkshopType.Mod;
-      var localDir = type.GetLocalDirInfo();
-      var fileName = type.GetLocalFileName();
-
-      if (!localDir.Exists)
-      {
-        Logger.Global.LogWarning("local mod folder not found");
-        return;
-      }
-
-      var localMods = new List<ModInfo>();
-
-      foreach (var dir in localDir.GetDirectories("*", SearchOption.AllDirectories))
-      {
-        foreach (var file in dir.GetFiles(fileName))
-        {
-          localMods.Add(new ModInfo()
-          {
-            Source = ModSource.Local,
-            Wrapped = SteamTransport.ItemWrapper.WrapLocalItem(file, type),
-          });
-        }
-      }
-
-      // only modify mod list on main thread
-      await UniTask.SwitchToMainThread();
-      this.mods.AddRange(localMods);
-    }
-
-    public async UniTask LoadWorkshopMods()
-    {
-      var items = await Steam.LoadWorkshopItems();
-
-      foreach (var item in items)
-      {
-        this.mods.Add(new ModInfo
-        {
-          Source = ModSource.Workshop,
-          Wrapped = SteamTransport.ItemWrapper.WrapWorkshopItem(item, "About\\About.xml"),
-          WorkshopItem = item
-        });
-      }
-    }
-
-    public void LoadDetails()
-    {
-      foreach (var mod in this.mods)
-        mod.LoadDetails();
-    }
 
     public async UniTask LoadConfig()
     {
@@ -112,15 +63,7 @@ namespace StationeersLaunchPad
     {
       var config = new ModConfig();
       foreach (var mod in mods)
-      {
-        config.Mods.Add(mod.Source switch
-        {
-          ModSource.Core => new CoreModData(),
-          ModSource.Local => new LocalModData(mod.Path, mod.Enabled),
-          ModSource.Workshop => new WorkshopModData(mod.Wrapped, mod.Enabled),
-          _ => throw new InvalidOperationException($"invalid mod source: {mod.Source}"),
-        });
-      }
+        config.Mods.Add(mod.Def.ToModData(mod.Enabled));
       return config;
     }
 
@@ -136,18 +79,18 @@ namespace StationeersLaunchPad
         }
 
         //Speical case for core path
-        if (mod.Source == ModSource.Core && string.IsNullOrEmpty(mod.Path))
+        if (mod.Source == ModSourceType.Core && string.IsNullOrEmpty(mod.DirectoryPath))
         {
           modsByPath["Core"] = mod;
           continue;
         }
 
-        if (string.IsNullOrEmpty(mod.Path))
+        if (string.IsNullOrEmpty(mod.DirectoryPath))
         {
           Logger.Global.LogWarning($"Mod has empty path: {mod.GetType().Name}");
           continue;
         }
-        var normalizedPath = NormalizePath(mod.Path);
+        var normalizedPath = NormalizePath(mod.DirectoryPath);
         modsByPath[normalizedPath] = mod;
       }
 
@@ -197,7 +140,7 @@ namespace StationeersLaunchPad
       }
       foreach (var mod in modsByPath.Values)
       {
-        Logger.Global.LogDebug($"new mod added at {mod.Path}");
+        Logger.Global.LogDebug($"new mod added at {mod.DirectoryPath}");
         mods[count++] = mod;
         mod.Enabled = true;
       }
@@ -208,7 +151,7 @@ namespace StationeersLaunchPad
     {
       var curIndex = mods.IndexOf(mod);
       if (curIndex == -1)
-        throw new InvalidOperationException($"unknown mod {mod.Source} {mod.DisplayName}");
+        throw new InvalidOperationException($"unknown mod {mod.Source} {mod.Name}");
 
       if (curIndex == index)
         return false;
@@ -247,8 +190,8 @@ namespace StationeersLaunchPad
         return false;
       var prefSource = mode switch
       {
-        DisableDuplicateMode.KeepLocal => ModSource.Local,
-        DisableDuplicateMode.KeepWorkshop => ModSource.Workshop,
+        DisableDuplicateMode.KeepLocal => ModSourceType.Local,
+        DisableDuplicateMode.KeepWorkshop => ModSourceType.Workshop,
         _ => throw new InvalidOperationException($"Unknown duplicate mode {mode}"),
       };
 
@@ -267,7 +210,7 @@ namespace StationeersLaunchPad
         if (nonPref.Source == pref.Source)
         {
           // if we have 2 conflicting mods in the same source, just pick the first by path
-          if (string.Compare(nonPref.Path, pref.Path) < 0)
+          if (string.Compare(nonPref.DirectoryPath, pref.DirectoryPath) < 0)
             (nonPref, pref) = (pref, nonPref);
         }
         else if (nonPref.Source == prefSource)
@@ -284,7 +227,7 @@ namespace StationeersLaunchPad
       foreach (var mod in disabledMods)
       {
         if (prefMods.TryGetExisting(mod, out var pref))
-          Logger.Global.LogWarning($"{mod.Source} {mod.DisplayName} disabled in favor of {pref.Source} {pref.DisplayName}");
+          Logger.Global.LogWarning($"{mod.Source} {mod.Name} disabled in favor of {pref.Source} {pref.Name}");
       }
 
       return disabledMods.Count > 0;
@@ -298,7 +241,7 @@ namespace StationeersLaunchPad
       {
         if (!mod.Enabled)
           continue;
-        if (mod.Source == ModSource.Core)
+        if (mod.Source == ModSourceType.Core)
           continue;
         var missingDeps = false;
         foreach (var dep in mod.About.DependsOn ?? new())
@@ -312,7 +255,7 @@ namespace StationeersLaunchPad
           if (mod.DepsWarned)
             continue;
 
-          Logger.Global.LogWarning($"{mod.Source} {mod.DisplayName} is missing dependency {dep}");
+          Logger.Global.LogWarning($"{mod.Source} {mod.Name} is missing dependency {dep}");
 
           var possible = this.mods.Where(mod2 => mod2 != mod && mod2.Satisfies(dep)).ToList();
           if (possible.Count == 0)
@@ -323,7 +266,7 @@ namespace StationeersLaunchPad
 
           Logger.Global.LogWarning("Possible matches:");
           foreach (var mod2 in possible)
-            Logger.Global.LogWarning($"- {mod2.Source} {mod2.DisplayName}");
+            Logger.Global.LogWarning($"- {mod2.Source} {mod2.Name}");
         }
         mod.DepsWarned = missingDeps;
         if (missingDeps)
@@ -402,7 +345,7 @@ namespace StationeersLaunchPad
         var graph = new OrderGraph(mods);
         foreach (var mod in mods)
         {
-          if (!mod.Enabled || mod.Source == ModSource.Core)
+          if (!mod.Enabled || mod.Source == ModSourceType.Core)
             continue;
           foreach (var modRef in mod.About.OrderBefore ?? new())
           {

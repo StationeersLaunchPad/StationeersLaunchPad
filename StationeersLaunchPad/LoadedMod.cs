@@ -36,9 +36,9 @@ namespace StationeersLaunchPad
 
     public LoadedMod(ModInfo info)
     {
-      this.Logger = Logger.Global.CreateChild(info.DisplayName);
+      this.Logger = Logger.Global.CreateChild(info.Name);
       this.Info = info;
-      var resource = new DummyResource(info.Path);
+      var resource = new DummyResource(info.DirectoryPath);
       this.ContentHandler = new(resource, new List<IResource>().AsReadOnly(), this.Prefabs.AsReadOnly());
     }
 
@@ -114,7 +114,7 @@ namespace StationeersLaunchPad
       this.Logger.LogDebug("Loading Entrypoints");
 
       var gameObj = new GameObject();
-      gameObj.name = this.Info.DisplayName;
+      gameObj.name = this.Info.Name;
       GameObject.DontDestroyOnLoad(gameObj);
 
       // instantiate all entrypoints

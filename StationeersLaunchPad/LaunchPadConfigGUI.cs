@@ -1,5 +1,6 @@
 ﻿using BepInEx.Configuration;
 using ImGuiNET;
+using StationeersLaunchPad.Sources;
 using System;
 using System.Reflection;
 using UI.ImGuiUi;
@@ -28,7 +29,7 @@ namespace StationeersLaunchPad
 
     public static void DrawConfigEditor(ModInfo modInfo)
     {
-      if (modInfo == null || modInfo.Source == ModSource.Core)
+      if (modInfo == null || modInfo.Source == ModSourceType.Core)
       {
         ImGuiHelper.TextDisabled("Select a mod to edit configuration");
         return;
@@ -44,7 +45,7 @@ namespace StationeersLaunchPad
       var configFiles = mod.GetSortedConfigs();
       if (configFiles == null || configFiles.Count == 0)
       {
-        ImGuiHelper.TextDisabled($"{modInfo.DisplayName} does not have any configuration");
+        ImGuiHelper.TextDisabled($"{modInfo.Name} does not have any configuration");
         return;
       }
 
