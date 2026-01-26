@@ -1,6 +1,7 @@
 using BepInEx.Configuration;
 using Cysharp.Threading.Tasks;
 using StationeersLaunchPad.Entrypoints;
+using StationeersLaunchPad.Metadata;
 using StationeersMods.Interface;
 using StationeersMods.Shared;
 using System.Collections.Generic;
@@ -9,7 +10,7 @@ using System.Linq;
 using System.Reflection;
 using UnityEngine;
 
-namespace StationeersLaunchPad
+namespace StationeersLaunchPad.Loading
 {
   public class LoadedMod
   {
@@ -189,44 +190,6 @@ namespace StationeersLaunchPad
         this._configDirty = false;
       }
       return this._cachedSortedConfigs;
-    }
-  }
-
-  public class SortedConfigFile
-  {
-    public readonly ConfigFile ConfigFile;
-    public readonly string FileName;
-    public readonly List<SortedConfigCategory> Categories;
-
-    public SortedConfigFile(ConfigFile configFile)
-    {
-      this.ConfigFile = configFile;
-      this.FileName = Path.GetFileName(configFile.ConfigFilePath);
-      var categories = new List<SortedConfigCategory>();
-      foreach (var group in configFile.Select(entry => entry.Value).GroupBy(entry => entry.Definition.Section))
-      {
-        categories.Add(new SortedConfigCategory(
-          configFile,
-          group.Key,
-          group.OrderBy(entry => entry.Definition.Key).ToList()
-        ));
-      }
-      categories.Sort((a, b) => a.Category.CompareTo(b.Category));
-      this.Categories = categories;
-    }
-  }
-
-  public class SortedConfigCategory
-  {
-    public readonly ConfigFile ConfigFile;
-    public readonly string Category;
-    public readonly List<ConfigEntryBase> Entries;
-
-    public SortedConfigCategory(ConfigFile configFile, string category, List<ConfigEntryBase> entries)
-    {
-      this.ConfigFile = configFile;
-      this.Category = category;
-      this.Entries = entries;
     }
   }
 }

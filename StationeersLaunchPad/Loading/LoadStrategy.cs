@@ -1,11 +1,12 @@
 ﻿using Cysharp.Threading.Tasks;
+using StationeersLaunchPad.Metadata;
 using StationeersLaunchPad.Sources;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 
-namespace StationeersLaunchPad
+namespace StationeersLaunchPad.Loading
 {
   public enum LoadStrategyType
   {

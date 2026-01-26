@@ -1,5 +1,6 @@
 
 using Cysharp.Threading.Tasks;
+using StationeersLaunchPad.Metadata;
 using System.Collections.Generic;
 
 namespace StationeersLaunchPad.Sources
@@ -36,9 +37,9 @@ namespace StationeersLaunchPad.Sources
   // Contains only the base information about a mod, not any configuration related to it
   public abstract class ModDefinition
   {
-    public readonly ModAbout About;
+    public readonly ModAboutEx About;
 
-    public ModDefinition(ModAbout about) => About = about;
+    public ModDefinition(ModAboutEx about) => About = about;
 
     public abstract string Name { get; }
     public abstract ModSourceType Type { get; }
