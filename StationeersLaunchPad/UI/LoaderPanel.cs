@@ -4,9 +4,9 @@ using StationeersLaunchPad.Sources;
 using System;
 using UnityEngine;
 
-namespace StationeersLaunchPad
+namespace StationeersLaunchPad.UI
 {
-  public static class LaunchPadLoaderGUI
+  public static class LoaderPanel
   {
     [Flags]
     public enum ChangeFlags
@@ -49,7 +49,7 @@ namespace StationeersLaunchPad
         ImGui.Spacing();
         var line = Logger.Global.Last();
         if (line != null)
-          LaunchPadConsoleGUI.DrawConsoleLine(line, true);
+          LogPanel.DrawConsoleLine(line, true);
         else
           ImGuiHelper.Text("");
 
@@ -172,7 +172,7 @@ namespace StationeersLaunchPad
             {
               ImGui.AlignTextToFramePadding();
 
-              if (LaunchPadConfigGUI.DrawConfigEntry(Configs.AutoSortOnStart))
+              if (ConfigPanel.DrawConfigEntry(Configs.AutoSortOnStart))
                 changed |= ChangeFlags.AutoSort;
 
               ImGui.SameLine();
@@ -278,7 +278,7 @@ namespace StationeersLaunchPad
         {
           if (ImGui.BeginTabItem("Logs", openLogs ? ImGuiTabItemFlags.SetSelected : ImGuiTabItemFlags.None))
           {
-            LaunchPadConsoleGUI.DrawConsole(selectedInfo?.Loaded?.Logger ?? Logger.Global);
+            LogPanel.DrawConsole(selectedInfo?.Loaded?.Logger ?? Logger.Global);
             ImGui.EndTabItem();
           }
           openLogs = false;
@@ -306,14 +306,14 @@ namespace StationeersLaunchPad
           );
           if (open)
           {
-            LaunchPadConfigGUI.DrawConfigEditor(selectedInfo);
+            ConfigPanel.DrawConfigEditor(selectedInfo);
             ImGui.EndTabItem();
           }
 
           if (ImGui.BeginTabItem("LaunchPad Configuration"))
           {
             DrawExportButton();
-            var configChanged = LaunchPadConfigGUI.DrawConfigFile(Configs.Sorted, category => category != "Internal");
+            var configChanged = ConfigPanel.DrawConfigFile(Configs.Sorted, category => category != "Internal");
             // If we changed launchpad config and haven't loaded mods yet, mark mods changed to apply disable/sort behaviour
             if (loadState <= LoadState.Configuring && configChanged)
               changed |= ChangeFlags.Mods;

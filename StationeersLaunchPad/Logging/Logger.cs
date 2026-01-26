@@ -1,6 +1,7 @@
 ﻿using System;
 using UnityEngine;
 
+// This is not moved to another package because the import would conflict with UnityEngine.Logger
 namespace StationeersLaunchPad
 {
   [Flags]
@@ -17,25 +18,11 @@ namespace StationeersLaunchPad
 
   public class Logger
   {
-    public static Logger Global
-    { 
-      get; private set;
-    } = new Logger("Global");
+    public static readonly Logger Global = new("Global");
 
-    public string Name
-    {
-      get; private set;
-    }
-
-    public Logger Parent
-    {
-      get; private set;
-    }
-
-    public LogBuffer Buffer
-    {
-      get; private set;
-    }
+    public readonly string Name;
+    public readonly Logger Parent;
+    public readonly LogBuffer Buffer;
 
     public int Count => this.Buffer.Count;
 

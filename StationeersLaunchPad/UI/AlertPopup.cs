@@ -6,9 +6,9 @@ using System.Linq;
 using UI.ImGuiUi;
 using UnityEngine;
 
-namespace StationeersLaunchPad
+namespace StationeersLaunchPad.UI
 {
-  public static class LaunchPadAlertGUI
+  public static class AlertPopup
   {
     public static Vector2 DefaultSize => new Vector2(600, 200);
     public static Vector2 DefaultPosition => ImguiHelper.ScreenSize / 2;
