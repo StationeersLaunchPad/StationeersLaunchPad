@@ -1,176 +1,74 @@
-using Assets.Scripts.Networking.Transports;
-using Assets.Scripts.Serialization;
-using Steamworks.Ugc;
-using System;
+using StationeersLaunchPad.Sources;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using UnityEngine;
 
 namespace StationeersLaunchPad
 {
   public class ModInfo
   {
-    public const int MOD_NAME_SIZE_LIMIT = 128;
-    public const int MOD_DESCRIPTION_SIZE_LIMIT = 8000;
-    public const int MOD_CHANGELOG_SIZE_LIMIT = 8000;
-    public const int MOD_THUMBNAIL_SIZE_LIMIT = 1024 * 1024;
+    // Metadata
+    public readonly ModDefinition Def;
+    public readonly List<string> Assemblies = new();
+    public readonly List<string> AssetBundles = new();
 
-    public int SortIndex;
+    // Validation state
+    public readonly bool DepsInvalid;
+    public readonly bool OrderInvalid;
+
+    // Configuration State
+    public bool Enabled;
     public bool DepsWarned;
 
-    public ModSource Source;
-    public SteamTransport.ItemWrapper Wrapped;
-    public Item WorkshopItem;
-    public bool Enabled;
-
-    public ModAbout About;
-
-    public string Name => this.Wrapped.DirectoryName;
-    public string DisplayName => this.Source == ModSource.Core ? "Core" : this.About == null ? this.Path : this.About.Name;
-    public string Path => this.Source == ModSource.Core ? "" : this.Wrapped.DirectoryPath;
-    public string AboutPath => System.IO.Path.Combine(this.Path, "About");
-    public string AboutXmlPath => System.IO.Path.Combine(this.AboutPath, "About.xml");
-    public string ThumbnailPath => System.IO.Path.Combine(this.AboutPath, "thumb.png");
-    public string PreviewPath => System.IO.Path.Combine(this.AboutPath, "preview.png");
-
-    public List<string> Assemblies = new();
-    public List<string> AssetBundles = new();
-
+    // Temp State (to be removed)
     public LoadedMod Loaded;
 
-    public ulong WorkshopHandle => this.Source switch
-    {
-      ModSource.Core => 1,
-      ModSource.Workshop => this.Wrapped.Id,
-      _ => this.About?.WorkshopHandle ?? 0,
-    };
+    // Definition Accessors
+    public ModAbout About => Def.About;
+    public ModSourceType Source => Def.Type;
+    public string Name => About.Name;
+    public string DirectoryPath => Def.DirectoryPath;
+    public string DirectoryName => Path.GetDirectoryName(DirectoryPath);
+    public ulong WorkshopHandle => Def.WorkshopHandle;
+    public string ModID => About.ModID ?? "";
 
-    public string ModID => this.Source == ModSource.Core ? "core" : this.About?.ModID ?? "";
+    public string AboutPath => Path.Combine(DirectoryPath, "About");
+    public string AboutXmlPath => Path.Combine(AboutPath, "About.xml");
+    public string ThumbnailPath => Path.Combine(AboutPath, "thumb.png");
+    public string PreviewPath => Path.Combine(AboutPath, "preview.png");
 
-    public void LoadDetails()
+    public ModInfo(ModDefinition def)
     {
-      if (this.Source == ModSource.Core)
+      Def = def;
+
+      if (def.Type is ModSourceType.Core)
         return;
 
-      // Load About.xml once
-      this.About ??= XmlSerialization.Deserialize<ModAbout>(this.Wrapped.FilePathFullName, "ModMetadata") ??
-          new ModAbout
-          {
-            Name = $"[Invalid About.xml] {this.Name}",
-            Author = "",
-            Version = "",
-            Description = "",
-          };
-
-      foreach (var dep in this.About.DependsOn ?? new())
-      {
-        if (!dep.IsValid)
-        {
-          Logger.Global.LogWarning($"{this.Source} {this.DisplayName} has invalid dependencies");
-          break;
-        }
-      }
-      foreach (var dep in this.About.OrderBefore ?? new())
-      {
-        if (!dep.IsValid)
-        {
-          Logger.Global.LogWarning($"{this.Source} {this.DisplayName} has invalid ordering constraints");
-          break;
-        }
-      }
-      foreach (var dep in this.About.OrderAfter ?? new())
-      {
-        if (!dep.IsValid)
-        {
-          Logger.Global.LogWarning($"{this.Source} {this.DisplayName} has invalid ordering constraints");
-          break;
-        }
-      }
+      foreach (var dep in def.About.DependsOn ?? new())
+        DepsInvalid |= !dep.IsValid;
+      foreach (var before in def.About.OrderBefore ?? new())
+        OrderInvalid |= !before.IsValid;
+      foreach (var after in def.About.OrderAfter ?? new())
+        OrderInvalid |= !after.IsValid;
 
       Assemblies.AddRange(Directory.GetFiles(
-        this.Path, "*.dll", SearchOption.AllDirectories));
-
-      var assetFiles = Directory.GetFiles(this.Path, "*.assets", SearchOption.AllDirectories);
-      this.AssetBundles.AddRange(assetFiles);
+        DirectoryPath, "*.dll", SearchOption.AllDirectories));
+      AssetBundles.AddRange(Directory.GetFiles(
+        DirectoryPath, "*.assets", SearchOption.AllDirectories));
     }
 
     public bool SortBefore(ModInfo other)
     {
-      if (other.About?.OrderAfter?.Any(v => this.Satisfies(v)) ?? false)
+      if (other.About?.OrderAfter?.Any(v => Satisfies(v)) ?? false)
         return true;
-      if (this.About?.OrderBefore?.Any(v => other.Satisfies(v)) ?? false)
-        return true;
-      return false;
+      return About?.OrderBefore?.Any(v => other.Satisfies(v)) ?? false;
     }
 
     public bool Satisfies(ModReference modRef)
     {
-      if (modRef.WorkshopHandle != 0 && this.WorkshopHandle == modRef.WorkshopHandle)
+      if (modRef.WorkshopHandle != 0 && WorkshopHandle == modRef.WorkshopHandle)
         return true;
-      if (!string.IsNullOrEmpty(modRef.ModID) && this.ModID == modRef.ModID)
-        return true;
-      return false;
+      return !string.IsNullOrEmpty(modRef.ModID) && ModID == modRef.ModID;
     }
-
-    public (bool, string) IsWorkshopValid()
-    {
-      // if its core its fine, if its on the workshop in the first place its probably fine too
-      if (this.Source != ModSource.Local)
-        return (true, string.Empty);
-
-      if (this.About == null)
-        return (false, "Mod has invalid/no about data.");
-
-      if (this.About.Name?.Length > ModInfo.MOD_NAME_SIZE_LIMIT)
-        return (false, $"Mod name is larger than {ModInfo.MOD_NAME_SIZE_LIMIT} characters, current size is {this.About.Name?.Length} characters.");
-
-      if (this.About.Description?.Length > ModInfo.MOD_DESCRIPTION_SIZE_LIMIT)
-        return (false, $"Mod description is larger than {ModInfo.MOD_DESCRIPTION_SIZE_LIMIT} characters, current size is {this.About.Description?.Length} characters.");
-
-      if (this.About.ChangeLog?.Length > ModInfo.MOD_CHANGELOG_SIZE_LIMIT)
-        return (false, $"Mod changelog is larger than {ModInfo.MOD_CHANGELOG_SIZE_LIMIT} characters, current size is {this.About.ChangeLog?.Length} characters.");
-
-      if (!File.Exists(this.ThumbnailPath))
-        return (false, $"Mod does not have a thumb.png in the About folder.");
-
-      var thumbnailInfo = new FileInfo(this.ThumbnailPath);
-      if (thumbnailInfo?.Length > ModInfo.MOD_THUMBNAIL_SIZE_LIMIT)
-        return (false, $"Mod thumbnail size is larger than {ModInfo.MOD_THUMBNAIL_SIZE_LIMIT / 1024} kilobytes, current size is {thumbnailInfo?.Length / 1024} kilobytes.");
-
-      return (true, string.Empty);
-    }
-
-    public void OpenLocalFolder()
-    {
-      try
-      {
-        Process.Start("explorer.exe", $"\"{this.Wrapped.DirectoryPath}\"");
-      }
-      catch (Exception ex)
-      {
-        Logger.Global.LogException(ex);
-      }
-    }
-
-    public void OpenWorkshopPage()
-    {
-      try
-      {
-        Application.OpenURL($"steam://url/CommunityFilePage/{WorkshopHandle}");
-      }
-      catch (Exception ex)
-      {
-        Logger.Global.LogException(ex);
-      }
-    }
-  }
-
-  public enum ModSource
-  {
-    Core,
-    Local,
-    Workshop
   }
 }

@@ -1,5 +1,6 @@
 ﻿using BepInEx;
 using ImGuiNET;
+using StationeersLaunchPad.Sources;
 using System;
 using UnityEngine;
 
@@ -188,11 +189,11 @@ namespace StationeersLaunchPad
 
               foreach (var mod in modList.AllMods)
               {
-                if (mod.Source is ModSource.Core)
+                if (mod.Source is ModSourceType.Core)
                   continue;
                 var flag = mod.Enabled ? hasEnabled : hasDisabled;
                 allState |= flag;
-                if (mod.Source is ModSource.Local)
+                if (mod.Source is ModSourceType.Local)
                   localState |= flag;
                 else
                   workshopState |= flag;
@@ -234,9 +235,9 @@ namespace StationeersLaunchPad
               {
                 foreach (var mod in modList.AllMods)
                 {
-                  if (mod.Source is ModSource.Core)
+                  if (mod.Source is ModSourceType.Core)
                     continue;
-                  var tgtFlags = mod.Source is ModSource.Workshop ? tgtWorkshop : tgtLocal;
+                  var tgtFlags = mod.Source is ModSourceType.Workshop ? tgtWorkshop : tgtLocal;
                   if (tgtFlags == hasBoth)
                     continue;
                   var tgt = (tgtFlags & hasEnabled) != 0;
@@ -337,7 +338,7 @@ namespace StationeersLaunchPad
         if (draggingMod != null && !dragged)
         {
           selectedInfo = draggingMod;
-          if (selectedInfo != null && selectedInfo.Source == ModSource.Core)
+          if (selectedInfo != null && selectedInfo.Source == ModSourceType.Core)
             selectedInfo = null;
           openInfo = selectedInfo != null;
         }
@@ -384,7 +385,7 @@ namespace StationeersLaunchPad
           ImGuiHelper.DrawSameLine(() => ImGuiHelper.Text($"{mod.Source}"));
 
           ImGui.TableNextColumn();
-          ImGuiHelper.Text($"{mod.DisplayName}");
+          ImGuiHelper.Text($"{mod.Name}");
 
           if (draggingMod != null)
             if (mod.SortBefore(draggingMod))
@@ -439,7 +440,7 @@ namespace StationeersLaunchPad
           ImGuiHelper.DrawSameLine(() => ImGuiHelper.Text($"{info.Source}"));
 
           ImGui.TableNextColumn();
-          ImGuiHelper.Text(info.DisplayName);
+          ImGuiHelper.Text(info.Name);
 
           ImGui.PopID();
           idx++;
@@ -452,7 +453,7 @@ namespace StationeersLaunchPad
     {
       var mod = info?.Loaded;
 
-      if (info.Source == ModSource.Core)
+      if (info.Source == ModSourceType.Core)
       {
         ImGuiHelper.Text("C");
         ImGuiHelper.ItemTooltip("This mod contains Stationeers' assemblies and data.");
@@ -511,16 +512,16 @@ namespace StationeersLaunchPad
 
       var about = selectedInfo.About;
 
-      ImGuiHelper.Text(selectedInfo.DisplayName);
+      ImGuiHelper.Text(selectedInfo.Name);
 
       if (ImGui.Button("Open Local Folder"))
-        selectedInfo.OpenLocalFolder();
+        ExplorerUtil.Open(selectedInfo.DirectoryPath);
 
       if (selectedInfo.WorkshopHandle > 1)
       {
         ImGui.SameLine();
         if (ImGui.Button("Open Workshop Page"))
-          selectedInfo.OpenWorkshopPage();
+          Steam.OpenWorkshopPage(selectedInfo.WorkshopHandle);
       }
 
       ImGui.Spacing();
@@ -528,12 +529,12 @@ namespace StationeersLaunchPad
       ImGui.SameLine();
       ImGuiHelper.Text(selectedInfo.Source.ToString());
 
-      if (!string.IsNullOrEmpty(selectedInfo.Path))
+      if (!string.IsNullOrEmpty(selectedInfo.DirectoryPath))
       {
         ImGui.Spacing();
         ImGuiHelper.Text("Path:");
         ImGui.SameLine();
-        ImGuiHelper.Text(selectedInfo.Path);
+        ImGuiHelper.Text(selectedInfo.DirectoryPath);
       }
 
       if (about == null)

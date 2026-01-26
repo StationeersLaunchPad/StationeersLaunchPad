@@ -1,4 +1,5 @@
 ﻿using Cysharp.Threading.Tasks;
+using StationeersLaunchPad.Sources;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -37,7 +38,7 @@ namespace StationeersLaunchPad
       this.modList = modList;
     }
 
-    protected IEnumerable<ModInfo> Mods => this.modList.EnabledMods.Where(mod => mod.Source != ModSource.Core);
+    protected IEnumerable<ModInfo> Mods => this.modList.EnabledMods.Where(mod => mod.Source != ModSourceType.Core);
 
     private bool failed = false;
 

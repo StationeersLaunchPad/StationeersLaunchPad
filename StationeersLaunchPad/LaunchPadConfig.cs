@@ -3,6 +3,7 @@ using Assets.Scripts.Serialization;
 using Assets.Scripts.Util;
 using BepInEx.Configuration;
 using Cysharp.Threading.Tasks;
+using StationeersLaunchPad.Sources;
 using Steamworks;
 using System;
 using System.Collections;
@@ -146,20 +147,11 @@ namespace StationeersLaunchPad
 
         LoadState = LoadState.Searching;
 
-        Logger.Global.LogInfo("Listing Local Mods");
-        await modList.LoadLocalMods();
-
-        if (!SteamDisabled)
-        {
-          Logger.Global.LogInfo("Listing Workshop Mods");
-          await modList.LoadWorkshopMods();
-        }
+        Logger.Global.LogInfo("Listing Mods");
+        modList = new(await ModSource.ListAll(!SteamDisabled));
 
         Logger.Global.LogInfo("Loading Mod Order");
         await modList.LoadConfig();
-
-        Logger.Global.LogInfo("Loading Details");
-        modList.LoadDetails();
 
         if (!modList.CheckDependencies() && !GameManager.IsBatchMode)
           AutoLoad = false;
@@ -213,7 +205,7 @@ namespace StationeersLaunchPad
     }
 
     public static ModInfo MatchMod(ModData modData) =>
-      modData != null ? modList.AllMods.First(mod => mod.Path == modData.DirectoryPath) : null;
+      modData != null ? modList.AllMods.First(mod => mod.DirectoryPath == modData.DirectoryPath) : null;
 
     private static void HandleChange(LaunchPadLoaderGUI.ChangeFlags changed)
     {
@@ -259,7 +251,6 @@ namespace StationeersLaunchPad
           SteamDisabled = true;
         }
       }
-      modList.AddCore();
     }
 
     private async static UniTask LoadMods()
@@ -372,14 +363,14 @@ namespace StationeersLaunchPad
           var config = new ModConfig();
           foreach (var mod in modList.EnabledMods)
           {
-            if (mod.Source == ModSource.Core)
+            if (mod.Source == ModSourceType.Core)
             {
               config.Mods.Add(new CoreModData());
               continue;
             }
 
-            var dirName = $"{mod.Source}_{mod.Wrapped.DirectoryName}";
-            var root = mod.Wrapped.DirectoryPath;
+            var dirName = $"{mod.Source}_{mod.DirectoryName}";
+            var root = mod.DirectoryPath;
             foreach (var file in Directory.GetFiles(root, "*", SearchOption.AllDirectories))
             {
               var entryPath = Path.Combine("mods", dirName, file.Substring(root.Length + 1)).Replace('\\', '/');
@@ -395,7 +386,7 @@ namespace StationeersLaunchPad
             serializer.Serialize(stream, config);
           }
         }
-        Process.Start("explorer", $"/select,\"{pkgpath}\"");
+        ExplorerUtil.OpenDirectorySelect(pkgpath);
       }
       catch (Exception ex)
       {

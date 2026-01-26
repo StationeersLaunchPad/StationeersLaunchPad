@@ -5,6 +5,7 @@ using Assets.Scripts.Networking.Transports;
 using Assets.Scripts.Serialization;
 using Assets.Scripts.UI;
 using HarmonyLib;
+using StationeersLaunchPad.Sources;
 using Steamworks;
 using System;
 using System.Collections.Generic;
@@ -247,10 +248,10 @@ namespace StationeersLaunchPad
       if (modInfo == null)
         return;
 
-      var modValid = modInfo.IsWorkshopValid();
-      if (!modValid.Item1 && modValid.Item2 != string.Empty)
+      var (valid, error) = Steam.ValidateForWorkshop(modInfo);
+      if (!valid && !string.IsNullOrEmpty(error))
       {
-        AlertPanel.Instance.ShowAlert(modValid.Item2, AlertState.Alert);
+        AlertPanel.Instance.ShowAlert(error, AlertState.Alert);
         __instance.SelectedModButtonRight?.SetActive(false);
         return;
       }
@@ -260,9 +261,9 @@ namespace StationeersLaunchPad
         return;
 
       var publishButton = __instance.SelectedModButtonRight?.GetComponentInChildren<TextMeshProUGUI>();
-      if (modInfo.Source == ModSource.Local && modAbout.WorkshopHandle == 0)
+      if (modInfo.Source == ModSourceType.Local && modAbout.WorkshopHandle == 0)
         publishButton.SetText("Publish");
-      else if (modInfo.Source == ModSource.Workshop)
+      else if (modInfo.Source == ModSourceType.Workshop)
         publishButton.SetText("Unsubscribe");
       else
         publishButton.SetText("Update");
