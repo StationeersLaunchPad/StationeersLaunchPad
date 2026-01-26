@@ -4,6 +4,7 @@ using Assets.Scripts.Util;
 using BepInEx.Configuration;
 using Cysharp.Threading.Tasks;
 using StationeersLaunchPad.Sources;
+using StationeersLaunchPad.UI;
 using Steamworks;
 using System;
 using System.Collections;
@@ -192,27 +193,27 @@ namespace StationeersLaunchPad
     {
       if (AutoLoad)
       {
-        if (LaunchPadLoaderGUI.DrawAutoLoad(LoadState, SecondsUntilAutoLoad))
+        if (LoaderPanel.DrawAutoLoad(LoadState, SecondsUntilAutoLoad))
           AutoLoad = false;
       }
       else
       {
-        var changed = LaunchPadLoaderGUI.DrawManualLoad(LoadState, modList, AutoSort);
+        var changed = LoaderPanel.DrawManualLoad(LoadState, modList, AutoSort);
         HandleChange(changed);
       }
 
-      LaunchPadAlertGUI.Draw();
+      AlertPopup.Draw();
     }
 
     public static ModInfo MatchMod(ModData modData) =>
       modData != null ? modList.AllMods.First(mod => mod.DirectoryPath == modData.DirectoryPath) : null;
 
-    private static void HandleChange(LaunchPadLoaderGUI.ChangeFlags changed)
+    private static void HandleChange(LoaderPanel.ChangeFlags changed)
     {
-      if (changed == LaunchPadLoaderGUI.ChangeFlags.None)
+      if (changed == LoaderPanel.ChangeFlags.None)
         return;
-      var sortChanged = changed.HasFlag(LaunchPadLoaderGUI.ChangeFlags.AutoSort);
-      var modsChanged = changed.HasFlag(LaunchPadLoaderGUI.ChangeFlags.Mods);
+      var sortChanged = changed.HasFlag(LoaderPanel.ChangeFlags.AutoSort);
+      var modsChanged = changed.HasFlag(LoaderPanel.ChangeFlags.Mods);
       if (sortChanged)
         AutoSort = Configs.AutoSortOnStart.Value;
       if (sortChanged || modsChanged)
@@ -223,7 +224,7 @@ namespace StationeersLaunchPad
           modList.SortByDeps();
         modList.SaveConfig();
       }
-      var next = changed.HasFlag(LaunchPadLoaderGUI.ChangeFlags.NextStep);
+      var next = changed.HasFlag(LoaderPanel.ChangeFlags.NextStep);
       if (next && LoadState == LoadState.Configuring)
         LoadState = LoadState.Loading;
       else if (next && (LoadState == LoadState.Loaded || LoadState == LoadState.Failed))
@@ -331,11 +332,11 @@ namespace StationeersLaunchPad
         AutoLoad = false;
         return true;
       }
-      return LaunchPadAlertGUI.Show(
+      return AlertPopup.Show(
         "Restart Recommended",
         "StationeersLaunchPad has been updated, it is recommended to restart the game.",
-        LaunchPadAlertGUI.DefaultSize,
-        LaunchPadAlertGUI.DefaultPosition,
+        AlertPopup.DefaultSize,
+        AlertPopup.DefaultPosition,
         ("Restart Game", restartGame),
         ("Continue Loading", () => true),
         ("Close", stopLoad)
@@ -350,7 +351,7 @@ namespace StationeersLaunchPad
 
       EssentialPatches.GameStarted = true;
 
-      LaunchPadAlertGUI.Close();
+      AlertPopup.Close();
     }
 
     public static void ExportModPackage()

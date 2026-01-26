@@ -1,5 +1,6 @@
 ﻿using Assets.Scripts;
 using Cysharp.Threading.Tasks;
+using StationeersLaunchPad.UI;
 using System;
 using System.IO;
 using System.IO.Compression;
@@ -26,7 +27,7 @@ namespace StationeersLaunchPad
         foreach (var file in installDir.EnumerateFiles("*.dll.bak"))
         {
           // if the matching dll doesn't exist, this probably wasn't from us?
-          if (!File.Exists(file.FullName.Substring(0, file.FullName.Length - 4)))
+          if (!File.Exists(file.FullName[..^4]))
             continue;
           Logger.Global.LogDebug($"Removing update backup file {file.FullName}");
           file.Delete();
@@ -144,9 +145,9 @@ namespace StationeersLaunchPad
       }
 
       var description = release.FormatDescription();
-      await LaunchPadAlertGUI.Show("Update Available", $"StationeersLaunchPad {release.TagName} is available, would you like to automatically download and update?\n\n{description}",
+      await AlertPopup.Show("Update Available", $"StationeersLaunchPad {release.TagName} is available, would you like to automatically download and update?\n\n{description}",
         new Vector2(800, 400),
-        LaunchPadAlertGUI.DefaultPosition,
+        AlertPopup.DefaultPosition,
         ("Yes", acceptUpdate),
         ("View release info", openGithub),
         ("No", rejectUpdate)

@@ -1,14 +1,14 @@
 ﻿using ImGuiNET;
 
-namespace StationeersLaunchPad
+namespace StationeersLaunchPad.UI
 {
-  public static class LaunchPadConsoleGUI
+  public static class LogPanel
   {
     private static ulong lastLineCount = 0;
     private static Logger lastLogger = null;
     public static void DrawConsole(Logger logger)
     {
-      LaunchPadConfigGUI.DrawEnumEntry(Configs.LogSeverities, Configs.LogSeverities.Value);
+      ConfigPanel.DrawEnumEntry(Configs.LogSeverities, Configs.LogSeverities.Value);
       ImGui.BeginChild("##logs", ImGuiWindowFlags.HorizontalScrollbar);
 
       var shouldScroll = false;

@@ -6,6 +6,7 @@ using Assets.Scripts.Serialization;
 using Assets.Scripts.UI;
 using HarmonyLib;
 using StationeersLaunchPad.Sources;
+using StationeersLaunchPad.UI;
 using Steamworks;
 using System;
 using System.Collections.Generic;
@@ -310,7 +311,7 @@ namespace StationeersLaunchPad
       if (modData == null)
         return;
 
-      LaunchPadConfigGUI.DrawWorkshopConfig(LaunchPadConfig.MatchMod(modData));
+      ConfigPanel.DrawWorkshopConfig(LaunchPadConfig.MatchMod(modData));
     }
   }
 

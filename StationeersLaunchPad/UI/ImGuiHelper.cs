@@ -4,7 +4,7 @@ using System.Runtime.CompilerServices;
 using UI.ImGuiUi;
 using UnityEngine;
 
-namespace StationeersLaunchPad
+namespace StationeersLaunchPad.UI
 {
   public static class ImGuiHelper
   {

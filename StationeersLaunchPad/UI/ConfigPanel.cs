@@ -6,9 +6,9 @@ using System.Reflection;
 using UI.ImGuiUi;
 using UnityEngine;
 
-namespace StationeersLaunchPad
+namespace StationeersLaunchPad.UI
 {
-  internal class LaunchPadConfigGUI
+  internal class ConfigPanel
   {
     public static void DrawWorkshopConfig(ModInfo modInfo)
     {
