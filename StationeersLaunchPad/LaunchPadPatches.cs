@@ -128,7 +128,7 @@ namespace StationeersLaunchPad
     [HarmonyPatch(typeof(SplashBehaviour), nameof(SplashBehaviour.Draw)), HarmonyPrefix]
     static bool SplashDraw()
     {
-      if (!GameManager.IsBatchMode && !GameStarted)
+      if (!Platform.IsServer && !GameStarted)
         LaunchPadConfig.Draw();
 
       return GameStarted;
@@ -340,7 +340,7 @@ namespace StationeersLaunchPad
 
       if (Path.IsPathRooted(SavePath))
         __result = SavePath;
-      else if (GameManager.IsBatchMode)
+      else if (Platform.IsServer)
         __result = Path.Combine(StationSaveUtils.ExeDirectory.FullName, SavePath);
       else
         __result = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Personal), "My Games", SavePath);

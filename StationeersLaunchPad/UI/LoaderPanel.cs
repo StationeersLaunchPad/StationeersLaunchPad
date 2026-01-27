@@ -18,7 +18,7 @@ namespace StationeersLaunchPad.UI
       NextStep = 1 << 2,
     }
 
-    private static LoadState lastState;
+    private static LoadStage lastState;
     private static ModInfo selectedInfo = null;
     private static bool openLogs = false;
     private static bool openInfo = false;
@@ -26,7 +26,7 @@ namespace StationeersLaunchPad.UI
     private static bool dragged = false;
 
     // returns true if the user clicked to stop autoloading
-    public static bool DrawAutoLoad(LoadState loadState, double autoTime)
+    public static bool DrawAutoLoad(LoadStage loadState, StageWait wait)
     {
       var stopAuto = false;
       ImGuiHelper.Draw(() =>
@@ -36,14 +36,14 @@ namespace StationeersLaunchPad.UI
         ImGuiHelper.Text($"StationeersLaunchPad {LaunchPadInfo.VERSION}");
         ImGuiHelper.Text(loadState switch
         {
-          LoadState.Updating => "Checking for Update",
-          LoadState.Initializing => "Initializing",
-          LoadState.Searching => "Finding Mods",
-          LoadState.Configuring => $"Loading Mods in {autoTime:0.0}s",
-          LoadState.Loading => "Loading Mods",
-          LoadState.Loaded => $"Starting game in {autoTime:0.0}s",
-          LoadState.Running => "Game Running",
-          LoadState.Failed => "Loading Failed",
+          LoadStage.Updating => "Checking for Update",
+          LoadStage.Initializing => "Initializing",
+          LoadStage.Searching => "Finding Mods",
+          LoadStage.Configuring => $"Loading Mods in {wait.SecondsRemaining:0.0}s",
+          LoadStage.Loading => "Loading Mods",
+          LoadStage.Loaded => $"Starting game in {wait.SecondsRemaining:0.0}s",
+          LoadStage.Running => "Game Running",
+          LoadStage.Failed => "Loading Failed",
           _ => throw new ArgumentOutOfRangeException(),
         });
 
@@ -67,12 +67,12 @@ namespace StationeersLaunchPad.UI
       return stopAuto;
     }
 
-    public static ChangeFlags DrawManualLoad(LoadState loadState, ModList modList, bool autoSort)
+    public static ChangeFlags DrawManualLoad(LoadStage loadState, ModList modList, bool autoSort)
     {
       var changed = ChangeFlags.None;
 
       // when we move into the loading step, clear the selected mod so all the logs are visible
-      if (lastState < LoadState.Loaded && loadState >= LoadState.Loading)
+      if (lastState < LoadStage.Loaded && loadState >= LoadStage.Loading)
         selectedInfo = null;
       lastState = loadState;
 
@@ -85,7 +85,7 @@ namespace StationeersLaunchPad.UI
         string nextStepText = null;
 
         void DrawBreadcrumbSep() => ImGuiHelper.DrawSameLine(() => ImGuiHelper.TextDisabled(">"), true);
-        void DrawBreadcrumb(string text, LoadState forState, string tooltip, string setNext = null)
+        void DrawBreadcrumb(string text, LoadStage forState, string tooltip, string setNext = null)
         {
           var match = forState == loadState;
           ImGuiHelper.TextDisabled(text, !match);
@@ -99,27 +99,27 @@ namespace StationeersLaunchPad.UI
 
         if (Configs.CheckForUpdate.Value)
         {
-          DrawBreadcrumb("Update", LoadState.Updating, "Checking for updates to StationeersLaunchPad");
+          DrawBreadcrumb("Update", LoadStage.Updating, "Checking for updates to StationeersLaunchPad");
           DrawBreadcrumbSep();
         }
 
-        DrawBreadcrumb("Initalize", LoadState.Initializing, "Initializing core components");
+        DrawBreadcrumb("Initalize", LoadStage.Initializing, "Initializing core components");
         DrawBreadcrumbSep();
 
-        DrawBreadcrumb("Locate Mods", LoadState.Searching, "Locating installed local and workshop mods");
+        DrawBreadcrumb("Locate Mods", LoadStage.Searching, "Locating installed local and workshop mods");
         DrawBreadcrumbSep();
 
-        DrawBreadcrumb("Select Mods", LoadState.Configuring, "Ready to load mods", "Load Mods");
+        DrawBreadcrumb("Select Mods", LoadStage.Configuring, "Ready to load mods", "Load Mods");
         DrawBreadcrumbSep();
 
-        DrawBreadcrumb("Loading Mods", LoadState.Loading, "Loading selected mods");
+        DrawBreadcrumb("Loading Mods", LoadStage.Loading, "Loading selected mods");
         DrawBreadcrumbSep();
 
-        if (loadState == LoadState.Failed)
-          DrawBreadcrumb("Loading Failed", LoadState.Failed,
+        if (loadState == LoadStage.Failed)
+          DrawBreadcrumb("Loading Failed", LoadStage.Failed,
             "Mods failed to load. Game may not function properly", "Start Game");
         else
-          DrawBreadcrumb("Mods Loaded", LoadState.Loaded, "Ready to start game", "Start Game");
+          DrawBreadcrumb("Mods Loaded", LoadStage.Loaded, "Ready to start game", "Start Game");
 
         {
           var style = ImGui.GetStyle();
@@ -159,12 +159,12 @@ namespace StationeersLaunchPad.UI
 
         switch (loadState)
         {
-          case LoadState.Initializing:
-          case LoadState.Searching:
-          case LoadState.Updating:
-          case LoadState.Configuring:
+          case LoadStage.Initializing:
+          case LoadStage.Searching:
+          case LoadStage.Updating:
+          case LoadStage.Configuring:
           {
-            if (loadState == LoadState.Initializing)
+            if (loadState == LoadStage.Initializing)
             {
               ImGuiHelper.Text("");
               ImGui.Spacing();
@@ -254,21 +254,21 @@ namespace StationeersLaunchPad.UI
               ImGui.Separator();
             }
 
-            if (DrawConfigTable(modList, loadState == LoadState.Configuring, autoSort))
+            if (DrawConfigTable(modList, loadState == LoadStage.Configuring, autoSort))
               changed |= ChangeFlags.Mods;
             break;
           }
 
-          case LoadState.Loading:
-          case LoadState.Loaded:
+          case LoadStage.Loading:
+          case LoadStage.Loaded:
           {
             DrawLoadTable(modList);
             break;
           }
 
           default:
-          case LoadState.Running:
-          case LoadState.Failed:
+          case LoadStage.Running:
+          case LoadStage.Failed:
             break;
         }
         ImGui.EndChild();
@@ -293,11 +293,11 @@ namespace StationeersLaunchPad.UI
             ImGui.EndChild();
             ImGui.EndTabItem();
           }
-          else if (!openInfo && loadState <= LoadState.Loading)
+          else if (!openInfo && loadState <= LoadStage.Loading)
             selectedInfo = null;
           openInfo = false;
 
-          var disabled = loadState <= LoadState.Loading;
+          var disabled = loadState <= LoadStage.Loading;
           ImGui.BeginDisabled(disabled);
           open = ImGui.BeginTabItem("Mod Configuration");
           ImGui.EndDisabled();
@@ -316,7 +316,7 @@ namespace StationeersLaunchPad.UI
             DrawExportButton();
             var configChanged = ConfigPanel.DrawConfigFile(Configs.Sorted, category => category != "Internal");
             // If we changed launchpad config and haven't loaded mods yet, mark mods changed to apply disable/sort behaviour
-            if (loadState <= LoadState.Configuring && configChanged)
+            if (loadState <= LoadStage.Configuring && configChanged)
               changed |= ChangeFlags.Mods;
 
             ImGui.EndTabItem();
@@ -516,7 +516,7 @@ namespace StationeersLaunchPad.UI
       ImGuiHelper.Text(selectedInfo.Name);
 
       if (ImGui.Button("Open Local Folder"))
-        ExplorerUtil.Open(selectedInfo.DirectoryPath);
+        ProcessUtil.OpenExplorerDir(selectedInfo.DirectoryPath);
 
       if (selectedInfo.WorkshopHandle > 1)
       {

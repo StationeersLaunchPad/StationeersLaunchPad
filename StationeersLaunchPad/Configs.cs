@@ -1,5 +1,4 @@
 
-using Assets.Scripts;
 using BepInEx.Configuration;
 using StationeersLaunchPad.Loading;
 using System.Collections.Generic;
@@ -11,6 +10,14 @@ namespace StationeersLaunchPad
   public enum DisableDuplicateMode
   {
     None, KeepLocal, KeepWorkshop
+  }
+
+  // config values that have different defaults depending on platform
+  public struct ConfigDefaults
+  {
+    public bool CheckForUpdate;
+    public bool AutoUpdateOnStart;
+    public bool LinuxPathPatch;
   }
 
   public static class Configs
@@ -40,6 +47,7 @@ namespace StationeersLaunchPad
 
     public static void Initialize(ConfigFile config)
     {
+      var platformDefaults = Platform.ConfigDefaults;
       AutoLoadOnStart = config.Bind(
         new ConfigDefinition("Startup", "AutoLoadOnStart"),
         true,
@@ -49,14 +57,14 @@ namespace StationeersLaunchPad
        );
       CheckForUpdate = config.Bind(
         new ConfigDefinition("Startup", "CheckForUpdate"),
-        !GameManager.IsBatchMode, // Default to false on DS
+        platformDefaults.CheckForUpdate,
         new ConfigDescription(
           "Automatically check for mod loader updates on startup."
         )
       );
       AutoUpdateOnStart = config.Bind(
         new ConfigDefinition("Startup", "AutoUpdateOnStart"),
-        !GameManager.IsBatchMode, // Default to false on DS
+        platformDefaults.AutoUpdateOnStart,
         new ConfigDescription(
           "Automatically update mod loader on startup. Ignored if CheckForUpdate is not also enabled."
         )
@@ -139,16 +147,9 @@ namespace StationeersLaunchPad
           "This setting is automatically managed and should probably not be manually changed. Remove update backup files on start."
         )
       );
-      OneTimeBoosterInstall = config.Bind(
-        new ConfigDefinition("Internal", "OneTimeBoosterInstall"),
-        true,
-        new ConfigDescription(
-          "This setting is automatically managed and should probably not be manually changed. Perform one-time download of LaunchPadBooster to update from version that didn't include it."
-        )
-      );
       LinuxPathPatch = config.Bind(
         new ConfigDefinition("Internal", "LinuxPathPatch"),
-        Path.DirectorySeparatorChar != '\\',
+        platformDefaults.LinuxPathPatch,
         new ConfigDescription(
           "Patch xml mod data loading to properly handle linux path separators"
         )

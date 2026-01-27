@@ -1,7 +1,6 @@
 using Assets.Scripts;
 using Assets.Scripts.Serialization;
 using Assets.Scripts.Util;
-using BepInEx.Configuration;
 using Cysharp.Threading.Tasks;
 using StationeersLaunchPad.Loading;
 using StationeersLaunchPad.Metadata;
@@ -17,11 +16,10 @@ using System.IO.Compression;
 using System.Linq;
 using System.Reflection;
 using System.Xml.Serialization;
-using UnityEngine;
 
 namespace StationeersLaunchPad
 {
-  public enum LoadState
+  public enum LoadStage
   {
     Updating,
     Initializing,
@@ -33,84 +31,97 @@ namespace StationeersLaunchPad
     Running,
   }
 
+  public struct LoadState
+  {
+    public bool AutoLoad;
+    public bool SteamDisabled;
+  }
+
+  public class StageWait
+  {
+    private readonly Stopwatch stopwatch = Stopwatch.StartNew();
+    public readonly double Seconds;
+    public readonly bool Auto;
+    private bool skipped = false;
+
+    public StageWait(double seconds, bool auto) => (Seconds, Auto) = (seconds, auto);
+
+    public double SecondsRemaining =>
+      Math.Clamp(stopwatch.Elapsed.TotalSeconds - Seconds, 0, Seconds);
+    public bool Done => skipped || (Auto && SecondsRemaining <= 0);
+
+    public void Skip() => skipped = true;
+  }
+
   public static class LaunchPadConfig
   {
     public static SplashBehaviour SplashBehaviour;
 
     private static ModList modList = ModList.NewEmpty();
 
-    private static LoadState LoadState = LoadState.Initializing;
+    private static LoadStage Stage = LoadStage.Initializing;
 
     private static bool AutoSort;
-    private static bool AutoLoad;
+    private static bool AutoLoad = true;
     private static bool SteamDisabled;
 
-    private static Stopwatch AutoStopwatch = new();
+    private static StageWait CurWait = new(0, false);
 
-    private static double SecondsUntilAutoLoad => Configs.AutoLoadWaitTime.Value - AutoStopwatch.Elapsed.TotalSeconds;
-    private static bool AutoLoadReady => AutoLoad && SecondsUntilAutoLoad <= 0;
+    public static void StopAutoLoad() => AutoLoad = false;
 
-    public static async void Run(ConfigFile config, bool stopAutoLoad)
+    public static void Draw()
+    {
+      if (AutoLoad)
+      {
+        if (LoaderPanel.DrawAutoLoad(Stage, CurWait))
+          StopAutoLoad();
+      }
+      else
+      {
+        var changed = LoaderPanel.DrawManualLoad(Stage, modList, AutoSort);
+        HandleChange(changed);
+      }
+
+      AlertPopup.Draw();
+    }
+
+    public static async void Run()
     {
       // we need to wait a frame so all the RuntimeInitializeOnLoad tasks are complete, otherwise GameManager.IsBatchMode won't be set yet
       await UniTask.Yield();
 
-      Configs.Initialize(config);
-      if (GameManager.IsBatchMode)
-      {
-        AutoLoad = true;
-        SteamDisabled = true;
-      }
-      else
-      {
-        AutoLoad = !stopAutoLoad && Configs.AutoLoadOnStart.Value;
-        SteamDisabled = Configs.DisableSteamOnStart.Value;
-      }
+      var initState = Platform.InitLoadState;
+      SteamDisabled = initState.SteamDisabled;
+      AutoLoad &= initState.AutoLoad;
       AutoSort = Configs.AutoSortOnStart.Value;
 
       // The save path on startup was used to load the mod list, so we can't change it at runtime.
       CustomSavePathPatches.SavePath = Configs.SavePathOnStart.Value;
+      Settings.CurrentData.SavePath = LaunchPadPaths.SavePath;
 
-      if (Configs.LinuxPathPatch.Value)
-        LaunchPadPatches.RunLinuxPathPatch();
-
-      await Load();
-
-      if (!AutoLoad && GameManager.IsBatchMode)
-      {
-        Logger.Global.LogError("An error occurred during initialization. Exiting");
-        Application.Quit();
-      }
-
-      if (!GameManager.IsBatchMode)
-      {
-        AutoStopwatch.Restart();
-        await UniTaskX.WaitWhile(() => LoadState == LoadState.Configuring && !AutoLoadReady);
-      }
-
-      if (LoadState == LoadState.Configuring)
-        LoadState = LoadState.Loading;
-
-      if (LoadState == LoadState.Loading)
-        await LoadMods();
-
-      if (!AutoLoad && GameManager.IsBatchMode)
-      {
-        Logger.Global.LogError("An error occurred during mod loading. Exiting");
-        Application.Quit();
-      }
-
-      if (!GameManager.IsBatchMode)
-      {
-        AutoStopwatch.Restart();
-        await UniTaskX.WaitWhile(() => LoadState < LoadState.Running && !AutoLoadReady);
-      }
+      await StageInitializing();
+      await StageUpdating();
+      await StageSearching();
+      await StageConfiguring();
+      await StageLoading();
+      await StageFinal();
 
       StartGame();
     }
 
-    private static async UniTask Load()
+    private static void OnStartupError(Exception ex)
     {
+      Logger.Global.LogError("Error occurred during initialization. Mods will not be loaded.");
+      Logger.Global.LogException(ex);
+
+      modList = ModList.NewEmpty();
+      Stage = LoadStage.Failed;
+      StopAutoLoad();
+    }
+
+    private static async UniTask StageInitializing()
+    {
+      Stage = LoadStage.Initializing;
       try
       {
         if (Configs.RunPostUpdateCleanup)
@@ -118,39 +129,72 @@ namespace StationeersLaunchPad
           LaunchPadUpdater.RunPostUpdateCleanup();
           Configs.PostUpdateCleanup.Value = false;
         }
+      }
+      catch (Exception ex)
+      {
+        OnStartupError(ex);
+        return;
+      }
 
-        if (Configs.RunOneTimeBoosterInstall)
-        {
-          if (!await LaunchPadUpdater.RunOneTimeBoosterInstall())
-            AutoLoad = false;
-          Configs.OneTimeBoosterInstall.Value = false;
-        }
+      if (SteamDisabled)
+        return;
 
-        if (Configs.CheckForUpdate.Value)
-        {
-          LoadState = LoadState.Updating;
-          if (await RunUpdate())
-          {
-            if (GameManager.IsBatchMode)
-            {
-              Logger.Global.LogWarning("LaunchPad has updated. Exiting");
-              Application.Quit();
-            }
+      try
+      {
+        var transport = SteamPatches.GetMetaServerTransport();
+        transport.InitClient();
+        SteamDisabled = !SteamClient.IsValid;
+      }
+      catch (Exception ex)
+      {
+        Logger.Global.LogError($"failed to initialize steam: {ex.Message}");
+        Logger.Global.LogError("workshop mods will not be loaded");
+        Logger.Global.LogError("turn on DisableSteam in LaunchPad Configuration to hide this message");
+        StopAutoLoad();
+        SteamDisabled = true;
+      }
+    }
 
-            AutoLoad = false;
-            LoadState = LoadState.Updating;
+    private static async UniTask StageUpdating()
+    {
+      if (Stage == LoadStage.Failed || !Configs.CheckForUpdate.Value)
+        return;
 
-            await PostUpdateRestartDialog();
-          }
-        }
+      Stage = LoadStage.Updating;
+      try
+      {
+        Logger.Global.LogInfo("Checking Version");
+        var release = await LaunchPadUpdater.GetUpdateRelease();
+        if (release == null)
+          return;
 
-        LoadState = LoadState.Initializing;
+        if (!Configs.AutoUpdateOnStart.Value && !await LaunchPadUpdater.CheckShouldUpdate(release))
+          return;
 
-        Logger.Global.LogInfo("Initializing...");
-        await UniTask.RunOnThreadPool(() => Initialize());
+        if (!await LaunchPadUpdater.UpdateToRelease(release))
+          return;
 
-        LoadState = LoadState.Searching;
+        Logger.Global.LogError($"StationeersLaunchPad updated to {release.TagName}, please restart your game!");
+        Configs.PostUpdateCleanup.Value = true;
+      }
+      catch (Exception ex)
+      {
+        Logger.Global.LogError("An error occurred during update.");
+        Logger.Global.LogException(ex);
+        StopAutoLoad();
+        return;
+      }
 
+      if (!await Platform.ContinueAfterUpdate())
+        StopAutoLoad();
+    }
+
+    private static async UniTask StageSearching()
+    {
+      if (Stage == LoadStage.Failed) return;
+      Stage = LoadStage.Searching;
+      try
+      {
         Logger.Global.LogInfo("Listing Mods");
         modList = ModList.FromDefs(await ModSource.ListAll(!SteamDisabled));
 
@@ -158,55 +202,60 @@ namespace StationeersLaunchPad
         modList.ApplyConfig(ModConfigUtil.LoadConfig());
         ModConfigUtil.SaveConfig(modList.ToModConfig());
 
-        if (!modList.CheckDependencies() && !GameManager.IsBatchMode)
-          AutoLoad = false;
+        var depNotice = !modList.CheckDependencies();
+        depNotice = modList.DisableDuplicates(Configs.DisableDuplicates.Value) || depNotice;
+        if (AutoSort)
+          depNotice = !modList.SortByDeps() || depNotice;
 
-        if (modList.DisableDuplicates(Configs.DisableDuplicates.Value) && !GameManager.IsBatchMode)
-          AutoLoad = false;
-
-        if (AutoSort && !modList.SortByDeps() && !GameManager.IsBatchMode)
-        {
-          AutoSort = false;
-          AutoLoad = false;
-        }
+        if (depNotice && Platform.PauseOnDepNotice)
+          StopAutoLoad();
 
         Logger.Global.LogInfo("Mod Config Initialized");
-
-        LoadState = LoadState.Configuring;
       }
       catch (Exception ex)
       {
-        if (!GameManager.IsBatchMode)
-        {
-          Logger.Global.LogError("Error occurred during initialization. Mods will not be loaded.");
-          Logger.Global.LogException(ex);
-
-          modList = ModList.NewEmpty();
-          LoadState = LoadState.Failed;
-          AutoLoad = false;
-        }
-        else
-        {
-          Logger.Global.LogError("Error occurred during initialization.");
-          Logger.Global.LogException(ex);
-        }
+        OnStartupError(ex);
       }
     }
 
-    public static void Draw()
+    private static async UniTask StageConfiguring()
     {
-      if (AutoLoad)
-      {
-        if (LoaderPanel.DrawAutoLoad(LoadState, SecondsUntilAutoLoad))
-          AutoLoad = false;
-      }
-      else
-      {
-        var changed = LoaderPanel.DrawManualLoad(LoadState, modList, AutoSort);
-        HandleChange(changed);
-      }
+      if (Stage == LoadStage.Failed) return;
+      Stage = LoadStage.Configuring;
 
-      AlertPopup.Draw();
+      CurWait = new(Configs.AutoLoadWaitTime.Value, AutoLoad);
+      await Platform.Wait(CurWait);
+    }
+
+    private static async UniTask StageLoading()
+    {
+      if (Stage == LoadStage.Failed) return;
+      Stage = LoadStage.Loading;
+
+      var stopwatch = Stopwatch.StartNew();
+
+      var (strategyType, strategyMode) = Configs.LoadStrategy;
+
+      LoadStrategy loadStrategy = (strategyType, strategyMode) switch
+      {
+        (LoadStrategyType.Linear, LoadStrategyMode.Serial) => new LoadStrategyLinearSerial(modList),
+        (LoadStrategyType.Linear, LoadStrategyMode.Parallel) => new LoadStrategyLinearParallel(modList),
+        _ => throw new Exception($"invalid load strategy ({strategyType}, {strategyMode})")
+      };
+      if (!await loadStrategy.LoadMods())
+        StopAutoLoad();
+
+      stopwatch.Stop();
+      Logger.Global.LogWarning($"Took {stopwatch.Elapsed:m\\:ss\\.fff} to load mods.");
+    }
+
+    private static async UniTask StageFinal()
+    {
+      if (Stage != LoadStage.Failed)
+        Stage = LoadStage.Loaded;
+
+      CurWait = new(Configs.AutoLoadWaitTime.Value, AutoLoad);
+      await Platform.Wait(CurWait);
     }
 
     public static ModInfo MatchMod(ModData modData) =>
@@ -229,127 +278,13 @@ namespace StationeersLaunchPad
         ModConfigUtil.SaveConfig(modList.ToModConfig());
       }
       var next = changed.HasFlag(LoaderPanel.ChangeFlags.NextStep);
-      if (next && LoadState == LoadState.Configuring)
-        LoadState = LoadState.Loading;
-      else if (next && (LoadState == LoadState.Loaded || LoadState == LoadState.Failed))
-        LoadState = LoadState.Running;
-    }
-
-    private static void Initialize()
-    {
-      Settings.CurrentData.SavePath = LaunchPadPaths.SavePath;
-
-      if (!SteamDisabled)
-      {
-        try
-        {
-          var transport = SteamPatches.GetMetaServerTransport();
-          transport.InitClient();
-          SteamDisabled = !SteamClient.IsValid;
-        }
-        catch (Exception ex)
-        {
-          Logger.Global.LogError($"failed to initialize steam: {ex.Message}");
-          Logger.Global.LogError("workshop mods will not be loaded");
-          Logger.Global.LogError("turn on DisableSteam in LaunchPad Configuration to hide this message");
-          AutoLoad = false;
-          SteamDisabled = true;
-        }
-      }
-    }
-
-    private async static UniTask LoadMods()
-    {
-      var stopwatch = Stopwatch.StartNew();
-      LoadState = LoadState.Loading;
-
-      var (strategyType, strategyMode) = Configs.LoadStrategy;
-
-      LoadStrategy loadStrategy = (strategyType, strategyMode) switch
-      {
-        (LoadStrategyType.Linear, LoadStrategyMode.Serial) => new LoadStrategyLinearSerial(modList),
-        (LoadStrategyType.Linear, LoadStrategyMode.Parallel) => new LoadStrategyLinearParallel(modList),
-        _ => throw new Exception($"invalid load strategy ({strategyType}, {strategyMode})")
-      };
-      if (!await loadStrategy.LoadMods())
-        AutoLoad = false;
-
-      stopwatch.Stop();
-      Logger.Global.LogWarning($"Took {stopwatch.Elapsed:m\\:ss\\.fff} to load mods.");
-
-      LoadState = LoadState.Loaded;
-    }
-
-    private async static UniTask<bool> RunUpdate()
-    {
-      try
-      {
-        Logger.Global.LogInfo("Checking Version");
-        var release = await LaunchPadUpdater.GetUpdateRelease();
-        if (release == null)
-          return false;
-
-        if (!Configs.AutoUpdateOnStart.Value && !await LaunchPadUpdater.CheckShouldUpdate(release))
-          return false;
-
-        if (!await LaunchPadUpdater.UpdateToRelease(release))
-          return false;
-
-        Logger.Global.LogError($"StationeersLaunchPad updated to {release.TagName}, please restart your game!");
-        Configs.PostUpdateCleanup.Value = true;
-        return true;
-      }
-      catch (Exception ex)
-      {
-        Logger.Global.LogError("An error occurred during update.");
-        Logger.Global.LogException(ex);
-        return false;
-      }
-    }
-
-    private static void RestartGame()
-    {
-      var startInfo = new ProcessStartInfo
-      {
-        FileName = LaunchPadPaths.ExecutablePath,
-        WorkingDirectory = LaunchPadPaths.GameRootPath,
-        UseShellExecute = false
-      };
-
-      // remove environment variables that new process will inherit
-      startInfo.Environment.Remove("DOORSTOP_INITIALIZED");
-      startInfo.Environment.Remove("DOORSTOP_DISABLE");
-
-      Process.Start(startInfo);
-      Application.Quit();
-    }
-
-    private static UniTask PostUpdateRestartDialog()
-    {
-      bool restartGame()
-      {
-        RestartGame();
-        return false;
-      }
-      bool stopLoad()
-      {
-        AutoLoad = false;
-        return true;
-      }
-      return AlertPopup.Show(
-        "Restart Recommended",
-        "StationeersLaunchPad has been updated, it is recommended to restart the game.",
-        AlertPopup.DefaultSize,
-        AlertPopup.DefaultPosition,
-        ("Restart Game", restartGame),
-        ("Continue Loading", () => true),
-        ("Close", stopLoad)
-      );
+      if (next)
+        CurWait.Skip();
     }
 
     private static void StartGame()
     {
-      LoadState = LoadState.Running;
+      Stage = LoadStage.Running;
       var co = (IEnumerator) typeof(SplashBehaviour).GetMethod("AwakeCoroutine", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(SplashBehaviour, new object[] { });
       SplashBehaviour.StartCoroutine(co);
 
@@ -391,7 +326,7 @@ namespace StationeersLaunchPad
             serializer.Serialize(stream, config);
           }
         }
-        ExplorerUtil.OpenDirectorySelect(pkgpath);
+        ProcessUtil.OpenExplorerSelectFile(pkgpath);
       }
       catch (Exception ex)
       {

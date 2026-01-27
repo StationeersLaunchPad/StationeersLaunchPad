@@ -16,6 +16,17 @@ namespace StationeersLaunchPad
       if (Harmony.HasAnyPatches(LaunchPadInfo.GUID))
         return;
 
+      // Do not add any more to this method, add to FinishAwake instead.
+      // The Steamworks dll redirect needs to be installed before any types
+      // that rely on it are initialized. Any types referenced in a method
+      // are initialized before the method starts, so this method needs to
+      // avoid causing any type initialization before the above method runs
+      InstallSteamworksRedirect();
+      FinishAwake();
+    }
+
+    private static void InstallSteamworksRedirect()
+    {
       // If the windows steamworks assembly is not found, try to replace it with the linux one
       AppDomain.CurrentDomain.AssemblyResolve += (_, args) =>
       {
@@ -23,20 +34,25 @@ namespace StationeersLaunchPad
           return AppDomain.CurrentDomain.GetAssemblies().First(assembly => assembly.GetName().Name == "Facepunch.Steamworks.Posix");
         return null;
       };
+    }
 
-      // *** DO NOT REFERENCE LaunchPadConfig FIELDS IN THIS METHOD ***
-      // referencing LaunchPadConfig fields in this method will force the class to initialize before the method starts
-      // we need to add the resolve hook above before LaunchPadConfig initializes so the steamworks types will be valid on linux
-
-      var patchSuccess = LaunchPadPatches.RunPatches(new Harmony(LaunchPadInfo.GUID));
-
+    private void FinishAwake()
+    {
       var unityLogger = Debug.unityLogger as UnityEngine.Logger;
       unityLogger.logHandler = new LogWrapper(unityLogger.logHandler);
 
       var playerLoop = PlayerLoop.GetCurrentPlayerLoop();
       PlayerLoopHelper.Initialize(ref playerLoop);
 
-      LaunchPadConfig.Run(this.Config, !patchSuccess);
+      if (!LaunchPadPatches.RunPatches(new Harmony(LaunchPadInfo.GUID)))
+        LaunchPadConfig.StopAutoLoad();
+
+      Configs.Initialize(this.Config);
+
+      if (Configs.LinuxPathPatch.Value)
+        LaunchPadPatches.RunLinuxPathPatch();
+
+      LaunchPadConfig.Run();
     }
   }
 }
