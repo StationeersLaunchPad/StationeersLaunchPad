@@ -2,15 +2,18 @@
   <Target Name="CopyToPlugins" AfterTargets="Build">
     <ItemGroup>
       <InputFiles Include="$(OutputPath)$(AssemblyName).*" />
-      <OutputFiles Include="$(PluginPath)/$(AssemblyName).*" />
+      <OutputFiles Include="$(SLPPluginPath)/$(AssemblyName).*" />
+
       <_CopyFiles_Dest Include="@(InputFiles)">
-        <Dest>$(PluginPath)\%(Filename)%(Extension)</Dest>
+        <Dest>$(SLPPluginPath)\%(Filename)%(Extension)</Dest>
       </_CopyFiles_Dest>
+
       <CopyFiles Include="@(_CopyFiles_Dest)">
         <PrettySrc>$([System.String]::Copy('%(FullPath)').Replace('$(SolutionDir)', ''))</PrettySrc>
         <PrettyDest>$([System.String]::Copy('%(Dest)').Replace('$(StationeersDirectory)', ''))</PrettyDest>
       </CopyFiles>
     </ItemGroup>
+
     <Delete Files="%(OutputFiles.FullPath)" />
     <Message Text="%(CopyFiles.PrettySrc) -> %(CopyFiles.PrettyDest)" Importance="high" />
     <Copy SourceFiles="%(CopyFiles.FullPath)" DestinationFiles="%(CopyFiles.Dest)" />

@@ -15,6 +15,12 @@ The loading is currently done one mod at a time (`LoadStrategyLinearSerial` and 
 ### [AssemblyInfo.cs](AssemblyInfo.cs)
 Simple structure holding assembly name and the names of other assemblies it directly references. Part of a prototype of adding implicit dependencies based on assembly references. Currently this information is loaded but unused.
 
+### [Github.cs](Github.cs)
+Utility class for fetching and downloading github assets/releases.
+
+### [ImGuiHelper.cs](ImGuiHelper.cs)
+Utility class with functions to help with common ImGui functionality.
+
 ### [LaunchPadAlertGUI.cs](LaunchPadAlertGUI.cs)
 ImGui mod alert window.
 
@@ -23,6 +29,24 @@ ImGui mod configuration window.
 
 ### [LaunchPadConfig.cs](LaunchPadConfig.cs)
 Main workflow logic of loading mod configuration and mods.
+
+### [LaunchPadConfigGUI.cs](LaunchPadConfigGUI.cs)
+ImGui rendering class for configuration info.
+
+### [LaunchPadConsoleGUI.cs](LaunchPadConsoleGUI.cs)
+ImGui rendering class for the console info.
+
+### [LaunchPadInfo.cs](LaunchPadInfo.cs)
+Info class for plugin name, guid, and version.
+
+### [LaunchPadLoaderGUI.cs](LaunchPadLoaderGUI.cs)
+ImGui rendering class for loading info.
+
+### [LaunchPadPatches.cs](LaunchPadPatches.cs)
+Harmony patch class.
+
+### [LaunchPadPaths.cs](LaunchPadPaths.cs)
+Commonly used paths for easy access.
 
 ### [LaunchPadPlugin.cs](LaunchPadPlugin.cs)
 Bepinex plugin entrypoint to the mod loader.
@@ -36,15 +60,30 @@ Contains the implementations of loading in mod files, and information about load
 ### [LoadStrategy.cs](LoadStrategy.cs)
 Contains all implementation types for loading assemblies, resloving types, loading assets, and loading entry points.
 
-### [ModLoader.cs](ModLoader.cs)
-Contains the workflow for loading enabled mods into the game, currently just a simple linear load.
-Also contains the logic for finding Bepinex and StationeersMods entry points in the mod files.
+### [LogBuffer.cs](LogBuffer.cs)
+Class for holding log lines.
 
-### [ModInfo.cs](ModInfo.cs)
-Information about an installed mod (name, folder, about.xml).
+### [LogLine.cs](LogLine.cs)
+Class for holding a log line info.
 
 ### [Logger.cs](Logger.cs)
 A logger that can be scoped to a specific mod, as well as a log handler that associates log messages with a specific mod. This works, but the scoped logs can only be viewed during startup for now.
 
+### [LogWrapper.cs](LogWrapper.cs)
+Log wrapper that wraps Unity errors into the custom logger format.
+
+### [ModEntrypoint.cs](ModEntrypoint.cs)
+Contains mod entrypoint info classes for different types of mod entrypoints.
+
+### [ModInfo.cs](ModInfo.cs)
+Information about an installed mod (name, folder, about.xml).
+
+### [ModLoader.cs](ModLoader.cs)
+Contains the workflow for loading enabled mods into the game, currently just a simple linear load.
+Also contains the logic for finding Bepinex and StationeersMods entry points in the mod files.
+
 ### [TextFormatting.cs](TextFormatting.cs)
 Logic for converting Steam description tags to TextMeshPro tags.
+
+### [UpdateSequence.cs](UpdateSequence.cs)
+Contains the logic for updating the plugin, as well as backing up and/or reverting updates.

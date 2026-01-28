@@ -1,0 +1,6 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <!-- Change this to the path to your Steam Library -->
+    <SteamLibraryDirectory>$(MSBuildProgramFiles32)\Steam\steamapps\common\</SteamLibraryDirectory>
+  </PropertyGroup>
+</Project>

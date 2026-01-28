@@ -1,21 +1,30 @@
-<Project Sdk="Microsoft.NET.Sdk" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(SolutionDir)global.VS.props" />
-  <Import Project="$(SolutionDir)globalRefs.VS.props" />
+﻿<Project Sdk="Microsoft.NET.Sdk" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <AssemblyName>StationeersLaunchPad</AssemblyName>
+    <RootNamespace>$(AssemblyName)</RootNamespace>
     <IsServer>False</IsServer>
   </PropertyGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\Compatibility\StationeersMods.Interface\StationeersMods.Interface.csproj" />
-    <ProjectReference Include="..\Compatibility\StationeersMods.Shared\StationeersMods.Shared.csproj" />
-  </ItemGroup>
+
+  <!-- Import Stationeers VS properties - paths etc. -->
+  <Import Project="$(SolutionDir)Stationeers.VS.props" />
+
+  <!-- Import Game/Unity DLL references -->
+  <Import Project="$(SolutionDir)Stationeers.VS.References.props" />
+
+  <!-- ImGui DLL's -->
   <ItemGroup Condition="'$(IsServer)' == 'True'">
-    <ProjectReference Include="..\Compatibility\RG.ImGui\RG.ImGui.csproj" />
+    <ProjectReference Include="$(SLPCompatibilityDirectory)\RG.ImGui\RG.ImGui.csproj" />
   </ItemGroup>
+
   <ItemGroup Condition="'$(IsServer)' != 'True'">
     <Reference Include="RG.ImGui">
-      <HintPath>$(StationeersDirectory)\rocketstation_Data\Managed\RG.ImGui.dll</HintPath>
+      <HintPath>$(StationeersManagedDirectory)\RG.ImGui.dll</HintPath>
       <Private>False</Private>
     </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SLPCompatibilityDirectory)\StationeersMods.Interface\StationeersMods.Interface.csproj" />
+    <ProjectReference Include="$(SLPCompatibilityDirectory)\StationeersMods.Shared\StationeersMods.Shared.csproj" />
   </ItemGroup>
 </Project>

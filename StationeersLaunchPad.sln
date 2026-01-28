@@ -1,14 +1,43 @@
-
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StationeersMods.Interface", "Compatibility/StationeersMods.Interface/StationeersMods.Interface.csproj", "{3adb58e4-4e36-4e7d-bf51-efacae979ec6}"
+# Visual Studio Version 18
+VisualStudioVersion = 18.0.11201.2
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StationeersMods.Interface", "Compatibility\StationeersMods.Interface\StationeersMods.Interface.csproj", "{3ADB58E4-4E36-4E7D-BF51-EFACAE979EC6}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StationeersMods.Shared", "Compatibility/StationeersMods.Shared/StationeersMods.Shared.csproj", "{1aa11c13-774b-44e9-aab1-4d963e01e6af}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StationeersMods.Shared", "Compatibility\StationeersMods.Shared\StationeersMods.Shared.csproj", "{1AA11C13-774B-44E9-AAB1-4D963E01E6AF}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RG.ImGui", "Compatibility/RG.ImGui/RG.ImGui.csproj", "{36de1849-6373-4cbd-a9ea-a8a2afb4047a}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RG.ImGui", "Compatibility\RG.ImGui\RG.ImGui.csproj", "{36DE1849-6373-4CBD-A9EA-A8A2AFB4047A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StationeersLaunchPad", "StationeersLaunchPad/StationeersLaunchPad.csproj", "{99aa5fa7-3c70-4213-ada2-d6d745c38ac1}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StationeersLaunchPad", "StationeersLaunchPad\StationeersLaunchPad.csproj", "{99AA5FA7-3C70-4213-ADA2-D6D745C38AC1}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LaunchPadBooster", "LaunchPadBooster/LaunchPadBooster/LaunchPadBooster.csproj", "{9544610a-20e3-4bb0-93c6-6f11701cca5d}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LaunchPadBooster", "LaunchPadBooster\LaunchPadBooster\LaunchPadBooster.csproj", "{9544610A-20E3-4BB0-93C6-6F11701CCA5D}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".SLP", ".SLP", "{07348662-F5C3-495E-9993-B3B9176E0ED8}"
+	ProjectSection(SolutionItems) = preProject
+		.editorconfig = .editorconfig
+		.gitignore = .gitignore
+		.gitmodules = .gitmodules
+		after.StationeersLaunchPad.sln.targets = after.StationeersLaunchPad.sln.targets
+		Directory.Build.props = Directory.Build.props
+		Directory.Build.targets = Directory.Build.targets
+		README.md = README.md
+		Stationeers.VS.props = Stationeers.VS.props
+		Stationeers.VS.References.props = Stationeers.VS.References.props
+		Stationeers.VS.User.props = Stationeers.VS.User.props
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".LBP", ".LBP", "{81D3E2BB-EDFA-429D-A4C0-4EC353CA7F18}"
+	ProjectSection(SolutionItems) = preProject
+		LaunchPadBooster\.editorconfig = LaunchPadBooster\.editorconfig
+		LaunchPadBooster\.gitignore = LaunchPadBooster\.gitignore
+		LaunchPadBooster\LICENSE = LaunchPadBooster\LICENSE
+		LaunchPadBooster\README.md = LaunchPadBooster\README.md
+		LaunchPadBooster\Stationeers.VS.props = LaunchPadBooster\Stationeers.VS.props
+		LaunchPadBooster\Stationeers.VS.References.props = LaunchPadBooster\Stationeers.VS.References.props
+		LaunchPadBooster\Stationeers.VS.User.props = LaunchPadBooster\Stationeers.VS.User.props
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Compatibility", "Compatibility", "{224D246E-A8FC-464A-B2CB-389A905CDCFC}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -16,25 +45,36 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{3adb58e4-4e36-4e7d-bf51-efacae979ec6}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{3adb58e4-4e36-4e7d-bf51-efacae979ec6}.Release|Any CPU.Build.0 = Release|Any CPU
-		{3adb58e4-4e36-4e7d-bf51-efacae979ec6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{3adb58e4-4e36-4e7d-bf51-efacae979ec6}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{1aa11c13-774b-44e9-aab1-4d963e01e6af}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{1aa11c13-774b-44e9-aab1-4d963e01e6af}.Release|Any CPU.Build.0 = Release|Any CPU
-		{1aa11c13-774b-44e9-aab1-4d963e01e6af}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{1aa11c13-774b-44e9-aab1-4d963e01e6af}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{36de1849-6373-4cbd-a9ea-a8a2afb4047a}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{36de1849-6373-4cbd-a9ea-a8a2afb4047a}.Release|Any CPU.Build.0 = Release|Any CPU
-		{36de1849-6373-4cbd-a9ea-a8a2afb4047a}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{36de1849-6373-4cbd-a9ea-a8a2afb4047a}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{99aa5fa7-3c70-4213-ada2-d6d745c38ac1}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{99aa5fa7-3c70-4213-ada2-d6d745c38ac1}.Release|Any CPU.Build.0 = Release|Any CPU
-		{99aa5fa7-3c70-4213-ada2-d6d745c38ac1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{99aa5fa7-3c70-4213-ada2-d6d745c38ac1}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{9544610a-20e3-4bb0-93c6-6f11701cca5d}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{9544610a-20e3-4bb0-93c6-6f11701cca5d}.Release|Any CPU.Build.0 = Release|Any CPU
-		{9544610a-20e3-4bb0-93c6-6f11701cca5d}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{9544610a-20e3-4bb0-93c6-6f11701cca5d}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3ADB58E4-4E36-4E7D-BF51-EFACAE979EC6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3ADB58E4-4E36-4E7D-BF51-EFACAE979EC6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3ADB58E4-4E36-4E7D-BF51-EFACAE979EC6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3ADB58E4-4E36-4E7D-BF51-EFACAE979EC6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1AA11C13-774B-44E9-AAB1-4D963E01E6AF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1AA11C13-774B-44E9-AAB1-4D963E01E6AF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1AA11C13-774B-44E9-AAB1-4D963E01E6AF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1AA11C13-774B-44E9-AAB1-4D963E01E6AF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{36DE1849-6373-4CBD-A9EA-A8A2AFB4047A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{36DE1849-6373-4CBD-A9EA-A8A2AFB4047A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{36DE1849-6373-4CBD-A9EA-A8A2AFB4047A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{36DE1849-6373-4CBD-A9EA-A8A2AFB4047A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{99AA5FA7-3C70-4213-ADA2-D6D745C38AC1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{99AA5FA7-3C70-4213-ADA2-D6D745C38AC1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{99AA5FA7-3C70-4213-ADA2-D6D745C38AC1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{99AA5FA7-3C70-4213-ADA2-D6D745C38AC1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9544610A-20E3-4BB0-93C6-6F11701CCA5D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9544610A-20E3-4BB0-93C6-6F11701CCA5D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9544610A-20E3-4BB0-93C6-6F11701CCA5D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9544610A-20E3-4BB0-93C6-6F11701CCA5D}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{3ADB58E4-4E36-4E7D-BF51-EFACAE979EC6} = {224D246E-A8FC-464A-B2CB-389A905CDCFC}
+		{1AA11C13-774B-44E9-AAB1-4D963E01E6AF} = {224D246E-A8FC-464A-B2CB-389A905CDCFC}
+		{36DE1849-6373-4CBD-A9EA-A8A2AFB4047A} = {224D246E-A8FC-464A-B2CB-389A905CDCFC}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {6EDAB6C2-23F0-4CA7-BA75-82B821B28A19}
 	EndGlobalSection
 EndGlobal

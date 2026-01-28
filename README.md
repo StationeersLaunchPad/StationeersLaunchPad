@@ -35,6 +35,7 @@ __StationeersLaunchPad and StationeersMods can't be installed together__. Both m
 - Install mods into `%HOME%/documents/my games/stationeers/mods` or download them from steam workshop.
 - Start game. Mods will automatically load
 - If you want to reorder or enable/disable mods, click the loading window at the bottom when the game first opens
+  - To resume loading and step through stages, click the highlighted stage upper-left of the loading window
 - Mod will auto be updated unless otherwise chosen in configuration.
 
 ## Dedicated Server

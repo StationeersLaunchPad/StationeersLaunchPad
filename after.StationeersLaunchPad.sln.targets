@@ -1,4 +1,4 @@
-<Project>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Target Name="AfterSolution" AfterTargets="Build">
     <Exec Command="git describe --tags --dirty" ConsoleToMSBuild="true" StandardOutputImportance="Low">
       <Output TaskParameter="ConsoleOutput" PropertyName="BuildTag" />

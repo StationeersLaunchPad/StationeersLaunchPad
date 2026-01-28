@@ -1,0 +1,57 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(SolutionDir)Stationeers.VS.User.props" />
+
+  <PropertyGroup>
+    <TargetFramework>net4.8</TargetFramework>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+    <LangVersion>9.0</LangVersion>
+    <ErrorReport>none</ErrorReport>
+    <LanguageTargets>$(MSBuildToolsPath)\Microsoft.CSharp.targets</LanguageTargets>
+    <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
+
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <Targets>AnyCPU</Targets>
+    <OutputPath>$(SolutionDir)bin\$(Configuration)</OutputPath>
+
+    <!-- Do Not Change Anything Below -->
+    <StationeersDirectory>$(SteamLibraryDirectory)\Stationeers</StationeersDirectory>
+    <StationeersDataDirectory>$(StationeersDirectory)\rocketstation_Data</StationeersDataDirectory>
+    <StationeersManagedDirectory>$(StationeersDataDirectory)\Managed</StationeersManagedDirectory>
+    <StationeersPluginsDirectory>$(StationeersDataDirectory)\Plugins</StationeersPluginsDirectory>
+    <StationeersResourcesDirectory>$(StationeersDataDirectory)\Resources</StationeersResourcesDirectory>
+    <StationeersStreamingAssetsDirectory>$(StationeersDataDirectory)\StreamingAssets</StationeersStreamingAssetsDirectory>
+    <StationeersDocumentsDirectory>$(HOMEDRIVE)$(HOMEPATH)\Documents\My Games\Stationeers</StationeersDocumentsDirectory>
+
+    <SLPCompatibilityDirectory>$(SolutionDir)Compatibility</SLPCompatibilityDirectory>
+
+    <BIEDirectory>$(StationeersDirectory)\BepInEx</BIEDirectory>
+    <BIECoreDirectory>$(BIEDirectory)\core</BIECoreDirectory>
+    <BIEPatchersDirectory>$(BIEDirectory)\patchers</BIEPatchersDirectory>
+    <BIEPluginsDirectory>$(BIEDirectory)\plugins</BIEPluginsDirectory>
+
+    <SLPPluginPath>$(BIEPluginsDirectory)\StationeersLaunchPad</SLPPluginPath>
+
+    <NoStandardLibraries>true</NoStandardLibraries>
+    <NoStdLib>true</NoStdLib>
+    <NoConfig>true</NoConfig>
+    <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
+    <NoWarn>$(NoWarn);MSB3277</NoWarn> <!-- unity ships dlls with conflicting references -->
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>embedded</DebugType>
+    <Optimize>false</Optimize>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugSymbols>false</DebugSymbols>
+    <DebugType>none</DebugType>
+    <Optimize>true</Optimize>
+    <DefineConstants>TRACE</DefineConstants>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,79 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <!-- System DLL's -->
+    <SystemDll Include="$(StationeersManagedDirectory)\mscorlib.dll" />
+    <SystemDll Include="$(StationeersManagedDirectory)\netstandard.dll" />
+    <SystemDll Include="$(StationeersManagedDirectory)\System*.dll" />
+    <SystemRefs Include="@(SystemDll->'%(Filename)')">
+      <HintPath>$(StationeersManagedDirectory)\%(Identity).dll</HintPath>
+    </SystemRefs>
+    <Reference Include="@(SystemRefs)" />
+
+    <!-- BepInEx DLL's -->
+    <Reference Include="BepInEx">
+      <HintPath>$(BIECoreDirectory)\BepInEx.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+
+    <!-- Harmony DLL's -->
+    <Reference Include="0Harmony">
+      <HintPath>$(BIECoreDirectory)\0Harmony.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+
+    <!-- Game DLL's -->
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(StationeersManagedDirectory)\Assembly-CSharp.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Facepunch.Steamworks.Win64">
+      <HintPath>$(StationeersManagedDirectory)\Facepunch.Steamworks.Win64.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>$(StationeersManagedDirectory)\Newtonsoft.Json.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+
+    <!-- UniTask DLL's -->
+    <Reference Include="UniTask">
+      <HintPath>$(StationeersManagedDirectory)\UniTask.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+
+    <!-- Unity DLL's -->
+    <Reference Include="Unity.TextMeshPro">
+      <HintPath>$(StationeersManagedDirectory)\Unity.TextMeshPro.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+
+    <Reference Include="UnityEngine.AnimationModule">
+      <HintPath>$(StationeersManagedDirectory)\UnityEngine.AnimationModule.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="UnityEngine.AssetBundleModule">
+      <HintPath>$(StationeersManagedDirectory)\UnityEngine.AssetBundleModule.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>$(StationeersManagedDirectory)\UnityEngine.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(StationeersManagedDirectory)\UnityEngine.CoreModule.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="UnityEngine.PhysicsModule">
+      <HintPath>$(StationeersManagedDirectory)\UnityEngine.PhysicsModule.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>$(StationeersManagedDirectory)\UnityEngine.UI.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UnityWebRequestModule">
+      <HintPath>$(StationeersManagedDirectory)\UnityEngine.UnityWebRequestModule.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+  </ItemGroup>
+</Project>
