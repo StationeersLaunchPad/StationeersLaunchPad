@@ -1,7 +1,6 @@
 ﻿using ImGuiNET;
 using System;
 using System.Runtime.CompilerServices;
-using UI.ImGuiUi;
 using UnityEngine;
 
 namespace StationeersLaunchPad.UI
@@ -183,30 +182,6 @@ namespace StationeersLaunchPad.UI
         childFunc?.Invoke();
     }
 
-    public static void DrawWithPadding(Action func, float padding = 25.0f)
-    {
-      var screenSize = ImguiHelper.ScreenSize;
-      var paddingVector = new Vector2(padding, padding);
-      var topLeft = new Vector2(paddingVector.x, screenSize.y - 100.0f - paddingVector.y);
-      var bottomRight = screenSize - paddingVector;
-
-      ImGui.SetNextWindowSize(bottomRight - topLeft);
-      ImGui.SetNextWindowPos(topLeft);
-      func?.Invoke();
-    }
-
-    public static void DrawWithPadding2(Action func, float padding = 25.0f)
-    {
-      var screenSize = ImguiHelper.ScreenSize;
-      var paddingVector = new Vector2(padding, padding);
-      var topLeft = new Vector2(paddingVector.x, screenSize.y * 0.4f);
-      var bottomRight = screenSize - paddingVector;
-
-      ImGui.SetNextWindowSize(bottomRight - topLeft);
-      ImGui.SetNextWindowPos(topLeft);
-      func?.Invoke();
-    }
-
     public static void DrawSameLine(Action func, bool nl = false)
     {
       ImGui.SameLine();
@@ -272,6 +247,170 @@ namespace StationeersLaunchPad.UI
     {
       ImGui.PopStyleVar(4);
       ImGui.PopStyleColor((int) ImGuiCol.COUNT);
+    }
+
+    public static Vector4 FlashColor(ImGuiCol from, ImGuiCol to)
+    {
+      var style = ImGui.GetStyle();
+      var flashPos = Mathf.Sin(Time.realtimeSinceStartup * 5f) * 0.5f + 0.5f;
+      var crFrom = style.Colors[(int) from];
+      var crTo = style.Colors[(int) to];
+      return Vector4.Lerp(crFrom, crTo, flashPos);
+    }
+
+    public static Rect ScreenRect() => new(Vector2.zero, ImGui.GetMainViewport().Size);
+    public static Rect AvailableRect()
+    {
+      var min = ImGui.GetCursorScreenPos();
+      var size = ImGui.GetContentRegionAvail();
+      return new(min, min + size);
+    }
+
+    public static void SetNextWindowRect(Rect rect)
+    {
+      ImGui.SetNextWindowPos(rect.Min);
+      ImGui.SetNextWindowSize(rect.Size);
+    }
+
+    public static void SeparatorLine(Vector2 from, Vector2 to)
+    {
+      ImGui.GetWindowDrawList().AddLine(from, to,
+        ImGui.ColorConvertFloat4ToU32(
+          ImGui.GetStyle().Colors[(int) ImGuiCol.Separator]));
+    }
+
+    public static void Text(Rect rect, string text)
+    {
+      var drawList = ImGui.GetWindowDrawList();
+      drawList.PushClipRect(rect.Min, rect.Max, true);
+
+      ImGui.SetCursorScreenPos(rect.TL);
+      Text(text);
+      ImGui.SetCursorScreenPos(rect.TL);
+      ImGui.Dummy(rect.Size);
+
+      drawList.PopClipRect();
+    }
+
+    public static void TextCentered(Rect rect, string text)
+    {
+      var drawList = ImGui.GetWindowDrawList();
+      drawList.PushClipRect(rect.Min, rect.Max, true);
+
+      var sz = ImGui.CalcTextSize(text);
+      var offset = (rect.Size.x - sz.x) / 2f;
+      ImGui.SetCursorScreenPos(rect.TL + new Vector2(offset, 0));
+      Text(text);
+      ImGui.SetCursorScreenPos(rect.TL);
+      ImGui.Dummy(rect.Size);
+
+      drawList.PopClipRect();
+    }
+  }
+
+  public readonly struct Rect
+  {
+    public readonly Vector2 Min;
+    public readonly Vector2 Max;
+    public Vector2 Size => Max - Min;
+    public Rect(Vector2 min, Vector2 max) =>
+      (Min, Max) = (min, Vector2.Max(min, max));
+
+    public Vector2 TL => Min;
+    public Vector2 TR => new(Max.x, Min.y);
+    public Vector2 BL => new(Min.x, Max.y);
+    public Vector2 BR => Max;
+
+    // split at absolute X/Y value
+    public void SplitAX(float x, out Rect left, out Rect right) =>
+      (left, right) = (new(Min, new(x, Max.y)), new(new(x, Min.y), Max));
+    public void SplitAY(float y, out Rect top, out Rect bottom) =>
+      (top, bottom) = (new(Min, new(Max.x, y)), new(new(Min.x, y), Max));
+
+    // split at offset from left/top or negative from right/bottom
+    public void SplitOX(float ox, out Rect left, out Rect right) =>
+      SplitAX(ox < 0 ? Max.x + ox : Min.x + ox, out left, out right);
+    public void SplitOY(float oy, out Rect top, out Rect bottom) =>
+      SplitAY(oy < 0 ? Max.y + oy : Min.y + oy, out top, out bottom);
+
+    // split where left/top is relative width/height r (0-1)
+    public void SplitRX(float rx, out Rect left, out Rect right) =>
+      SplitAX(Min.x * (1 - rx) + Max.x * rx, out left, out right);
+    public void SplitRY(float ry, out Rect top, out Rect bottom) =>
+      SplitAY(Min.y * (1 - ry) + Max.y * ry, out top, out bottom);
+
+    public void Columns(float w0, out Rect c0, float w1, out Rect c1, out Rect c2)
+    {
+      SplitOX(w0, out c0, out var rest);
+      rest.SplitOX(w1, out c1, out c2);
+    }
+
+    public TableRow TableRow(float rowHei, Span<float> widths) =>
+      new(this.Shrink(0, 0, 0, this.Size.y - rowHei), widths);
+
+    public Rect Shrink(float margin) => Shrink(margin, margin, margin, margin);
+    public Rect Shrink(float minX, float minY, float maxX, float maxY) =>
+      new(new(Min.x + minX, Min.y + minY), new(Max.x - maxX, Max.y - maxY));
+
+    public Rect Shift(float x, float y) =>
+      new(Min + new Vector2(x, y), Max + new Vector2(x, y));
+
+    public Rect From(Vector2 min) => new(min, Max);
+
+    public override string ToString() => $"{Min},{Max}";
+  }
+
+  public ref struct TableRow
+  {
+    private Rect rect;
+    private Span<float> columns;
+    private int lastColumn;
+    private float lastColumnOffset;
+
+    public TableRow(Rect rect, Span<float> columns)
+    {
+      this.rect = rect;
+      this.columns = columns;
+      lastColumn = 0;
+      lastColumnOffset = 0;
+    }
+
+    public void NextRow() => rect = rect.Shift(0, rect.Size.y);
+    public Rect Rect => rect;
+
+    public Rect Column(int index)
+    {
+      if (index < lastColumn)
+      {
+        lastColumn = 0;
+        lastColumnOffset = 0;
+      }
+      while (lastColumn < index)
+      {
+        lastColumnOffset += columns[lastColumn];
+        lastColumn++;
+      }
+      var start = new Vector2(rect.Min.x + lastColumnOffset, rect.Min.y);
+      var end = index < columns.Length
+        ? new Vector2(start.x + columns[index], rect.Max.y)
+        : rect.Max;
+      return new(start, end);
+    }
+
+    public Rect ColumnsFrom(int startIndex)
+    {
+      if (startIndex < lastColumn)
+      {
+        lastColumn = 0;
+        lastColumnOffset = 0;
+      }
+      while (lastColumn < startIndex)
+      {
+        lastColumnOffset += columns[lastColumn];
+        lastColumn++;
+      }
+      var start = new Vector2(rect.Min.x + lastColumnOffset, rect.Min.y);
+      return new(start, rect.Max);
     }
   }
 }
