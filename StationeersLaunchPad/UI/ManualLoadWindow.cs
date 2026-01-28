@@ -1,4 +1,5 @@
 ﻿using ImGuiNET;
+using StationeersLaunchPad.Loading;
 using StationeersLaunchPad.Metadata;
 using StationeersLaunchPad.Sources;
 using System;
@@ -19,6 +20,7 @@ namespace StationeersLaunchPad.UI
 
     private static LoadStage lastStage;
     private static ModInfo selectedInfo = null;
+    private static LoadedMod selectedMod = null;
     private static bool openInfo = false;
     private static ModInfo draggingMod = null;
     private static bool dragged = false;
@@ -91,11 +93,11 @@ namespace StationeersLaunchPad.UI
         ImGui.EndChild();
 
         ImGuiHelper.SeparatorLine(bottomRect.TL, bottomRect.TR);
-        bottomRect = bottomRect.Shrink(0,1,0,0);
+        bottomRect = bottomRect.Shrink(0, 1, 0, 0);
 
         ImGui.SetCursorScreenPos(bottomRect.TL);
         ImGui.BeginChild("##logs", bottomRect.Size);
-        LogPanel.DrawConsole(selectedInfo?.Loaded?.Logger ?? Logger.Global);
+        LogPanel.DrawConsole(selectedMod?.Logger ?? Logger.Global);
         ImGui.EndChild();
 
         ImGui.End();
@@ -341,17 +343,20 @@ namespace StationeersLaunchPad.UI
       });
 
       var idx = 0;
-      foreach (var info in modList.EnabledMods)
+      foreach (var mod in ModLoader.LoadedMods)
       {
         ImGui.PushID(idx);
-        var mod = info.Loaded;
-        var isSelected = selectedInfo == info;
+        var info = mod.Info;
+        var isSelected = selectedMod == mod;
 
         ImGui.SetCursorScreenPos(row.Rect.TL);
         if (ImGui.Selectable("##scopeselect", isSelected, row.Rect.Size))
+        {
           selectedInfo = isSelected ? null : info;
+          selectedMod = isSelected ? null : mod;
+        }
 
-        DrawModState(row.Column(0), info);
+        DrawModState(row.Column(0), mod);
 
         ImGuiHelper.TextCentered(row.Column(1), $"{info.Source}");
 
@@ -364,14 +369,11 @@ namespace StationeersLaunchPad.UI
       }
     }
 
-    private static void DrawModState(Rect rect, ModInfo info)
+    private static void DrawModState(Rect rect, LoadedMod mod)
     {
-      var mod = info?.Loaded;
-
       var (text, tooltip) = mod switch
       {
-        _ when info.Source is ModSourceType.Core => ("C", "This mod contains Stationeers' assemblies and data."),
-        null => ("-", "This mod is contains no assemblies to load or an error has occurred."),
+        _ when mod.Info.Source is ModSourceType.Core => ("C", "This mod contains Stationeers' assemblies and data."),
         { LoadFailed: true } => ("X", "This mod is not loaded due to an error that has occurred."),
         { LoadFinished: true } => ("+", "This mod is finished loading."),
         { LoadedEntryPoints: true } => ("...", "This mod is currently loading entrypoints."),
@@ -418,7 +420,7 @@ namespace StationeersLaunchPad.UI
       );
       if (open)
       {
-        ConfigPanel.DrawConfigEditor(selectedInfo);
+        ConfigPanel.DrawConfigEditor(selectedMod, selectedInfo);
         ImGui.EndTabItem();
       }
     }

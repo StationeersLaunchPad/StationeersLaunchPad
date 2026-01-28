@@ -1,9 +1,52 @@
 ﻿using ImGuiNET;
+using StationeersLaunchPad.Loading;
 
 namespace StationeersLaunchPad.UI
 {
   public static class LogPanel
   {
+    private static bool standaloneLogsOpen = false;
+    private static LoadedMod logFilter = null;
+    public static void OpenStandaloneLogs()
+    {
+      standaloneLogsOpen = true;
+      logFilter = null;
+    }
+    public static void DrawStandaloneLogs()
+    {
+      if (!standaloneLogsOpen)
+        return;
+      ImGuiHelper.Draw(() =>
+      {
+        ImGui.SetNextWindowSize(new(1200, 800), ImGuiCond.Appearing);
+        ImGui.SetNextWindowSizeConstraints(
+          new(400, 300), new(float.PositiveInfinity, float.PositiveInfinity));
+        ImGui.Begin("Mod Logs",
+          ref standaloneLogsOpen, ImGuiWindowFlags.NoSavedSettings);
+
+        if (ImGui.BeginCombo("##modfilter", logFilter?.Info.Name ?? "All"))
+        {
+          if (ImGui.Selectable("All", logFilter == null))
+            logFilter = null;
+          var idx = 0;
+          foreach (var mod in ModLoader.LoadedMods)
+          {
+            ImGui.PushID(idx);
+
+            if (ImGui.Selectable(mod.Info.Name, logFilter == mod))
+              logFilter = mod;
+
+            ImGui.PopID();
+            idx++;
+          }
+          ImGui.EndCombo();
+        }
+        DrawConsole(logFilter?.Logger ?? Logger.Global);
+
+        ImGui.End();
+      });
+    }
+
     private static ulong lastLineCount = 0;
     private static Logger lastLogger = null;
     public static void DrawConsole(Logger logger)

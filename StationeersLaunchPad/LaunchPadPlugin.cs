@@ -5,6 +5,7 @@ using System;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.LowLevel;
+using Util.Commands;
 
 namespace StationeersLaunchPad
 {
@@ -52,7 +53,22 @@ namespace StationeersLaunchPad
       if (Configs.LinuxPathPatch.Value)
         LaunchPadPatches.RunLinuxPathPatch();
 
+      try
+      {
+        RegisterCommand();
+      }
+      catch (Exception ex)
+      {
+        StationeersLaunchPad.Logger.Global.LogWarning(
+          $"Failed to register SLP command: {ex}");
+      }
+
       LaunchPadConfig.Run();
+    }
+
+    private void RegisterCommand()
+    {
+      CommandLine.AddCommand("slp", new SLPCommand());
     }
   }
 }

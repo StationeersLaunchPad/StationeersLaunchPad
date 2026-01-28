@@ -297,22 +297,33 @@ namespace StationeersLaunchPad
 
     private static FieldInfo workshopMenuSelectedField;
     [HarmonyPatch(typeof(OrbitalSimulation), nameof(OrbitalSimulation.Draw)), HarmonyPrefix]
-    static void WorkshopMenuDrawConfig()
+    static void DrawInGameWindows()
+    {
+      DrawWorkshopMenuConfig();
+      DrawSettingsMenuConfig();
+      LogPanel.DrawStandaloneLogs();
+    }
+
+    private static void DrawWorkshopMenuConfig()
     {
       if (!WorkshopMenu.Instance.isActiveAndEnabled)
         return;
 
-      workshopMenuSelectedField ??= typeof(WorkshopMenu).GetField("_selectedModItem", BindingFlags.Instance | BindingFlags.NonPublic);
+      workshopMenuSelectedField ??= typeof(WorkshopMenu).GetField(
+        "_selectedModItem", BindingFlags.Instance | BindingFlags.NonPublic);
 
-      var selectedModItem = workshopMenuSelectedField.GetValue(WorkshopMenu.Instance) as WorkshopModListItem;
-      if (selectedModItem == null)
+      var selectedModItem =
+        workshopMenuSelectedField.GetValue(WorkshopMenu.Instance) as WorkshopModListItem;
+
+      ConfigPanel.DrawWorkshopConfig(LaunchPadConfig.MatchMod(selectedModItem?.Data));
+    }
+
+    private static void DrawSettingsMenuConfig()
+    {
+      if (!Settings.Instance.isActiveAndEnabled)
         return;
 
-      var modData = selectedModItem.Data;
-      if (modData == null)
-        return;
-
-      ConfigPanel.DrawWorkshopConfig(LaunchPadConfig.MatchMod(modData));
+      ConfigPanel.DrawSettingsWindow();
     }
   }
 

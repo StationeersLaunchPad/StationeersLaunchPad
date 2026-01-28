@@ -234,12 +234,16 @@ namespace StationeersLaunchPad
 
       var stopwatch = Stopwatch.StartNew();
 
+      foreach (var mod in modList.EnabledMods)
+        if (mod.Source is not ModSourceType.Core)
+          ModLoader.LoadedMods.Add(new(mod));
+
       var (strategyType, strategyMode) = Configs.LoadStrategy;
 
       LoadStrategy loadStrategy = (strategyType, strategyMode) switch
       {
-        (LoadStrategyType.Linear, LoadStrategyMode.Serial) => new LoadStrategyLinearSerial(modList),
-        (LoadStrategyType.Linear, LoadStrategyMode.Parallel) => new LoadStrategyLinearParallel(modList),
+        (LoadStrategyType.Linear, LoadStrategyMode.Serial) => new LoadStrategyLinearSerial(),
+        (LoadStrategyType.Linear, LoadStrategyMode.Parallel) => new LoadStrategyLinearParallel(),
         _ => throw new Exception($"invalid load strategy ({strategyType}, {strategyMode})")
       };
       if (!await loadStrategy.LoadMods())
@@ -294,7 +298,7 @@ namespace StationeersLaunchPad
       Platform.SetBackgroundEnabled(true);
     }
 
-    public static void ExportModPackage()
+    public static string ExportModPackage()
     {
       try
       {
@@ -327,11 +331,14 @@ namespace StationeersLaunchPad
             serializer.Serialize(stream, config);
           }
         }
-        ProcessUtil.OpenExplorerSelectFile(pkgpath);
+        if (!Platform.IsServer)
+          ProcessUtil.OpenExplorerSelectFile(pkgpath);
+        return $"exported {pkgpath}";
       }
       catch (Exception ex)
       {
         Logger.Global.LogException(ex);
+        return ex.ToString();
       }
     }
   }
