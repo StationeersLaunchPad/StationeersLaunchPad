@@ -19,7 +19,6 @@ namespace StationeersLaunchPad.UI
 
     private static LoadStage lastStage;
     private static ModInfo selectedInfo = null;
-    private static bool openLogs = false;
     private static bool openInfo = false;
     private static ModInfo draggingMod = null;
     private static bool dragged = false;
@@ -42,7 +41,8 @@ namespace StationeersLaunchPad.UI
         ImGui.Begin("##preloadermanual", ImGuiWindowFlags.NoDecoration | ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoSavedSettings);
 
         var contentRect = ImGuiHelper.AvailableRect();
-        contentRect.SplitRX(0.5f, out var leftRect, out var rightRect);
+        contentRect.SplitRY(0.6f, out var topRect, out var bottomRect);
+        topRect.SplitRX(0.5f, out var leftRect, out var rightRect);
 
         leftRect.SplitOY(ImGui.GetTextLineHeight(), out var statusRect, out leftRect);
 
@@ -79,7 +79,6 @@ namespace StationeersLaunchPad.UI
         ImGui.BeginChild("##right", rightRect.Size);
         if (ImGui.BeginTabBar("##right"))
         {
-          DrawLogsTab();
           DrawModInfoTab(stage);
           DrawModConfigTab(stage);
 
@@ -89,6 +88,14 @@ namespace StationeersLaunchPad.UI
 
           ImGui.EndTabBar();
         }
+        ImGui.EndChild();
+
+        ImGuiHelper.SeparatorLine(bottomRect.TL, bottomRect.TR);
+        bottomRect = bottomRect.Shrink(0,1,0,0);
+
+        ImGui.SetCursorScreenPos(bottomRect.TL);
+        ImGui.BeginChild("##logs", bottomRect.Size);
+        LogPanel.DrawConsole(selectedInfo?.Loaded?.Logger ?? Logger.Global);
         ImGui.EndChild();
 
         ImGui.End();
@@ -133,10 +140,7 @@ namespace StationeersLaunchPad.UI
       ImGui.SetCursorScreenPos(buttonRect.Min);
       ImGui.BeginDisabled(!nextEnabled);
       if (ImGui.Button(nextText, buttonRect.Size))
-      {
         next = true;
-        openLogs = true;
-      }
       ImGui.EndDisabled();
       if (nextEnabled)
         ImGui.PopStyleColor();
@@ -384,16 +388,6 @@ namespace StationeersLaunchPad.UI
       if (ImGui.Button("Export Mod Package"))
         LaunchPadConfig.ExportModPackage();
       ImGuiHelper.ItemTooltip("Package enabled mods into a zip file for dedicated servers.");
-    }
-
-    private static void DrawLogsTab()
-    {
-      if (ImGui.BeginTabItem("Logs", openLogs ? ImGuiTabItemFlags.SetSelected : ImGuiTabItemFlags.None))
-      {
-        LogPanel.DrawConsole(selectedInfo?.Loaded?.Logger ?? Logger.Global);
-        ImGui.EndTabItem();
-      }
-      openLogs = false;
     }
 
     private static void DrawModInfoTab(LoadStage stage)
