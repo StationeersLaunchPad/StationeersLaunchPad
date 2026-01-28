@@ -73,12 +73,12 @@ namespace StationeersLaunchPad
     {
       if (AutoLoad)
       {
-        if (LoaderPanel.DrawAutoLoad(Stage, CurWait))
+        if (AutoLoadWindow.Draw(Stage, CurWait))
           StopAutoLoad();
       }
       else
       {
-        var changed = LoaderPanel.DrawManualLoad(Stage, modList, AutoSort);
+        var changed = ManualLoadWindow.Draw(Stage, modList, AutoSort);
         HandleChange(changed);
       }
 
@@ -261,14 +261,14 @@ namespace StationeersLaunchPad
     public static ModInfo MatchMod(ModData modData) =>
       modData != null ? modList.AllMods.First(mod => mod.DirectoryPath == modData.DirectoryPath) : null;
 
-    private static void HandleChange(LoaderPanel.ChangeFlags changed)
+    private static void HandleChange(ManualLoadWindow.ChangeFlags changed)
     {
-      if (changed == LoaderPanel.ChangeFlags.None)
+      if (changed == ManualLoadWindow.ChangeFlags.None)
         return;
-      var sortChanged = changed.HasFlag(LoaderPanel.ChangeFlags.AutoSort);
-      var modsChanged = changed.HasFlag(LoaderPanel.ChangeFlags.Mods);
+      var sortChanged = changed.HasFlag(ManualLoadWindow.ChangeFlags.AutoSort);
+      var modsChanged = changed.HasFlag(ManualLoadWindow.ChangeFlags.Mods);
       if (sortChanged)
-        AutoSort = Configs.AutoSortOnStart.Value;
+        Configs.AutoLoadOnStart.Value = AutoSort = !AutoSort;
       if (sortChanged || modsChanged)
       {
         modList.CheckDependencies();
@@ -277,7 +277,7 @@ namespace StationeersLaunchPad
           modList.SortByDeps();
         ModConfigUtil.SaveConfig(modList.ToModConfig());
       }
-      var next = changed.HasFlag(LoaderPanel.ChangeFlags.NextStep);
+      var next = changed.HasFlag(ManualLoadWindow.ChangeFlags.NextStep);
       if (next)
         CurWait.Skip();
     }
@@ -291,6 +291,7 @@ namespace StationeersLaunchPad
       EssentialPatches.GameStarted = true;
 
       AlertPopup.Close();
+      Platform.SetBackgroundEnabled(true);
     }
 
     public static void ExportModPackage()

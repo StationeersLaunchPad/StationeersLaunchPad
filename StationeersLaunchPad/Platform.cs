@@ -2,7 +2,10 @@
 using Cysharp.Threading.Tasks;
 using StationeersLaunchPad.UI;
 using System.IO;
+using System.Linq;
 using UnityEngine;
+using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 namespace StationeersLaunchPad
 {
@@ -38,6 +41,10 @@ namespace StationeersLaunchPad
 
     public static bool PauseOnDepNotice => Current.PlatformPauseOnDepNotice;
     protected abstract bool PlatformPauseOnDepNotice { get; }
+
+    public static void SetBackgroundEnabled(bool enabled) =>
+      Current.PlatformSetBg(enabled);
+    protected abstract void PlatformSetBg(bool enabled);
   }
 
   public class ClientPlatform : Platform
@@ -66,6 +73,23 @@ namespace StationeersLaunchPad
       AlertPopup.PostUpdateRestartDialog();
 
     protected override bool PlatformPauseOnDepNotice => true;
+
+    private bool bgEnabled = true;
+    protected override void PlatformSetBg(bool enabled)
+    {
+      if (enabled == bgEnabled)
+        return;
+      bgEnabled = enabled;
+
+      var canvas = SceneManager.GetActiveScene()
+        .GetRootGameObjects()
+        .FirstOrDefault(go => go.name == "Canvas");
+      if (canvas == null)
+        return;
+
+      foreach (var img in canvas.GetComponentsInChildren<Image>())
+        img.color = enabled ? Color.white : Color.black;
+    }
   }
 
   public class ServerPlatform : Platform
@@ -103,5 +127,7 @@ namespace StationeersLaunchPad
     }
 
     protected override bool PlatformPauseOnDepNotice => false;
+
+    protected override void PlatformSetBg(bool enabled) { }
   }
 }
