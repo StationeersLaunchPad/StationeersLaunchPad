@@ -1,8 +1,10 @@
 ﻿using BepInEx.Configuration;
 using ImGuiNET;
+using StationeersLaunchPad.Loading;
 using StationeersLaunchPad.Metadata;
 using StationeersLaunchPad.Sources;
 using System;
+using System.Linq;
 using System.Reflection;
 using UI.ImGuiUi;
 using UnityEngine;
@@ -11,6 +13,11 @@ namespace StationeersLaunchPad.UI
 {
   internal class ConfigPanel
   {
+    private const ImGuiWindowFlags StaticWindowFlags = 0
+      | ImGuiWindowFlags.NoMove
+      | ImGuiWindowFlags.NoResize
+      | ImGuiWindowFlags.NoSavedSettings;
+
     public static void DrawWorkshopConfig(ModInfo modInfo)
     {
       var screenSize = ImguiHelper.ScreenSize;
@@ -22,13 +29,32 @@ namespace StationeersLaunchPad.UI
       {
         ImGui.SetNextWindowSize(bottomRight - topLeft);
         ImGui.SetNextWindowPos(topLeft);
-        if (ImGui.Begin("Mod Configuration##menuconfig", ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoSavedSettings))
-          DrawConfigEditor(modInfo);
+        ImGui.Begin("Mod Configuration##menuconfig", StaticWindowFlags);
+        DrawConfigEditor(
+          ModLoader.LoadedMods.FirstOrDefault(mod => mod.Info == modInfo),
+          modInfo);
         ImGui.End();
       });
     }
 
-    public static void DrawConfigEditor(ModInfo modInfo)
+    public static void DrawSettingsWindow()
+    {
+      var screenSize = ImguiHelper.ScreenSize;
+      var padding = new Vector2(25, 25);
+      var topLeft = new Vector2(screenSize.x - 800f - padding.x, padding.y);
+      var bottomRight = screenSize - padding;
+
+      ImGuiHelper.Draw(() =>
+      {
+        ImGui.SetNextWindowSize(bottomRight - topLeft);
+        ImGui.SetNextWindowPos(topLeft);
+        ImGui.Begin("LaunchPad Configuration##menulpconfig", StaticWindowFlags);
+        DrawConfigFile(Configs.Sorted, category => category != "Internal");
+        ImGui.End();
+      });
+    }
+
+    public static void DrawConfigEditor(LoadedMod mod, ModInfo modInfo)
     {
       if (modInfo == null || modInfo.Source == ModSourceType.Core)
       {
@@ -36,10 +62,9 @@ namespace StationeersLaunchPad.UI
         return;
       }
 
-      var mod = modInfo.Loaded;
       if (mod == null)
       {
-        ImGuiHelper.TextDisabled("Mod was not enabled at load time or is not configurable.");
+        ImGuiHelper.TextDisabled("Mod was not enabled at load time.");
         return;
       }
 

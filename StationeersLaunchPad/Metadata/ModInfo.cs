@@ -1,4 +1,3 @@
-using StationeersLaunchPad.Loading;
 using StationeersLaunchPad.Sources;
 using System.Collections.Generic;
 using System.IO;
@@ -20,9 +19,6 @@ namespace StationeersLaunchPad.Metadata
     // Configuration State
     public bool Enabled;
     public bool DepsWarned;
-
-    // Temp State (to be removed)
-    public LoadedMod Loaded;
 
     // Definition Accessors
     public ModAboutEx About => Def.About;

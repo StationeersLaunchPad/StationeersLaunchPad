@@ -32,15 +32,6 @@ namespace StationeersLaunchPad.Loading
 
   public abstract class LoadStrategy
   {
-    private readonly ModList modList;
-
-    protected LoadStrategy(ModList modList)
-    {
-      this.modList = modList;
-    }
-
-    protected IEnumerable<ModInfo> Mods => this.modList.EnabledMods.Where(mod => mod.Source != ModSourceType.Core);
-
     private bool failed = false;
 
     // returns true if all mods loaded successfully
@@ -83,22 +74,12 @@ namespace StationeersLaunchPad.Loading
 
   public class LoadStrategyLinearSerial : LoadStrategy
   {
-    public LoadStrategyLinearSerial(ModList modList) : base(modList) { }
-
     public override async UniTask LoadAssemblies()
     {
-      foreach (var info in this.Mods)
+      foreach (var mod in ModLoader.LoadedMods)
       {
-        var mod = info.Loaded ?? new LoadedMod(info);
         if (mod.LoadedAssemblies || mod.LoadFailed || mod.LoadFinished)
           continue;
-        else
-          info.Loaded = mod;
-
-        if (!ModLoader.LoadedMods.Contains(mod))
-        {
-          ModLoader.LoadedMods.Add(mod);
-        }
 
         try
         {
@@ -114,9 +95,8 @@ namespace StationeersLaunchPad.Loading
 
     public async override UniTask LoadAssets()
     {
-      foreach (var info in this.Mods)
+      foreach (var mod in ModLoader.LoadedMods)
       {
-        var mod = info.Loaded;
         if (mod == null || mod.LoadedAssets || mod.LoadFailed || mod.LoadFinished)
           continue;
 
@@ -134,9 +114,8 @@ namespace StationeersLaunchPad.Loading
 
     public async override UniTask LoadEntryPoints()
     {
-      foreach (var info in this.Mods)
+      foreach (var mod in ModLoader.LoadedMods)
       {
-        var mod = info.Loaded;
         if (mod == null || mod.LoadedEntryPoints || mod.LoadFailed || mod.LoadFinished)
           continue;
 
@@ -157,17 +136,12 @@ namespace StationeersLaunchPad.Loading
 
   public class LoadStrategyLinearParallel : LoadStrategy
   {
-    public LoadStrategyLinearParallel(ModList modList) : base(modList) { }
-
     public override async UniTask LoadAssemblies()
     {
-      await UniTask.WhenAll(this.Mods.Select(async (info) =>
+      await UniTask.WhenAll(ModLoader.LoadedMods.Select(async (mod) =>
       {
-        var mod = info.Loaded ?? new LoadedMod(info);
         if (mod.LoadedAssemblies || mod.LoadFailed || mod.LoadFinished)
           return;
-        else
-          info.Loaded = mod;
 
         if (!ModLoader.LoadedMods.Contains(mod))
           ModLoader.LoadedMods.Add(mod);
@@ -186,9 +160,8 @@ namespace StationeersLaunchPad.Loading
 
     public async override UniTask LoadAssets()
     {
-      await UniTask.WhenAll(this.Mods.Select(async (info) =>
+      await UniTask.WhenAll(ModLoader.LoadedMods.Select(async (mod) =>
       {
-        var mod = info.Loaded;
         if (mod == null || mod.LoadedAssets || mod.LoadFailed || mod.LoadFinished)
           return;
 
@@ -206,9 +179,8 @@ namespace StationeersLaunchPad.Loading
 
     public async override UniTask LoadEntryPoints()
     {
-      await UniTask.WhenAll(this.Mods.Select(async (info) =>
+      await UniTask.WhenAll(ModLoader.LoadedMods.Select(async (mod) =>
       {
-        var mod = info.Loaded;
         if (mod == null || mod.LoadedEntryPoints || mod.LoadFailed || mod.LoadFinished)
           return;
 
