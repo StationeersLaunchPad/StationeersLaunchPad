@@ -105,5 +105,64 @@ namespace StationeersLaunchPad.UI
 
       ImGui.End();
     }
+
+    // returns true if loading should continue
+    public static async UniTask<bool> PostUpdateRestartDialog()
+    {
+      var continueLoad = true;
+      bool restartGame()
+      {
+        ProcessUtil.RestartGame();
+        return false;
+      }
+      bool stopLoad()
+      {
+        continueLoad = false;
+        return true;
+      }
+      await Show(
+        "Restart Recommended",
+        "StationeersLaunchPad has been updated, it is recommended to restart the game.",
+        DefaultSize,
+        DefaultPosition,
+        ("Restart Game", restartGame),
+        ("Continue Loading", () => true),
+        ("Close", stopLoad)
+      );
+      return continueLoad;
+    }
+
+    // returns true if update should happen
+    public static async UniTask<bool> ShouldUpdateDialog(
+      string tagName, string description, string url)
+    {
+      var doUpdate = false;
+      bool acceptUpdate()
+      {
+        doUpdate = true;
+        return true;
+      }
+      bool openGithub()
+      {
+        Application.OpenURL(url);
+        return false;
+      }
+      bool rejectUpdate()
+      {
+        doUpdate = false;
+        return true;
+      }
+
+      await Show(
+        "Update Available",
+        $"StationeersLaunchPad {tagName} is available, would you like to automatically download and update?\n\n{description}",
+        new Vector2(800, 400),
+        DefaultPosition,
+        ("Yes", acceptUpdate),
+        ("View release info", openGithub),
+        ("No", rejectUpdate)
+      );
+      return doUpdate;
+    }
   }
 }

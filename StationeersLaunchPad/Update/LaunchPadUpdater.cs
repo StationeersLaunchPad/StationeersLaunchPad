@@ -1,17 +1,14 @@
-﻿using Assets.Scripts;
-using Cysharp.Threading.Tasks;
+﻿using Cysharp.Threading.Tasks;
 using StationeersLaunchPad.UI;
 using System;
 using System.IO;
-using System.IO.Compression;
-using System.Linq;
-using UnityEngine;
 
 namespace StationeersLaunchPad.Update
 {
   public static class LaunchPadUpdater
   {
-    private static string TargetAssetName(Github.Release release) => $"StationeersLaunchPad-{(GameManager.IsBatchMode ? "server" : "client")}-{release.TagName}.zip";
+    private static string TargetAssetName(Github.Release release) =>
+      $"StationeersLaunchPad-{(Platform.IsServer ? "server" : "client")}-{release.TagName}.zip";
 
     public static void RunPostUpdateCleanup()
     {
@@ -36,62 +33,6 @@ namespace StationeersLaunchPad.Update
       catch (Exception ex)
       {
         Logger.Global.LogWarning($"error occurred during post update cleanup: {ex.Message}");
-      }
-    }
-
-    // returns true if booster is successfully installed
-    public static async UniTask<bool> RunOneTimeBoosterInstall()
-    {
-      try
-      {
-        var installDir = LaunchPadPaths.InstallDir;
-        if (installDir == null)
-        {
-          Logger.Global.LogWarning("Invalid install dir. skipping booster install");
-          return false;
-        }
-        const string boosterName = "LaunchPadBooster.dll";
-        var boosterPath = Path.Combine(installDir.FullName, boosterName);
-        if (File.Exists(boosterPath))
-        {
-          // if file exists, this is a full install so nothing to do
-          return true;
-        }
-        var targetTag = $"v{LaunchPadInfo.VERSION}";
-        Logger.Global.Log($"Installing LaunchPadBooster from release {targetTag}");
-        var release = await Github.LaunchPadRepo.FetchTagRelease(targetTag);
-        if (release == null)
-        {
-          Logger.Global.LogError("Installation incomplete. Please download latest version from github.");
-          return false;
-        }
-
-        var assetName = TargetAssetName(release);
-        var asset = release.Assets.Find(asset => asset.Name == assetName);
-        if (asset == null)
-        {
-          Logger.Global.LogError($"Failed to find {assetName} in release. Installation incomplete. Please download latest version from github.");
-          return false;
-        }
-
-        using (var archive = await asset.FetchToMemory())
-        {
-          var entry = archive.Entries.First(entry => entry.Name == boosterName);
-          if (entry == null)
-          {
-            Logger.Global.LogError($"Failed to find {boosterName} in {assetName}. Installation incomplete. Please download latest version from github.");
-            return false;
-          }
-          entry.ExtractToFile(boosterPath);
-        }
-
-        return true;
-      }
-      catch (Exception ex)
-      {
-        Logger.Global.LogException(ex);
-        Logger.Global.LogError("An error occurred during LaunchPadBooster install. Some mods may not function properly");
-        return false;
       }
     }
 
@@ -124,35 +65,14 @@ namespace StationeersLaunchPad.Update
     public static async UniTask<bool> CheckShouldUpdate(Github.Release release)
     {
       // if autoupdate is not enabled on server, just move on after the out-of-date message
-      if (GameManager.IsBatchMode)
+      if (Platform.IsServer)
         return false;
 
-      var doUpdate = false;
-      bool acceptUpdate()
-      {
-        doUpdate = true;
-        return true;
-      }
-      bool openGithub()
-      {
-        Application.OpenURL(release.HtmlUrl);
-        return false;
-      }
-      bool rejectUpdate()
-      {
-        doUpdate = false;
-        return true;
-      }
-
-      var description = release.FormatDescription();
-      await AlertPopup.Show("Update Available", $"StationeersLaunchPad {release.TagName} is available, would you like to automatically download and update?\n\n{description}",
-        new Vector2(800, 400),
-        AlertPopup.DefaultPosition,
-        ("Yes", acceptUpdate),
-        ("View release info", openGithub),
-        ("No", rejectUpdate)
+      return await AlertPopup.ShouldUpdateDialog(
+        release.TagName,
+        release.FormatDescription(),
+        release.HtmlUrl
       );
-      return doUpdate;
     }
 
     // returns true if update was successfully performed
