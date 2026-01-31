@@ -4,6 +4,7 @@
 ## Get latest from https://github.com/github/gitignore/blob/main/VisualStudio.gitignore
 
 Stationeers.VS.User.props
+Stationeers.VS.Extra.props
 build/
 
 # User-specific files
