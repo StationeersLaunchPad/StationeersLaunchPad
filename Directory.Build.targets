@@ -1,21 +1,26 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Target Name="CopyToPlugins" AfterTargets="Build">
+  <ItemGroup>
+    <!-- Add extra CopyOutputDir items to Extra.props file to copy to multiple Stationeers installs -->
+    <CopyOutputDir Include="$(SLPPluginPath)" />
+  </ItemGroup>
+  <Target Name="CopyToPlugins" AfterTargets="Build" Outputs="%(CopyOutputDir.Identity)">
+    <PropertyGroup>
+      <CopyOutputDir>%(CopyOutputDir.Identity)</CopyOutputDir>
+    </PropertyGroup>
     <ItemGroup>
       <InputFiles Include="$(OutputPath)$(AssemblyName).*" />
-      <OutputFiles Include="$(SLPPluginPath)/$(AssemblyName).*" />
 
       <_CopyFiles_Dest Include="@(InputFiles)">
-        <Dest>$(SLPPluginPath)\%(Filename)%(Extension)</Dest>
+        <Dest>$(CopyOutputDir)\%(Filename)%(Extension)</Dest>
       </_CopyFiles_Dest>
 
       <CopyFiles Include="@(_CopyFiles_Dest)">
         <PrettySrc>$([System.String]::Copy('%(FullPath)').Replace('$(SolutionDir)', ''))</PrettySrc>
-        <PrettyDest>$([System.String]::Copy('%(Dest)').Replace('$(StationeersDirectory)', ''))</PrettyDest>
       </CopyFiles>
     </ItemGroup>
 
-    <Delete Files="%(OutputFiles.FullPath)" />
-    <Message Text="%(CopyFiles.PrettySrc) -> %(CopyFiles.PrettyDest)" Importance="high" />
+    <Delete Files="%(CopyFiles.Dest)" />
+    <Message Text="%(CopyFiles.PrettySrc) -> %(CopyFiles.Dest)" Importance="high" />
     <Copy SourceFiles="%(CopyFiles.FullPath)" DestinationFiles="%(CopyFiles.Dest)" />
   </Target>
 </Project>

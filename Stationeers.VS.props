@@ -1,5 +1,8 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(SolutionDir)Stationeers.VS.User.props" />
+  <!-- Optional extra build file for customized local build -->
+  <Import Project="$(SolutionDir)Stationeers.VS.Extra.props"
+    Condition="Exists('$(SolutionDir)Stationeers.VS.Extra.props')" />
 
   <PropertyGroup>
     <TargetFramework>net4.8</TargetFramework>
