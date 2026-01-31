@@ -41,7 +41,6 @@ namespace StationeersLaunchPad.Sources
 
     public ModDefinition(ModAboutEx about) => About = about;
 
-    public abstract string Name { get; }
     public abstract ModSourceType Type { get; }
     public abstract ulong WorkshopHandle { get; }
     public abstract string DirectoryPath { get; }

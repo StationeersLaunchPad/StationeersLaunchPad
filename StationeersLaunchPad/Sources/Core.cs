@@ -29,7 +29,6 @@ namespace StationeersLaunchPad.Sources
     }
 
     public CoreModDefinition() : base(GetModAbout()) { }
-    public override string Name => "Core";
     public override ModSourceType Type => ModSourceType.Core;
     public override ulong WorkshopHandle => 1;
     public override string DirectoryPath => "";
