@@ -94,7 +94,7 @@ namespace StationeersLaunchPad
 
   public class ServerPlatform : Platform
   {
-    protected override bool PlatformIsServer => false;
+    protected override bool PlatformIsServer => true;
 
     protected override ConfigDefaults PlatformConfigDefaults => new()
     {

@@ -102,6 +102,7 @@ namespace StationeersLaunchPad
       await StageInitializing();
       await StageUpdating();
       await StageSearching();
+      SLPCommand.RunStartup();
       await StageConfiguring();
       await StageLoading();
       await StageFinal();
