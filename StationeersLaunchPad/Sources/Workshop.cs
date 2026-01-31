@@ -42,7 +42,6 @@ namespace StationeersLaunchPad.Sources
     public WorkshopModDefinition(Item item, ModAboutEx about) : base(about) =>
       Item = item;
 
-    public override string Name => Item.Title;
     public override ModSourceType Type => ModSourceType.Workshop;
     public override ulong WorkshopHandle => Item.Id;
     public override string DirectoryPath => Item.Directory;

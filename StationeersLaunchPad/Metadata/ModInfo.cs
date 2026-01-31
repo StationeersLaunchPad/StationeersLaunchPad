@@ -25,7 +25,7 @@ namespace StationeersLaunchPad.Metadata
     public ModSourceType Source => Def.Type;
     public string Name => About.Name;
     public string DirectoryPath => Def.DirectoryPath;
-    public string DirectoryName => Path.GetDirectoryName(DirectoryPath);
+    public string DirectoryName => new DirectoryInfo(DirectoryPath).Name;
     public ulong WorkshopHandle => Def.WorkshopHandle;
     public string ModID => About.ModID ?? "";
 

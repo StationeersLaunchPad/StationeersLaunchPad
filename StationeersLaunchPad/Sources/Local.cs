@@ -51,7 +51,6 @@ namespace StationeersLaunchPad.Sources
     public readonly string ModDirectory;
     public LocalModDefinition(string modDir, ModAboutEx about) : base(about) =>
       ModDirectory = modDir;
-    public override string Name => Path.GetDirectoryName(ModDirectory);
     public override ModSourceType Type => ModSourceType.Local;
     public override ulong WorkshopHandle => About.WorkshopHandle;
     public override string DirectoryPath => ModDirectory;
