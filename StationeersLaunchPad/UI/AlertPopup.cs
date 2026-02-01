@@ -81,26 +81,36 @@ namespace StationeersLaunchPad.UI
       ImGui.SetNextWindowFocus();
       ImGui.Begin($"{Title}##popup", ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoSavedSettings);
 
+      var spacing = ImGui.GetStyle().ItemSpacing;
+      var available = ImGui.GetContentRegionAvail();
+      var startCursor = ImGui.GetCursorScreenPos();
+      var btnCount = Buttons?.Count ?? 1;
+      var buttonSize = new Vector2((available.x - spacing.x * (btnCount - 1)) / btnCount, 35);
+      var separatorHeight = spacing.y * 2 + 1;
+
+      var contentSize = new Vector2(available.x, available.y - buttonSize.y - separatorHeight);
+
+      ImGui.BeginChild("##popup_content", contentSize);
       ImGuiHelper.TextWrapped(Description);
+      ImGui.EndChild();
 
-      var buttonSize = new Vector2((Size.x / Buttons?.Count) ?? 1, 35);
-
-      ImGui.SetCursorPosY(Size.y - (buttonSize.y + 10));
+      ImGui.SetCursorScreenPos(new(startCursor.x, startCursor.y + contentSize.y + spacing.y));
       ImGui.Separator();
 
-      ImGui.SetCursorPosX(5);
+      var index = 0;
       foreach ((var text, var clicked) in Buttons)
       {
-        if (ImGui.Button(text, buttonSize - new Vector2(5, 0)))
+        ImGui.SetCursorScreenPos(new(
+          startCursor.x + (buttonSize.x + spacing.x) * index,
+          startCursor.y + available.y - buttonSize.y));
+        if (ImGui.Button(text, buttonSize))
         {
           if (clicked?.Invoke() == true)
           {
             Close();
           }
         }
-        ImGui.SetCursorPosX(ImGui.GetCursorPosX() - 5);
-
-        ImGui.SameLine();
+        index++;
       }
 
       ImGui.End();
