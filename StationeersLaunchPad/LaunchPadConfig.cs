@@ -46,8 +46,7 @@ namespace StationeersLaunchPad
 
     public StageWait(double seconds, bool auto) => (Seconds, Auto) = (seconds, auto);
 
-    public double SecondsRemaining =>
-      Math.Clamp(stopwatch.Elapsed.TotalSeconds - Seconds, 0, Seconds);
+    public double SecondsRemaining => Seconds - stopwatch.Elapsed.TotalSeconds;
     public bool Done => skipped || (Auto && SecondsRemaining <= 0);
 
     public void Skip() => skipped = true;
