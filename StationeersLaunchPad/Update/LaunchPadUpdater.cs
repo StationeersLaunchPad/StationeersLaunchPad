@@ -49,10 +49,7 @@ namespace StationeersLaunchPad.Update
       if (latestRelease == null)
         return null;
 
-      var latestVersion = new Version(latestRelease.TagName.TrimStart('V', 'v'));
-      var currentVersion = new Version(LaunchPadInfo.VERSION.TrimStart('V', 'v'));
-
-      if (latestVersion <= currentVersion)
+      if (Version.Compare(latestRelease.TagName, LaunchPadInfo.VERSION) <= 0)
       {
         Logger.Global.LogInfo($"StationeersLaunchPad is up-to-date.");
         return null;

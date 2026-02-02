@@ -9,7 +9,7 @@ namespace StationeersLaunchPad.Sources
   {
     public static readonly CoreModSource Instance = new();
     private CoreModSource() { }
-    public override async UniTask<List<ModDefinition>> ListMods() =>
+    public override async UniTask<List<ModDefinition>> ListMods(ModSourceState state) =>
       new() { new CoreModDefinition() };
   }
 

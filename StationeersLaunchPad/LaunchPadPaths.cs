@@ -15,6 +15,13 @@ namespace StationeersLaunchPad
     public static string SavePath => string.IsNullOrEmpty(Settings.CurrentData.SavePath) ? StationSaveUtils.DefaultPath : Settings.CurrentData.SavePath;
     public static string ConfigPath => WorkshopMenu.ConfigPath;
 
+    public static string ModReposConfigPath =>
+      Path.Join(StationSaveUtils.DefaultPath, "modrepos.xml");
+    public static string ModReposPath =>
+      Path.Join(StationSaveUtils.DefaultPath, "modrepos");
+    public static string RepoModsPath =>
+      Path.Join(StationSaveUtils.DefaultPath, "repomods");
+
     private static DirectoryInfo _cachedInstallDir;
     public static DirectoryInfo InstallDir
     {

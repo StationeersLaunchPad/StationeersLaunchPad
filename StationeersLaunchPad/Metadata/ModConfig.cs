@@ -9,7 +9,7 @@ namespace StationeersLaunchPad.Metadata
     public static ModConfig LoadConfig()
     {
       var config = File.Exists(LaunchPadPaths.ConfigPath)
-            ? XmlSerialization.Deserialize<ModConfig>(LaunchPadPaths.ConfigPath)
+            ? XmlSerialization.Deserialize<ModConfig>(LaunchPadPaths.ConfigPath) ?? new()
             : new ModConfig();
       config.CreateCoreMod();
       return config;

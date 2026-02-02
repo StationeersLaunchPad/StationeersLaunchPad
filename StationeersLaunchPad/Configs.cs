@@ -7,11 +7,6 @@ using System.Linq;
 
 namespace StationeersLaunchPad
 {
-  public enum DisableDuplicateMode
-  {
-    None, KeepLocal, KeepWorkshop
-  }
-
   // config values that have different defaults depending on platform
   public struct ConfigDefaults
   {
@@ -29,7 +24,10 @@ namespace StationeersLaunchPad
     public static ConfigEntry<bool> AutoLoadOnStart;
     public static ConfigEntry<bool> AutoSortOnStart;
     public static ConfigEntry<int> AutoLoadWaitTime;
-    public static ConfigEntry<DisableDuplicateMode> DisableDuplicates;
+    public static ConfigEntry<bool> DedupeMods;
+    public static ConfigEntry<int> DedupePriorityLocal;
+    public static ConfigEntry<int> DedupePriorityRepo;
+    public static ConfigEntry<int> DedupePriorityWorkshop;
     public static ConfigEntry<LoadStrategyType> LoadStrategyType;
     public static ConfigEntry<LoadStrategyMode> LoadStrategyMode;
     public static ConfigEntry<bool> DisableSteamOnStart;
@@ -40,6 +38,10 @@ namespace StationeersLaunchPad
     public static ConfigEntry<LogSeverity> LogSeverities;
     public static ConfigEntry<bool> CompactLogs;
     public static ConfigEntry<bool> LinuxPathPatch;
+    public static ConfigEntry<int> RepoUpdateFrequency;
+    public static ConfigEntry<int> RepoFetchTimeout;
+    public static ConfigEntry<int> RepoModFetchTimeout;
+    public static ConfigEntry<bool> RepoModValidateDigest;
 
     public static bool RunPostUpdateCleanup => CheckForUpdate.Value && PostUpdateCleanup.Value;
     public static bool RunOneTimeBoosterInstall => CheckForUpdate.Value && OneTimeBoosterInstall.Value;
@@ -91,11 +93,41 @@ namespace StationeersLaunchPad
           "Don't attempt to load steam workshop mods"
         )
       );
-      DisableDuplicates = config.Bind(
-        new ConfigDefinition("Mod Loading", "DisableDuplicates"),
-        DisableDuplicateMode.None,
+      var oldDedupe = config.Bind(
+        new ConfigDefinition("Mod Loading", "DisableDuplicates"), "");
+      var dedupeDefault = oldDedupe.Value switch
+      {
+        "KeepLocal" => new int[] { 1, 2, 1, 3 },
+        "KeepWorkshop" => new int[] { 1, 1, 2, 3 },
+        _ => new int[] { 0, 2, 1, 3 },
+      };
+      config.Remove(oldDedupe.Definition);
+      DedupeMods = config.Bind(
+        new ConfigDefinition("Mod Dedupe", "DedupeMods"),
+        dedupeDefault[0] != 0,
         new ConfigDescription(
-          "Automatically disable duplicate mods, keeping the mod with the preferred source"
+          "Automatically disable duplicate mods, keeping the mod type with the highest priority"
+        )
+      );
+      DedupePriorityLocal = config.Bind(
+        new ConfigDefinition("Mod Dedupe", "DedupePriorityLocal"),
+        dedupeDefault[1],
+        new ConfigDescription(
+          "Priority of Local mods when deduping, lower priority gets disabled"
+        )
+      );
+      DedupePriorityWorkshop = config.Bind(
+        new ConfigDefinition("Mod Dedupe", "DedupePriorityWorkshop"),
+        dedupeDefault[2],
+        new ConfigDescription(
+          "Priority of Workshop mods when deduping, lower priority gets disabled"
+        )
+      );
+      DedupePriorityRepo = config.Bind(
+        new ConfigDefinition("Mod Dedupe", "DedupePriorityRepo"),
+        dedupeDefault[3],
+        new ConfigDescription(
+          "Priority of Repo mods when deduping, lower priority gets disabled"
         )
       );
       LoadStrategyType = config.Bind(
@@ -117,6 +149,34 @@ namespace StationeersLaunchPad
         "",
         new ConfigDescription(
           "This setting allows you to override the default path that config and save files are stored. Notice, due to how this path is implemented in the base game, this setting can only be applied on server start.  Changing it while in game will not have an effect until after a restart."
+        )
+      );
+      RepoUpdateFrequency = config.Bind(
+        new ConfigDefinition("Mod Repos", "RepoUpdateFrequency"),
+        300,
+        new ConfigDescription(
+          "Minimum time in seconds before checking a mod repo for new versions."
+        )
+      );
+      RepoFetchTimeout = config.Bind(
+        new ConfigDefinition("Mod Repos", "RepoFetchTimeout"),
+        15,
+        new ConfigDescription(
+          "Maximum time in seconds to wait for listing available versions in a mod repo."
+        )
+      );
+      RepoModFetchTimeout = config.Bind(
+        new ConfigDefinition("Mod Repos", "RepoModFetchTimeout"),
+        60,
+        new ConfigDescription(
+          "Maximum time in seconds to wait for downloading a new mod version."
+        )
+      );
+      RepoModValidateDigest = config.Bind(
+        new ConfigDefinition("Mod Repos", "RepoModValidateDigest"),
+        true,
+        new ConfigDescription(
+          "Reject new mod versions when they don't match the digest provided by the repo."
         )
       );
       AutoScrollLogs = config.Bind(

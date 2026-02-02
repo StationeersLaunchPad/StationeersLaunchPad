@@ -153,16 +153,14 @@ namespace StationeersLaunchPad.Metadata
     }
 
     // returns true if any mods were disabled
-    public bool DisableDuplicates(DisableDuplicateMode mode)
+    public bool DisableDuplicates()
     {
-      if (mode == DisableDuplicateMode.None)
+      if (!Configs.DedupeMods.Value)
         return false;
-      var prefSource = mode switch
-      {
-        DisableDuplicateMode.KeepLocal => ModSourceType.Local,
-        DisableDuplicateMode.KeepWorkshop => ModSourceType.Workshop,
-        _ => throw new InvalidOperationException($"Unknown duplicate mode {mode}"),
-      };
+
+      var localPrio = Configs.DedupePriorityLocal.Value;
+      var workshopPrio = Configs.DedupePriorityWorkshop.Value;
+      var repoPrio = Configs.DedupePriorityRepo.Value;
 
       var prefMods = new ModSet();
       var disabledMods = new List<ModInfo>();
@@ -176,17 +174,24 @@ namespace StationeersLaunchPad.Metadata
           continue;
         }
         var nonPref = mod;
-        if (nonPref.Source == pref.Source)
+        var prefPrio = pref.Source switch
         {
-          // if we have 2 conflicting mods in the same source, just pick the first by path
-          if (string.Compare(nonPref.DirectoryPath, pref.DirectoryPath) < 0)
-            (nonPref, pref) = (pref, nonPref);
-        }
-        else if (nonPref.Source == prefSource)
+          ModSourceType.Local => localPrio,
+          ModSourceType.Workshop => workshopPrio,
+          ModSourceType.Repo => repoPrio,
+          _ => int.MinValue,
+        };
+        var nonprefPrio = nonPref.Source switch
         {
-          // otherwise keep the mod with the preferred source type
-          (nonPref, pref) = (pref, nonPref);
-        }
+          ModSourceType.Local => localPrio,
+          ModSourceType.Workshop => workshopPrio,
+          ModSourceType.Repo => repoPrio,
+          _ => int.MinValue,
+        };
+        // keep new mod if higher priority
+        // if equal, we keep the existing mod as its earlier in the load order
+        if (nonprefPrio > prefPrio)
+          (pref, nonPref) = (nonPref, pref);
         prefMods.Remove(nonPref);
         prefMods.Add(pref);
         nonPref.Enabled = false;

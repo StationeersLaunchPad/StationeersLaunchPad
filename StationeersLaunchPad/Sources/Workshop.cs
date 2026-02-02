@@ -13,9 +13,11 @@ namespace StationeersLaunchPad.Sources
   {
     public static readonly WorkshopModSource Instance = new();
     private WorkshopModSource() { }
-    public override async UniTask<List<ModDefinition>> ListMods()
+    public override async UniTask<List<ModDefinition>> ListMods(ModSourceState state)
     {
       var mods = new List<ModDefinition>();
+      if (state.SteamDisabled)
+        return mods;
 
       var items = await Steam.LoadWorkshopItems();
 

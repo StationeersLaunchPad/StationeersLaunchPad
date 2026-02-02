@@ -1,7 +1,9 @@
 
 using ImGuiNET;
 using StationeersLaunchPad.Metadata;
+using StationeersLaunchPad.Sources;
 using System.Collections.Generic;
+using UnityEngine;
 
 namespace StationeersLaunchPad.UI
 {
@@ -29,10 +31,28 @@ namespace StationeersLaunchPad.UI
           Steam.OpenWorkshopPage(mod.WorkshopHandle);
       }
 
+      var rdef = mod.Def as RepoModDefinition;
+      if (rdef != null && rdef.Mod.RepoID.StartsWith("github.com/"))
+      {
+        ImGui.SameLine();
+        if (ImGui.Button("Open Repo"))
+          Application.OpenURL($"https://{rdef.Mod.RepoID}");
+      }
+
       DrawOneLine("Source:", mod.Source.ToString());
 
       if (!string.IsNullOrEmpty(mod.DirectoryPath))
         DrawOneLine("Path:", mod.DirectoryPath);
+
+      if (rdef != null)
+      {
+        DrawOneLine("Repo:", rdef.Mod.RepoID);
+        if (!string.IsNullOrEmpty(rdef.Mod.Branch))
+          DrawOneLine("\tBranch:", rdef.Mod.Branch);
+        DrawOneLine("\tMinVersion:", rdef.Mod.MinVersion);
+        if (!string.IsNullOrEmpty(rdef.Mod.MaxVersion))
+          DrawOneLine("\tMaxVersion:", rdef.Mod.MaxVersion);
+      }
 
       if (about == null)
       {
