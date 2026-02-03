@@ -44,6 +44,14 @@ namespace StationeersLaunchPad.Loading
       return false;
     }
 
+    public static bool TryGetAssemblyMod(Assembly assembly, out LoadedMod mod)
+    {
+      lock (AssembliesLock)
+      {
+        return AssemblyToMod.TryGetValue(assembly, out mod);
+      }
+    }
+
     public static async UniTask WaitFor(AsyncOperation op)
     {
       while (!op.isDone)
