@@ -23,7 +23,7 @@ namespace StationeersLaunchPad
         {
           var res = instance.Execute(cmd);
           if (!string.IsNullOrEmpty(res))
-            ConsoleWindow.Print($"slp: {res}");
+            Compat.ConsoleWindowPrint($"slp: {res}");
         }
         catch (Exception ex)
         {

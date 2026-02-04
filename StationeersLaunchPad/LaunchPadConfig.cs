@@ -41,7 +41,7 @@ namespace StationeersLaunchPad
   {
     private readonly Stopwatch stopwatch = Stopwatch.StartNew();
     public readonly double Seconds;
-    public readonly bool Auto;
+    public bool Auto;
     private bool skipped = false;
 
     public StageWait(double seconds, bool auto) => (Seconds, Auto) = (seconds, auto);
@@ -66,7 +66,11 @@ namespace StationeersLaunchPad
 
     private static StageWait CurWait = new(0, false);
 
-    public static void StopAutoLoad() => AutoLoad = false;
+    public static void StopAutoLoad()
+    {
+      AutoLoad = false;
+      CurWait.Auto = false;
+    }
 
     public static void Draw()
     {
