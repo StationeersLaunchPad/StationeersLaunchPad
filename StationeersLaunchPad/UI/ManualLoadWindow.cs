@@ -95,10 +95,15 @@ namespace StationeersLaunchPad.UI
         ImGuiHelper.SeparatorLine(bottomRect.TL, bottomRect.TR);
         bottomRect = bottomRect.Shrink(0, 1, 0, 0);
 
-        ImGui.SetCursorScreenPos(bottomRect.TL);
-        ImGui.BeginChild("##logs", bottomRect.Size);
+        bottomRect.SplitOY(-ImGui.GetTextLineHeightWithSpacing(),
+          out var logRect, out var consoleRect);
+
+        ImGui.SetCursorScreenPos(logRect.TL);
+        ImGui.BeginChild("##logs", logRect.Size);
         LogPanel.DrawConsole(selectedMod?.Logger ?? Logger.Global);
         ImGui.EndChild();
+
+        StartupConsole.DrawInput(consoleRect);
 
         ImGui.End();
       });
