@@ -12,6 +12,8 @@ namespace StationeersLaunchPad.Repos
 {
   public static class ModRepos
   {
+    public static ModReposConfig Current;
+
     public static void SaveConfig(ModReposConfig config)
     {
       if (!config.SaveXml(LaunchPadPaths.ModReposConfigPath))
@@ -37,10 +39,21 @@ namespace StationeersLaunchPad.Repos
       await UniTask.WhenAll(config.Repos.Select(repo =>
         UniTask.RunOnThreadPool(() => LoadRepoCache(repo))));
 
+      return config;
+    }
+
+    public static async UniTask UpdateRepos(ModReposConfig config)
+    {
       Logger.Global.LogDebug("Fetching repo updates");
       await UniTask.WhenAll(config.Repos.Select(repo => UpdateRepoData(repo)));
+    }
 
-      return config;
+    public static void AssignNewRepoDir(ModReposConfig config, ModRepoDef repo)
+    {
+      var dirs = new DirAssignment();
+      foreach (var r in config.Repos)
+        dirs.Assign(r.DirName, r.ID);
+      repo.DirName = dirs.Assign(repo.DirName, repo.ID);
     }
 
     private static readonly XmlSerializer DataSerializer =
@@ -140,11 +153,42 @@ namespace StationeersLaunchPad.Repos
     public static async UniTask UpdateMods(ModReposConfig config)
     {
       var index = ModRepoIndex.Build(config);
+      var dirs = InitRepoModsAssignment(config);
+
+      var updateTasks = new List<UniTask>();
+
+      foreach (var mod in config.Mods)
+      {
+        if (!TryPickModUpdate(index, dirs, mod, out var target, out var newDir))
+          continue;
+        updateTasks.Add(PerformModUpdate(mod, target, newDir));
+      }
+
+      if (updateTasks.Count > 0)
+        await UniTask.WhenAll(updateTasks);
+
+      CleanRepoModDirs(config);
+    }
+
+    public static async UniTask<bool> UpdateMod(ModReposConfig config, RepoModDef mod)
+    {
+      var index = ModRepoIndex.Build(config);
+      var dirs = InitRepoModsAssignment(config);
+      if (!TryPickModUpdate(index, dirs, mod, out var target, out var newDir))
+        return false;
+      return await PerformModUpdate(mod, target, newDir);
+    }
+
+    private static DirAssignment InitRepoModsAssignment(ModReposConfig config)
+    {
       var dirs = new DirAssignment();
       foreach (var mod in config.Mods)
       {
+        if (mod.DirName is null)
+          continue;
         if (!dirs.CanAssign(mod.DirName))
         {
+          Logger.Global.LogDebug($"repomod dir {mod.DirName} already in use");
           mod.DirName = null;
           continue;
         }
@@ -152,39 +196,43 @@ namespace StationeersLaunchPad.Repos
           LaunchPadPaths.RepoModsPath, mod.DirName, "About/About.xml");
         if (!File.Exists(aboutPath))
         {
+          Logger.Global.LogDebug($"repomod dir {mod.DirName} missing About/About.xml");
           mod.DirName = null;
           continue;
         }
         if (!dirs.TryAssign(mod.DirName))
           throw new InvalidOperationException();
       }
+      return dirs;
+    }
 
-      var updateTasks = new List<UniTask>();
-
-      foreach (var mod in config.Mods)
+    private static bool TryPickModUpdate(
+      ModRepoIndex index, DirAssignment dirs, RepoModDef mod,
+      out ModVersionData target, out string newDir)
+    {
+      mod.PrevDirName = mod.DirName;
+      target = index.GetLatest(
+        mod.ModID, mod.RepoID, mod.Branch, mod.MinVersion, mod.MaxVersion);
+      if (target == null)
       {
-        mod.PrevDirName = mod.DirName;
-        var target = index.GetLatest(
-          mod.ModID, mod.RepoID, mod.Branch, mod.MinVersion, mod.MaxVersion);
-        if (target == null)
-        {
-          Logger.Global.LogWarning(
-            $"No valid versions for {mod.ModID}@{mod.Branch}[{mod.MinVersion},{mod.MaxVersion}] in {mod.RepoID}");
-          continue;
-        }
-        if (!string.IsNullOrEmpty(mod.DirName)
-          && Version.Compare(target.Version, mod.Version) <= 0)
-        {
-          Logger.Global.LogDebug($"{mod.ModID}@{mod.Branch}[{mod.Version}] in {mod.RepoID} up to date");
-          continue;
-        }
-        var newDir = dirs.Assign(null, $"{mod.ModID}_{mod.Branch}_{target.Version}");
-        updateTasks.Add(UpdateMod(mod, target, newDir));
+        Logger.Global.LogWarning(
+          $"No valid versions for {mod.ModID}@{mod.Branch}[{mod.MinVersion},{mod.MaxVersion}] in {mod.RepoID}");
+        newDir = null;
+        return false;
       }
+      if (!string.IsNullOrEmpty(mod.DirName)
+        && Version.Compare(target.Version, mod.Version) <= 0)
+      {
+        Logger.Global.LogDebug($"{mod.ModID}@{mod.Branch}[{mod.Version}] in {mod.RepoID} up to date");
+        newDir = null;
+        return false;
+      }
+      newDir = dirs.Assign(null, $"{mod.ModID}_{mod.Branch}_{target.Version}");
+      return true;
+    }
 
-      if (updateTasks.Count > 0)
-        await UniTask.WhenAll(updateTasks);
-
+    public static void CleanRepoModDirs(ModReposConfig config)
+    {
       var modDirs = new HashSet<string>();
       foreach (var mod in config.Mods)
         if (!string.IsNullOrEmpty(mod.DirName))
@@ -200,7 +248,7 @@ namespace StationeersLaunchPad.Repos
       }
     }
 
-    private static async UniTask UpdateMod(
+    private static async UniTask<bool> PerformModUpdate(
       RepoModDef mod, ModVersionData target, string dirName)
     {
       var curName = $"{mod.ModID}@{mod.Branch}[{mod.Version}]";
@@ -208,13 +256,16 @@ namespace StationeersLaunchPad.Repos
       Logger.Global.LogInfo($"Updating {curName} to {target.Version}");
       try
       {
+        if (string.IsNullOrEmpty(dirName))
+          throw new InvalidOperationException($"empty dirName for {curName} during update");
+
         using var req = UnityWebRequest.Get(target.Url);
         req.timeout = Configs.RepoModFetchTimeout.Value;
         var res = await req.SendWebRequest();
         if (res.responseCode != 200)
         {
           Logger.Global.LogError($"Error fetching {targetName} from {mod.RepoID}: status {res.responseCode}");
-          return;
+          return false;
         }
         var data = res.downloadHandler.data;
 
@@ -227,7 +278,7 @@ namespace StationeersLaunchPad.Repos
             if (Configs.RepoModValidateDigest.Value)
             {
               Logger.Global.LogError(msg);
-              return;
+              return false;
             }
             Logger.Global.LogWarning(msg);
           }
@@ -244,16 +295,18 @@ namespace StationeersLaunchPad.Repos
         {
           Logger.Global.LogError($"{mod.ModID}@{mod.Branch}[{target.Version}] from {mod.RepoID} does not contain an About/About.xml file. skipping update");
           try { Directory.Delete(dirPath, true); } catch { }
-          return;
+          return false;
         }
         Logger.Global.LogInfo($"Updated {mod.ModID}@{mod.Branch}[{mod.Version}] to {target.Version}");
         mod.Version = target.Version;
         mod.DirName = dirName;
+        return true;
       }
       catch (Exception ex)
       {
         Logger.Global.LogError($"Error updating {mod.ModID}@{mod.Branch}[{mod.Version}] to {target.Version}");
         Logger.Global.LogException(ex);
+        return false;
       }
     }
 

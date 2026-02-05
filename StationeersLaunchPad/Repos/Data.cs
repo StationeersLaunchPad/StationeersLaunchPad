@@ -32,6 +32,8 @@ namespace StationeersLaunchPad.Repos
   {
     [XmlAttribute("Value")] public string Value;
 
+    public override string ToString() => Value;
+
     public static implicit operator StringData(string value) =>
       new() { Value = value };
     public static implicit operator string(StringData data) =>

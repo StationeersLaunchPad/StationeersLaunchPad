@@ -31,6 +31,7 @@ namespace StationeersLaunchPad.UI
         submitted = true;
         var args = CmdLineParser.SplitCommandLine(input).ToArray();
         string res = null;
+        Logger.Global.LogInfo($"> {input}");
         try
         {
           res = SLPCommand.Instance.ExecuteStartup(args);
@@ -49,8 +50,8 @@ namespace StationeersLaunchPad.UI
         submitted = false;
       }
 
-      if (ImGui.IsItemActive() && input.Length > 0)
-        DrawPopupWindow(rect);
+      // if (ImGui.IsItemActive() && input.Length > 0)
+      //   DrawPopupWindow(rect);
 
       return false;
     }
