@@ -50,3 +50,13 @@ __StationeersLaunchPad and StationeersMods can't be installed together__. Both m
   - enable/disable and reorder mods to match what you want installed on the server
   - on the Launchpad Configuration tab, click `Export Mod Package` to create a zip file containing the enabled mods and config file
   - extract the zip file into the dedicated server folder (should create `modconfig.xml` and `mods` folder in same folder as `rocketstation_DedicatedServer.exe`)
+
+## Modding
+Information on modding stationeers can be found at:
+- [Stationeers Modding Docs](https://stationeerslaunchpad.github.io/docs/) (work in progress)
+- [Stationeers Discord](https://discord.gg/stationeers) #modding channel
+- [Stationeers Modding Discord](https://discord.gg/5qZbPVTw2U)
+- [LaunchPadBooster library](https://github.com/StationeersLaunchPad/LaunchPadBooster)
+
+### Linking against StationeersLaunchPad
+Linking against StationeersLaunchPad (using any class in the `StationeersLaunchPad` namespace or nested namespaces) is unsupported. These classes are not a stable API, and will change without notice. The code is MIT licensed so you are free to copy any utilities you want to use into your own mod. LaunchPadBooster also contains utilities with a stable API that can be used by mods. If there is something you need that only StationeersLaunchPad has, reach out on github or discord and it can be added as an injected parameter to the Default Entrypoint.

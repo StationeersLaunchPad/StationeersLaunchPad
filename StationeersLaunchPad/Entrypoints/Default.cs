@@ -57,26 +57,18 @@ namespace StationeersLaunchPad.Entrypoints
       var mparams = loadMethod.GetParameters();
       if (mparams.Length == 0)
         return null;
-      var hasPrefabs = false;
-      var hasConfig = false;
-      var eparams = new List<EntrypointParam>();
-      foreach (var arg in mparams)
-      {
-        if (arg.ParameterType == typeof(List<GameObject>) && !hasPrefabs)
-        {
-          eparams.Add(new PrefabsParam());
-          hasPrefabs = true;
-        }
-        else if (arg.ParameterType == typeof(ConfigFile) && !hasConfig)
-        {
-          eparams.Add(new ConfigParam());
-          hasConfig = true;
-        }
-        else
-          return null;
-      }
+      var eparams = Parser.Parse(mparams);
+      if (eparams == null)
+        return null;
       return new(mod, type, loadMethod, eparams);
     }
+
+    private static ParamPatternMatch<EntrypointParam> Parser =
+      new ParamPatternMatch<EntrypointParam>()
+        .Register<List<GameObject>, PrefabsParam>()
+        .Register<ConfigFile, ConfigParam>()
+        .Register<List<Assembly>, AssembliesParam>()
+        .Register<ModData, ModDataParam>();
 
     public abstract class EntrypointParam
     {
@@ -115,6 +107,15 @@ namespace StationeersLaunchPad.Entrypoints
         return Config = new ConfigFile(path, true);
       }
     }
+    public class AssembliesParam : EntrypointParam
+    {
+      public override object GetParam(DefaultEntrypoint entry) => entry.Mod.Assemblies;
+    }
+    public class ModDataParam : EntrypointParam
+    {
+      public override object GetParam(DefaultEntrypoint entry) =>
+        entry.Mod.Info.Def.ToModData(true);
+    }
   }
 
   public partial class EntrypointSearch
@@ -147,6 +148,39 @@ namespace StationeersLaunchPad.Entrypoints
         }
       });
       return entries;
+    }
+  }
+
+  public class ParamPatternMatch<T>
+  {
+    private readonly Dictionary<Type, int> ptypeToIndex = new();
+    private readonly List<Func<T>> ctors = new();
+
+    public ParamPatternMatch<T> Register<P, T2>() where T2 : T, new()
+    {
+      ptypeToIndex.Add(typeof(P), ctors.Count);
+      ctors.Add(() => new T2());
+      return this;
+    }
+
+    public List<T> Parse(ParameterInfo[] ptypes)
+    {
+      Span<bool> used = stackalloc bool[ctors.Count];
+      Span<int> idxs = stackalloc int[ptypes.Length];
+
+      for (var i = 0; i < ptypes.Length; i++)
+      {
+        if (!ptypeToIndex.TryGetValue(ptypes[i].ParameterType, out idxs[i]))
+          return null;
+        if (used[idxs[i]])
+          return null;
+        used[idxs[i]] = true;
+      }
+
+      var res = new List<T>(ptypes.Length);
+      foreach (var idx in idxs)
+        res.Add(ctors[idx]());
+      return res;
     }
   }
 }

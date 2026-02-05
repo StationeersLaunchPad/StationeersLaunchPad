@@ -49,6 +49,7 @@ namespace StationeersLaunchPad.UI
 
     private static ulong lastLineCount = 0;
     private static Logger lastLogger = null;
+    private static int tooltipDelay = 0;
     public static void DrawConsole(Logger logger)
     {
       ConfigPanel.DrawEnumEntry(Configs.LogSeverities, Configs.LogSeverities.Value);
@@ -73,7 +74,12 @@ namespace StationeersLaunchPad.UI
         ImGui.SetScrollHereY();
       }
 
-      ImGuiHelper.DrawIfHovering(() =>
+      if (ImGui.IsWindowHovered())
+        tooltipDelay--;
+      else
+        tooltipDelay = 15;
+
+      if (tooltipDelay <= 0)
       {
         ImGuiHelper.TextTooltip("Right-click to copy logs.");
         if (ImGui.IsMouseClicked(ImGuiMouseButton.Right))
@@ -81,7 +87,7 @@ namespace StationeersLaunchPad.UI
           logger.CopyToClipboard();
           logger.Log("Logs copied to clipboard.");
         }
-      });
+      }
 
       ImGui.EndChild();
     }

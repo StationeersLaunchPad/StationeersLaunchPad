@@ -68,7 +68,7 @@ namespace StationeersLaunchPad
 
     private void RegisterCommand()
     {
-      CommandLine.AddCommand("slp", new SLPCommand());
+      CommandLine.AddCommand("slp", SLPCommand.Instance);
     }
   }
 }
