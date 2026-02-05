@@ -321,6 +321,11 @@ namespace StationeersLaunchPad.UI
     public Vector2 BL => new(Min.x, Max.y);
     public Vector2 BR => Max;
 
+    public float L => Min.x;
+    public float T => Min.y;
+    public float R => Max.x;
+    public float B => Max.y;
+
     // split at absolute X/Y value
     public void SplitAX(float x, out Rect left, out Rect right) =>
       (left, right) = (new(Min, new(x, Max.y)), new(new(x, Min.y), Max));
