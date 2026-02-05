@@ -1,6 +1,7 @@
 
 using Cysharp.Threading.Tasks;
 using StationeersLaunchPad.Metadata;
+using StationeersLaunchPad.Repos;
 using System.Collections.Generic;
 
 namespace StationeersLaunchPad.Sources
@@ -9,24 +10,31 @@ namespace StationeersLaunchPad.Sources
   {
     Core,
     Local,
-    Workshop
+    Workshop,
+    Repo,
+  }
+
+  public struct ModSourceState
+  {
+    public bool SteamDisabled;
+    public ModReposConfig Repos;
   }
 
   public abstract class ModSource
   {
-    public abstract UniTask<List<ModDefinition>> ListMods();
+    public abstract UniTask<List<ModDefinition>> ListMods(ModSourceState state);
 
-    public static async UniTask<List<ModDefinition>> ListAll(bool includeWorkshop)
+    public static async UniTask<List<ModDefinition>> ListAll(ModSourceState state)
     {
       var listTasks = new List<UniTask<List<ModDefinition>>>()
       {
-        CoreModSource.Instance.ListMods(),
-        LocalModSource.Instance.ListMods(),
+        CoreModSource.Instance.ListMods(state),
+        LocalModSource.Instance.ListMods(state),
+        WorkshopModSource.Instance.ListMods(state),
+        RepoModSource.Instance.ListMods(state),
       };
-      if (includeWorkshop)
-        listTasks.Add(WorkshopModSource.Instance.ListMods());
-      var lists = await UniTask.WhenAll(listTasks);
 
+      var lists = await UniTask.WhenAll(listTasks);
       var mods = new List<ModDefinition>();
       foreach (var list in lists)
         mods.AddRange(list);

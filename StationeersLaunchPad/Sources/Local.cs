@@ -12,38 +12,38 @@ namespace StationeersLaunchPad.Sources
   {
     public static readonly LocalModSource Instance = new();
     private LocalModSource() { }
-    public override UniTask<List<ModDefinition>> ListMods() =>
-      UniTask.RunOnThreadPool(() =>
+    public override async UniTask<List<ModDefinition>> ListMods(ModSourceState state)
+    {
+      await UniTask.SwitchToThreadPool();
+      var type = SteamTransport.WorkshopType.Mod;
+      var localDir = type.GetLocalDirInfo();
+      var fileName = type.GetLocalFileName();
+      var mods = new List<ModDefinition>();
+
+      if (!localDir.Exists)
       {
-        var type = SteamTransport.WorkshopType.Mod;
-        var localDir = type.GetLocalDirInfo();
-        var fileName = type.GetLocalFileName();
-        var mods = new List<ModDefinition>();
-
-        if (!localDir.Exists)
-        {
-          Logger.Global.LogWarning("local mod folder not found");
-          return mods;
-        }
-
-        foreach (var dir in localDir.GetDirectories("*", SearchOption.AllDirectories))
-        {
-          foreach (var file in dir.GetFiles(fileName))
-          {
-            var modDir = dir.Parent;
-            var about = XmlSerialization.Deserialize<ModAboutEx>(
-              file.FullName, "ModMetadata") ?? new()
-              {
-                Name = $"[Invalid About.xml] {modDir.Name}",
-                Author = "",
-                Version = "",
-                Description = "",
-              };
-            mods.Add(new LocalModDefinition(modDir.FullName, about));
-          }
-        }
+        Logger.Global.LogWarning("local mod folder not found");
         return mods;
-      });
+      }
+
+      foreach (var dir in localDir.GetDirectories("*", SearchOption.AllDirectories))
+      {
+        foreach (var file in dir.GetFiles(fileName))
+        {
+          var modDir = dir.Parent;
+          var about = XmlSerialization.Deserialize<ModAboutEx>(
+            file.FullName, "ModMetadata") ?? new()
+            {
+              Name = $"[Invalid About.xml] {modDir.Name}",
+              Author = "",
+              Version = "",
+              Description = "",
+            };
+          mods.Add(new LocalModDefinition(modDir.FullName, about));
+        }
+      }
+      return mods;
+    }
   }
 
   public class LocalModDefinition : ModDefinition

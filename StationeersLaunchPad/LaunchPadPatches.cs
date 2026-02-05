@@ -18,6 +18,7 @@ using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.UI;
 using GameString = Assets.Scripts.Localization2.GameString;
 
 namespace StationeersLaunchPad
@@ -239,6 +240,10 @@ namespace StationeersLaunchPad
     [HarmonyPatch(typeof(WorkshopMenu), "SelectMod"), HarmonyPostfix]
     static void WorkshopMenuSelectMod(WorkshopMenu __instance, WorkshopModListItem modItem)
     {
+      var publishButton = __instance.SelectedModButtonRight;
+      if (publishButton == null)
+        return;
+
       if (modItem == null)
         return;
 
@@ -250,25 +255,38 @@ namespace StationeersLaunchPad
       if (modInfo == null)
         return;
 
-      var (valid, error) = Steam.ValidateForWorkshop(modInfo);
-      if (!valid && !string.IsNullOrEmpty(error))
-      {
-        AlertPanel.Instance.ShowAlert(error, AlertState.Alert);
-        __instance.SelectedModButtonRight?.SetActive(false);
-        return;
-      }
-
       var modAbout = modInfo.About;
       if (modAbout == null)
         return;
 
-      var publishButton = __instance.SelectedModButtonRight?.GetComponentInChildren<TextMeshProUGUI>();
-      if (modInfo.Source == ModSourceType.Local && modAbout.WorkshopHandle == 0)
-        publishButton.SetText("Publish");
-      else if (modInfo.Source == ModSourceType.Workshop)
-        publishButton.SetText("Unsubscribe");
-      else
-        publishButton.SetText("Update");
+      if (modInfo.Source is ModSourceType.Local)
+      {
+        var (valid, error) = Steam.ValidateForWorkshop(modInfo);
+        if (!valid && !string.IsNullOrEmpty(error))
+        {
+          AlertPanel.Instance.ShowAlert(error, AlertState.Alert);
+          publishButton.SetActive(false);
+          return;
+        }
+      }
+
+      var publishText = publishButton.GetComponentInChildren<TextMeshProUGUI>();
+      switch (modInfo.Source)
+      {
+        case ModSourceType.Local:
+          publishButton.SetActive(true);
+          publishText.SetText(modAbout.WorkshopHandle == 0 ? "Publish" : "Update");
+          break;
+        case ModSourceType.Workshop:
+          publishButton.SetActive(true);
+          publishText.SetText("Unsubscribe");
+          break;
+        case ModSourceType.Core:
+        case ModSourceType.Repo:
+        default:
+          publishButton.SetActive(false);
+          break;
+      }
 
       var modIGDescription = modAbout.InGameDescription;
       __instance.DescriptionText.text = !string.IsNullOrEmpty(modIGDescription) ? modIGDescription : TextFormatting.SteamToTMP(modAbout.Description);
@@ -293,6 +311,19 @@ namespace StationeersLaunchPad
           Application.OpenURL(linkInfo.GetLinkID());
         }
       }
+    }
+
+    [HarmonyPatch(typeof(WorkshopModListItem), "SetFormatModName"), HarmonyPostfix]
+    static void WorkshopModListItemIcon(WorkshopModListItem __instance, Image ____icon)
+    {
+      try
+      {
+        var mod = LaunchPadConfig.MatchMod(__instance.Data);
+        if (mod?.Source is not ModSourceType.Repo)
+          return;
+        ____icon.sprite = Stationpedia.Instance?.HomePageOverrideImage;
+      }
+      catch { }
     }
 
     private static FieldInfo workshopMenuSelectedField;

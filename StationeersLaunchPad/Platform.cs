@@ -1,6 +1,7 @@
 
 using Cysharp.Threading.Tasks;
 using StationeersLaunchPad.UI;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEngine;
@@ -20,6 +21,21 @@ namespace StationeersLaunchPad
           Application.platform
             is RuntimePlatform.WindowsServer
             or RuntimePlatform.LinuxServer;
+
+    private static HashSet<char> InvalidFileChars;
+    public static string MakeValidFileName(string name, char replacement = '_')
+    {
+      if (InvalidFileChars == null)
+      {
+        InvalidFileChars = new();
+        foreach (var c in Path.GetInvalidFileNameChars())
+          InvalidFileChars.Add(c);
+      }
+      var res = new char[name.Length];
+      for (var i = 0; i < name.Length; i++)
+        res[i] = InvalidFileChars.Contains(name[i]) ? replacement : name[i];
+      return new(res);
+    }
 
     public static bool IsServer => Current.PlatformIsServer;
     protected abstract bool PlatformIsServer { get; }

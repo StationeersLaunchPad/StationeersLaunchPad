@@ -4,6 +4,7 @@ using Assets.Scripts.Util;
 using Cysharp.Threading.Tasks;
 using StationeersLaunchPad.Loading;
 using StationeersLaunchPad.Metadata;
+using StationeersLaunchPad.Repos;
 using StationeersLaunchPad.Sources;
 using StationeersLaunchPad.UI;
 using StationeersLaunchPad.Update;
@@ -199,15 +200,27 @@ namespace StationeersLaunchPad
       Stage = LoadStage.Searching;
       try
       {
+        Logger.Global.LogInfo("Loading Mod Repos");
+        var modRepos = await ModRepos.LoadConfig();
+        ModRepos.SaveConfig(modRepos);
+        await ModRepos.UpdateMods(modRepos);
+        ModRepos.SaveConfig(modRepos);
+
         Logger.Global.LogInfo("Listing Mods");
-        modList = ModList.FromDefs(await ModSource.ListAll(!SteamDisabled));
+        modList = ModList.FromDefs(await ModSource.ListAll(new()
+        {
+          Repos = modRepos,
+          SteamDisabled = SteamDisabled,
+        }));
 
         Logger.Global.LogInfo("Loading Mod Config");
-        modList.ApplyConfig(ModConfigUtil.LoadConfig());
+        var modConfig = ModConfigUtil.LoadConfig();
+        ModRepos.UpdateModPaths(modRepos, modConfig);
+        modList.ApplyConfig(modConfig);
         ModConfigUtil.SaveConfig(modList.ToModConfig());
 
         var depNotice = !modList.CheckDependencies();
-        depNotice = modList.DisableDuplicates(Configs.DisableDuplicates.Value) || depNotice;
+        depNotice = modList.DisableDuplicates() || depNotice;
         if (AutoSort)
           depNotice = !modList.SortByDeps() || depNotice;
 
@@ -280,7 +293,7 @@ namespace StationeersLaunchPad
       if (sortChanged || modsChanged)
       {
         modList.CheckDependencies();
-        modList.DisableDuplicates(Configs.DisableDuplicates.Value);
+        modList.DisableDuplicates();
         if (AutoSort)
           modList.SortByDeps();
         ModConfigUtil.SaveConfig(modList.ToModConfig());

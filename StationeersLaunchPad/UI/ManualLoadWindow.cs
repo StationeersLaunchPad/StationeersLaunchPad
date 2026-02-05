@@ -170,41 +170,34 @@ namespace StationeersLaunchPad.UI
       ImGui.SameLine();
       ImGuiHelper.Text("Enable:");
 
-      const int hasEnabled = 1;
-      const int hasDisabled = 2;
-      const int hasBoth = hasEnabled | hasDisabled;
-      var allState = 0;
-      var localState = 0;
-      var workshopState = 0;
+      const byte hasEnabled = 1;
+      const byte hasDisabled = 2;
+      const byte hasBoth = hasEnabled | hasDisabled;
 
+      Span<byte> states = stackalloc byte[4];
       foreach (var mod in modList.AllMods)
       {
         if (mod.Source is ModSourceType.Core)
           continue;
         var flag = mod.Enabled ? hasEnabled : hasDisabled;
-        allState |= flag;
-        if (mod.Source is ModSourceType.Local)
-          localState |= flag;
-        else
-          workshopState |= flag;
+        states[0] |= flag;
+        states[(int) mod.Source] |= flag;
       }
+      Span<byte> tgtStates = stackalloc byte[] { hasBoth, hasBoth, hasBoth, hasBoth };
 
-      var tgtLocal = hasBoth;
-      var tgtWorkshop = hasBoth;
-
-      bool SelectCheckbox(string label, int curState, out int nextState, bool force = false)
+      bool SelectCheckbox(string label, byte curState, out byte nextState, bool force = false)
       {
         if (curState == 0 && !force)
         {
-          nextState = 0;
+          nextState = hasBoth;
           return false;
         }
         ImGui.SameLine();
         ImGui.PushItemFlag(ImGuiItemFlags.MixedValue, curState == hasBoth);
         nextState = curState switch
         {
-          hasEnabled => hasDisabled,
-          _ => hasEnabled,
+          hasDisabled => hasEnabled,
+          _ => hasDisabled,
         };
         var tempState = (curState & hasEnabled) != 0;
         var res = ImGui.Checkbox(label, ref tempState);
@@ -212,22 +205,27 @@ namespace StationeersLaunchPad.UI
         return res;
       }
 
-      ImGui.BeginDisabled(allState == 0);
-      if (SelectCheckbox("All##enableAll", allState, out var nextState, force: true))
-        tgtLocal = tgtWorkshop = nextState;
-      if (SelectCheckbox("Local##enableLocal", localState, out nextState))
-        tgtLocal = nextState;
-      if (SelectCheckbox("Workshop##enableWorkshop", workshopState, out nextState))
-        tgtWorkshop = nextState;
+      ImGui.BeginDisabled(states[0] == 0);
+      if (SelectCheckbox("All##enableAll", states[0], out var nextState, force: true))
+        tgtStates.Fill(nextState);
+      if (SelectCheckbox("Local##enableLocal",
+          states[(int) ModSourceType.Local], out nextState))
+        tgtStates[(int) ModSourceType.Local] = nextState;
+      if (SelectCheckbox("Workshop##enableWorkshop",
+          states[(int) ModSourceType.Workshop], out nextState))
+        tgtStates[(int) ModSourceType.Workshop] = nextState;
+      if (SelectCheckbox("Repo##enableRepo",
+          states[(int) ModSourceType.Repo], out nextState))
+        tgtStates[(int) ModSourceType.Repo] = nextState;
       ImGui.EndDisabled();
 
-      if (tgtLocal != hasBoth || tgtWorkshop != hasBoth)
+      if ((tgtStates[1] & tgtStates[2] & tgtStates[3]) != hasBoth)
       {
         foreach (var mod in modList.AllMods)
         {
           if (mod.Source is ModSourceType.Core)
             continue;
-          var tgtFlags = mod.Source is ModSourceType.Workshop ? tgtWorkshop : tgtLocal;
+          var tgtFlags = tgtStates[(int) mod.Source];
           if (tgtFlags == hasBoth)
             continue;
           var tgt = (tgtFlags & hasEnabled) != 0;
