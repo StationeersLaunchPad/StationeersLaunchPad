@@ -35,7 +35,6 @@ namespace StationeersLaunchPad.UI
 
       ImGuiHelper.Draw(() =>
       {
-        ImGuiHelper.ApplyStationeersStyle();
         ImGui.SetNextWindowSize(bottomRight - topLeft);
         ImGui.SetNextWindowPos(topLeft);
         ImGui.Begin("Mod Configuration##menuconfig", StaticWindowFlags);
@@ -43,7 +42,6 @@ namespace StationeersLaunchPad.UI
           ModLoader.LoadedMods.FirstOrDefault(mod => mod.Info == modInfo),
           modInfo);
         ImGui.End();
-        ImGuiHelper.RestoreDefaultSTyle();
       });
     }
 
@@ -58,10 +56,8 @@ namespace StationeersLaunchPad.UI
       {
         ImGui.SetNextWindowSize(bottomRight - topLeft);
         ImGui.SetNextWindowPos(topLeft);
-        ImGuiHelper.ApplyStationeersStyle();
         ImGui.Begin("LaunchPad Configuration##menulpconfig", StaticWindowFlags);
         DrawConfigFile(Configs.Sorted, category => category != "Internal");
-        ImGuiHelper.RestoreDefaultSTyle();
         ImGui.End();
       });
     }
@@ -103,7 +99,7 @@ namespace StationeersLaunchPad.UI
 
     public static bool DrawConfigFile(SortedConfigFile configFile, Func<string, bool> categoryFilter = null)
     {
-      ImGuiHelper.Header(configFile.FileName);
+      ImGuiHelper.Text(configFile.FileName);
       ImGui.PushID(configFile.FileName);
 
       var changed = false;
@@ -113,16 +109,9 @@ namespace StationeersLaunchPad.UI
         if (categoryFilter != null && !categoryFilter(category.Category))
           continue;
 
-        var font = ImGui.GetFont();
-        ImGuiHelper.PushFontScale(1.15f);
-        ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(0, 15));
-        bool collapsed = !ImGui.CollapsingHeader(category.Category, ImGuiTreeNodeFlags.DefaultOpen);
-        ImGui.PopStyleVar();
-        ImGuiHelper.PopFontScale();
-        if (collapsed)
+        if (!ImGui.CollapsingHeader(category.Category, ImGuiTreeNodeFlags.DefaultOpen))
           continue;
 
-        ImGui.Indent();
         foreach (var entry in category.Entries)
         {
           bool visible = true;
@@ -130,7 +119,6 @@ namespace StationeersLaunchPad.UI
           if(visible && DrawConfigEntry(entry))
               changed = true;
         }
-        ImGui.Unindent();
       }
 
       ImGui.PopID();
@@ -153,9 +141,8 @@ namespace StationeersLaunchPad.UI
       Configs.TryReadTag(entry, "RequireRestart", ref requireRestart);
       isCustomDrawn = Configs.TryReadTag(entry, "CustomDrawer", ref customDrawer);
       ImGui.BeginDisabled(disabled);
-      if(entry.BoxedValue is not bool || isCustomDrawn)
-        // Bool value propery drawer will display the name.
-        ImGuiHelper.Text(displayName);
+      ImGuiHelper.Text(displayName);
+      ImGui.SameLine();
       if (fill)
         ImGui.SetNextItemWidth(-float.Epsilon);
 
@@ -184,7 +171,7 @@ namespace StationeersLaunchPad.UI
           Enum => DrawEnumEntry(entry, value as Enum),
           string => DrawStringEntry(entry as ConfigEntry<string>),
           char => DrawCharEntry(entry as ConfigEntry<char>),
-          bool => DrawBoolEntry(entry as ConfigEntry<bool>, displayName),
+          bool => DrawBoolEntry(entry as ConfigEntry<bool>),
           float => DrawFloatEntry(entry as ConfigEntry<float>),
           double => DrawDoubleEntry(entry as ConfigEntry<double>),
           decimal => DrawDecimalEntry(entry as ConfigEntry<decimal>),
@@ -223,97 +210,201 @@ namespace StationeersLaunchPad.UI
 
     private static bool DrawColorEntry(ConfigEntry<Color> entry)
     {
+      var changed = false;
+
       var value = entry.Value;
       var r = value.r;
       ImGui.Spacing();
-      var vector4 = new Vector4(value.r, value.g, value.b, value.a);
-      if (ImGui.ColorEdit4("##color", ref vector4))
+      ImGuiHelper.Text($"Red ({r * 255}):");
+      if (ImGui.SliderFloat("##colorvaluer", ref r, 0.0f, 1.0f))
       {
-        entry.BoxedValue = new Color(vector4.x, vector4.y, vector4.z, vector4.w);
-        return true;
+        entry.BoxedValue = new Color(r, value.g, value.b, value.a);
+        changed = true;
       }
-      return false;
+
+      var g = value.g;
+      ImGuiHelper.Text($"Green ({g * 255}):");
+      if (ImGui.SliderFloat("##colorvalueg", ref g, 0.0f, 1.0f))
+      {
+        entry.BoxedValue = new Color(value.r, g, value.b, value.a);
+        changed = true;
+      }
+
+      var b = value.b;
+      ImGuiHelper.Text($"Blue ({b * 255}):");
+      if (ImGui.SliderFloat("##colorvalueb", ref b, 0.0f, 1.0f))
+      {
+        entry.BoxedValue = new Color(value.r, value.g, b, value.a);
+        changed = true;
+      }
+
+      var a = value.a;
+      ImGuiHelper.Text($"Alpha ({a * 255}):");
+      if (ImGui.SliderFloat("##colorvaluea", ref a, 0.0f, 1.0f))
+      {
+        entry.BoxedValue = new Color(value.r, value.g, value.b, a);
+        changed = true;
+      }
+
+      return changed;
     }
 
     private static bool DrawVector2Entry(ConfigEntry<Vector2> entry)
     {
+      var changed = false;
+
       var value = entry.Value;
+      var x = value.x;
       ImGui.Spacing();
+      ImGuiHelper.Text("X:");
+      ImGui.SameLine();
       string format = "%.3f";
       Configs.TryReadTag(entry, "Format", ref format);
-      if (ImGui.DragFloat2("##vector2", ref value, format))
+      if (ImGui.InputFloat("##vector2valuex", ref x, format))
       {
-        entry.BoxedValue = value;
-        return true;
+        entry.BoxedValue = new Vector2(x, value.y);
+        changed = true;
       }
-      return false;
+
+      var y = value.y;
+      ImGuiHelper.Text("Y:");
+      ImGui.SameLine();
+      if (ImGui.InputFloat("##vector2valuey", ref y, format))
+      {
+        entry.BoxedValue = new Vector2(value.x, y);
+        changed = true;
+      }
+
+      return changed;
     }
 
     private static bool DrawVector3Entry(ConfigEntry<Vector3> entry)
     {
+      var changed = false;
+
       var value = entry.Value;
+      var x = value.x;
       ImGui.Spacing();
+      ImGuiHelper.Text("X:");
+      ImGui.SameLine();
       string format = "%.3f";
       Configs.TryReadTag(entry, "Format", ref format);
-      if (ImGui.DragFloat3("##vector3", ref value, format))
+      if (ImGui.InputFloat("##vector3valuex", ref x, format))
       {
-        entry.BoxedValue = value;
-        return true;
+        entry.BoxedValue = new Vector3(x, value.y, value.z);
+        changed = true;
       }
-      return false;
+
+      var y = value.y;
+      ImGuiHelper.Text("Y:");
+      ImGui.SameLine();
+      if (ImGui.InputFloat("##vector3valuey", ref y, format))
+      {
+        entry.BoxedValue = new Vector3(value.x, y, value.z);
+        changed = true;
+      }
+
+      var z = value.z;
+      ImGuiHelper.Text("Z:");
+      ImGui.SameLine();
+      if (ImGui.InputFloat("##vector3valuez", ref z, format))
+      {
+        entry.BoxedValue = new Vector3(value.x, value.y, z);
+        changed = true;
+      }
+
+      return changed;
     }
 
     private static bool DrawVector4Entry(ConfigEntry<Vector4> entry)
     {
+      var changed = false;
+
       var value = entry.Value;
+      var x = value.x;
       ImGui.Spacing();
+      ImGuiHelper.Text("X:");
+      ImGui.SameLine();
       string format = "%.3f";
       Configs.TryReadTag(entry, "Format", ref format);
-      if (ImGui.DragFloat4("##vector4", ref value, format))
+      if (ImGui.InputFloat("##vector4valuex", ref x, format))
       {
-        entry.BoxedValue = value;
-        return true;
+        entry.BoxedValue = new Vector4(x, value.y, value.z, value.w);
+        changed = true;
       }
-      return false;
+
+      var y = value.y;
+      ImGuiHelper.Text("Y:");
+      ImGui.SameLine();
+      if (ImGui.InputFloat("##vector4valuey", ref y, format))
+      {
+        entry.BoxedValue = new Vector4(value.x, y, value.z, value.w);
+        changed = true;
+      }
+
+      var z = value.z;
+      ImGuiHelper.Text("Z:");
+      ImGui.SameLine();
+      if (ImGui.InputFloat("##vector4valuez", ref z, format))
+      {
+        entry.BoxedValue = new Vector4(value.x, value.y, z, value.w);
+        changed = true;
+      }
+
+      var w = value.z;
+      ImGuiHelper.Text("W:");
+      ImGui.SameLine();
+      if (ImGui.InputFloat("##vector4valuew", ref w, format))
+      {
+        entry.BoxedValue = new Vector4(value.x, value.y, value.z, w);
+        changed = true;
+      }
+
+      return changed;
     }
 
     public static bool DrawEnumEntry(ConfigEntryBase entry, Enum value)
     {
       var changed = false;
-      var currentValue = Convert.ToUInt64(value);
+      var currentValue = Convert.ToInt32(value);
       var type = value.GetType();
-      var values = GetEnumValues(type);
-      var names = GetEnumDisplayNames(type);
-      var flags = type.GetCustomAttribute<FlagsAttribute>() != null;
-        
-      var previewValue = FormatEnumValue(type, value);
-      if (ImGui.BeginCombo("##enumvalue", previewValue))
+      var values = Enum.GetValues(type);
+      var names = Enum.GetNames(type);
+      var index = -1;
+      for (var i = 0; i < values.Length; i++)
+      {
+        if (values.GetValue(i).Equals(value))
+        {
+          index = i;
+          break;
+        }
+      }
+
+      if (type.GetCustomAttribute<FlagsAttribute>() != null)
       {
         for (var i = 0; i < values.Length; i++)
         {
-          var item = values[i];
-          if (flags)
+          for (; i < values.Length; i++)
           {
-            var isChecked = item == 0 ? currentValue == item : (currentValue & item) == item;
-            if (ImGui.Checkbox(names.GetValue(i).ToString(), ref isChecked))
+            var val = (int) values.GetValue(i);
+            var newValue = (currentValue & val) == val;
+            if (ImGui.Checkbox(names.GetValue(i).ToString(), ref newValue))
             {
-              entry.BoxedValue = Enum.ToObject(type, isChecked ? currentValue | item : currentValue & ~item);
+              entry.BoxedValue = newValue ? currentValue | val : currentValue & ~val;
               changed = true;
             }
-          }
-          else
-          {
-            var selected = currentValue == values[i];
-            if (selected)
-              ImGui.SetItemDefaultFocus();
-            if (ImGui.Selectable(names[i], selected))
-            {
-              entry.BoxedValue = Enum.ToObject(type, values[i]);
-              changed = true;
-            }
+            if (i != values.Length - 1)
+              ImGui.SameLine();
           }
         }
-        ImGui.EndCombo();
+      }
+      else
+      {
+        if (ImGui.Combo("##enumvalue", ref index, names, names.Length))
+        {
+          entry.BoxedValue = values.GetValue(index);
+          changed = true;
+        }
       }
 
       return changed;
@@ -345,12 +436,12 @@ namespace StationeersLaunchPad.UI
       return changed;
     }
 
-    public static bool DrawBoolEntry(ConfigEntry<bool> entry, string displayName)
+    public static bool DrawBoolEntry(ConfigEntry<bool> entry)
     {
       var changed = false;
 
       var value = entry.Value;
-      if (ImGui.Checkbox(displayName, ref value))
+      if (ImGui.Checkbox("##boolvalue", ref value))
       {
         entry.BoxedValue = value;
         changed = true;
@@ -621,100 +712,6 @@ namespace StationeersLaunchPad.UI
         ImGuiHelper.TextDisabled("is null");
 
       return changed;
-    }
-
-    private static ulong[] GetEnumValues(Type enumType)
-    {
-      if (!enumValuesCache.TryGetValue(enumType, out var values))
-      {
-        // Can't use GetValues because order is different from enumType.GetFields.
-        var fields = enumType.GetFields(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-        values = new ulong[fields.Length];
-        for (int i = 0; i < fields.Length; i++)
-          values[i] = (ulong)Convert.ChangeType(fields[i].GetValue(null), TypeCode.UInt64);
-        enumValuesCache.Add(enumType, values);
-      }
-      return values;
-    }
-    private static string[] GetEnumDisplayNames(Type enumType)
-    {
-      if (!enumNamesCache.TryGetValue(enumType, out var result))
-      {
-        var fields = enumType.GetFields(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-        result = new string[fields.Length];
-        for (int i = 0; i < fields.Length; i++)
-        {
-          var field = fields[i];
-          var attr = field.GetCustomAttribute<System.ComponentModel.DataAnnotations.DisplayAttribute>();
-          if (attr != null)
-            result[i] = attr.GetName();
-          else
-            result[i] = field.Name;
-        }
-        enumNamesCache.Add(enumType, result);
-      }
-      return result;
-    }
-    private static string[] GetEnumDisplayShortNames(Type enumType)
-    {
-      if (!enumShortNamesCache.TryGetValue(enumType, out var result))
-      {
-        var fields = enumType.GetFields(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-        result = new string[fields.Length];
-        for (int i = 0; i < fields.Length; i++)
-        {
-          var field = fields[i];
-          var attr = field.GetCustomAttribute<System.ComponentModel.DataAnnotations.DisplayAttribute>();
-          if (attr != null)
-            result[i] = attr.GetShortName();
-          else
-            result[i] = field.Name;
-        }
-        enumShortNamesCache.Add(enumType, result);
-      }
-      return result;
-    }
-
-    private static string FormatEnumValue(Type enumType, object enumValue)
-    {
-      if(!enumCacheSorted.TryGetValue(enumType, out var sorted))
-      {
-        var names = GetEnumDisplayShortNames(enumType);
-        var values = GetEnumValues(enumType);
-        sorted = values.Zip(names, (val, name) => (val, name)).OrderBy(tuple => tuple.val).ToArray();
-        enumCacheSorted.Add(enumType, sorted);
-      }
-
-      var value = Convert.ToUInt64(enumValue);
-      bool isFlags = enumType.GetCustomAttribute<FlagsAttribute>() != null;
-      // Fast-path - zero value.
-      if (value == 0L)
-      {
-        if (sorted.Length != 0 && sorted[0].Value == 0L)
-          return sorted[0].Name;
-        return "<None>";
-      }
-      var result = new StringBuilder();
-      ulong saveValue = value;
-      // Make the string in reverse order - if there's compound values, they'll be first and we'll exclude their components from the value,
-      // thus minimizing the resulting string.
-      for(int i = sorted.Length - 1; i >= 0; i--)
-      {
-        if ((value & sorted[i].Value) == sorted[i].Value)
-        {
-          value -= sorted[i].Value;
-          if (result.Length > 0)
-            result.Insert(0, ", ");
-          result.Insert(0, sorted[i].Name);
-          if (!isFlags)
-            break;
-        }
-      }
-      // There's some value that's not defined in the enum? Not sure how to deal with that, so let the enum deal with it instead.
-      if (value != 0L)
-        return Enum.Format(enumType, enumValue, "G");
-
-      return result.ToString();
     }
   }
 }
