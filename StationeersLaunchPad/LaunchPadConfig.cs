@@ -2,6 +2,7 @@ using Assets.Scripts;
 using Assets.Scripts.Serialization;
 using Assets.Scripts.Util;
 using Cysharp.Threading.Tasks;
+using StationeersLaunchPad.Commands;
 using StationeersLaunchPad.Loading;
 using StationeersLaunchPad.Metadata;
 using StationeersLaunchPad.Repos;
@@ -339,11 +340,21 @@ namespace StationeersLaunchPad
       Platform.SetBackgroundEnabled(true);
     }
 
-    public static string ExportModPackage()
+    public static string ExportModPackage(string pkgpath = null)
     {
       try
       {
-        var pkgpath = Path.Combine(LaunchPadPaths.SavePath, $"modpkg_{DateTime.Now:yyyy-MM-dd_HH-mm-ss-fff}.zip");
+        if (string.IsNullOrEmpty(pkgpath))
+          pkgpath = Path.Combine(
+            LaunchPadPaths.SavePath,
+            $"modpkg_{DateTime.Now:yyyy-MM-dd_HH-mm-ss-fff}.zip");
+        else
+        {
+          if (!Path.IsPathRooted(pkgpath))
+            pkgpath = Path.Combine(LaunchPadPaths.SavePath, pkgpath);
+          if (!pkgpath.ToLower().EndsWith(".zip"))
+            pkgpath += ".zip";
+        }
         using (var archive = ZipFile.Open(pkgpath, ZipArchiveMode.Create))
         {
           var config = new ModConfig();
