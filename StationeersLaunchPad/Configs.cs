@@ -157,6 +157,19 @@ namespace StationeersLaunchPad
 
       Sorted = new SortedConfigFile(config);
     }
+
+    // Try reading specified tag from the list of tags of an entry and return it's value by ref argument.
+    // If specified tag isn't found the value argument remains unchanged.
+    public static bool TryReadTag<TValue>(ConfigEntryBase entry, string tag, ref TValue value)
+    {
+      var pair = entry.Description.Tags.OfType<KeyValuePair<string, TValue>>().LastOrDefault(kvp => kvp.Key?.Equals(tag) ?? false);
+      if (pair.Key != null)
+      {
+        value = pair.Value;
+        return true;
+      }
+      return false;
+    }
   }
 
   public class SortedConfigFile
@@ -175,7 +188,7 @@ namespace StationeersLaunchPad
         categories.Add(new SortedConfigCategory(
           configFile,
           group.Key,
-          group.OrderBy(entry => entry.Definition.Key).ToList()
+          group
         ));
       }
       categories.Sort((a, b) => a.Category.CompareTo(b.Category));
@@ -188,12 +201,24 @@ namespace StationeersLaunchPad
     public readonly ConfigFile ConfigFile;
     public readonly string Category;
     public readonly List<ConfigEntryBase> Entries;
+    public int Order;
 
-    public SortedConfigCategory(ConfigFile configFile, string category, List<ConfigEntryBase> entries)
+    public SortedConfigCategory(ConfigFile configFile, string category, IEnumerable<ConfigEntryBase> entries)
     {
       this.ConfigFile = configFile;
       this.Category = category;
-      this.Entries = entries;
+      var entriesOrdered = entries.Select(entry =>
+      {
+        var order = 0;
+        Configs.TryReadTag(entry, "Order", ref order);
+        return (Order: order, Entry: entry);
+      }).ToList();
+      entriesOrdered.Sort((a, b) =>
+      {
+        var order = a.Order.CompareTo(b.Order);
+        return order != 0 ? order : a.Entry.Definition.Key.CompareTo(b.Entry.Definition.Key);
+      });
+      this.Entries = entriesOrdered.Select(e => e.Entry).ToList();
     }
   }
 }

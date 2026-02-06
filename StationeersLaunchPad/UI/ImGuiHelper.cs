@@ -1,5 +1,6 @@
 ﻿using ImGuiNET;
 using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using UnityEngine;
 
@@ -11,6 +12,18 @@ namespace StationeersLaunchPad.UI
     public static void Text(string text)
     {
       ImGui.TextUnformatted(text);
+    }
+
+    public static void Header(string text)
+    {
+      PushFontScale(1.25f);
+      ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(0, 10));
+      ImGui.Separator();
+      ImGui.Indent();
+      ImGui.TextColored(new Vector4(1.00f, 0.40f, 0.09f, 1.00f), text);
+      ImGui.Separator();
+      ImGui.PopStyleVar();
+      PopFontScale();
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -305,6 +318,108 @@ namespace StationeersLaunchPad.UI
       ImGui.Dummy(rect.Size);
 
       drawList.PopClipRect();
+    }
+
+    public static void ApplyStationeersStyle()
+    {
+      ImGui.PushStyleVar(ImGuiStyleVar.Alpha, 1.0f);
+      ImGui.PushStyleVar(ImGuiStyleVar.DisabledAlpha, 1.0f);
+      ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(8, 8));
+      ImGui.PushStyleVar(ImGuiStyleVar.WindowRounding, 11);
+      ImGui.PushStyleVar(ImGuiStyleVar.WindowBorderSize, 1);
+      ImGui.PushStyleVar(ImGuiStyleVar.WindowMinSize, new Vector2(32, 32));
+      ImGui.PushStyleVar(ImGuiStyleVar.WindowTitleAlign, new Vector2(0.5f, 0.5f));
+      ImGui.PushStyleVar(ImGuiStyleVar.ChildRounding, 4);
+      ImGui.PushStyleVar(ImGuiStyleVar.ChildBorderSize, 1);
+      ImGui.PushStyleVar(ImGuiStyleVar.PopupRounding, 4);
+      ImGui.PushStyleVar(ImGuiStyleVar.PopupBorderSize, 1);
+      ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, new Vector2(8, 4));
+      ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 4);
+      ImGui.PushStyleVar(ImGuiStyleVar.FrameBorderSize, 0);
+      ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(4, 4));
+      ImGui.PushStyleVar(ImGuiStyleVar.ItemInnerSpacing, new Vector2(4, 4));
+      ImGui.PushStyleVar(ImGuiStyleVar.CellPadding, new Vector2(4, 4));
+      ImGui.PushStyleVar(ImGuiStyleVar.IndentSpacing, 20);
+      ImGui.PushStyleVar(ImGuiStyleVar.ScrollbarSize, 11);
+      ImGui.PushStyleVar(ImGuiStyleVar.ScrollbarRounding, 4);
+      ImGui.PushStyleVar(ImGuiStyleVar.GrabMinSize, 20);
+      ImGui.PushStyleVar(ImGuiStyleVar.GrabRounding, 4);
+      ImGui.PushStyleVar(ImGuiStyleVar.TabRounding, 4);
+      ImGui.PushStyleVar(ImGuiStyleVar.ButtonTextAlign, new Vector2(0.5f, 0.5f));
+      ImGui.PushStyleVar(ImGuiStyleVar.SelectableTextAlign, new Vector2(0, 0));
+      ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1.00f, 1.00f, 1.00f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.TextDisabled, new Vector4(0.50f, 0.50f, 0.50f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.WindowBg, new Vector4(0.184f, 0.184f, 0.216f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.ChildBg, new Vector4(0.184f, 0.184f, 0.216f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.PopupBg, new Vector4(0.08f, 0.08f, 0.08f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.Border, new Vector4(0.43f, 0.43f, 0.50f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.BorderShadow, new Vector4(0.00f, 0.00f, 0.00f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.FrameBg, new Vector4(0.13f, 0.13f, 0.16f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.FrameBgHovered, new Vector4(0.34f, 0.34f, 0.35f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.FrameBgActive, new Vector4(0.44f, 0.25f, 0.24f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.TitleBg, new Vector4(0.16f, 0.16f, 0.20f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.TitleBgActive, new Vector4(0.44f, 0.25f, 0.24f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.TitleBgCollapsed, new Vector4(0.00f, 0.00f, 0.00f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.MenuBarBg, new Vector4(0.14f, 0.14f, 0.14f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.ScrollbarBg, new Vector4(0.02f, 0.02f, 0.02f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.ScrollbarGrab, new Vector4(1.00f, 1.00f, 1.00f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabHovered, new Vector4(1.00f, 1.00f, 1.00f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.ScrollbarGrabActive, new Vector4(0.78f, 0.78f, 0.78f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.CheckMark, new Vector4(1.00f, 0.40f, 0.09f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.SliderGrab, new Vector4(1.00f, 0.40f, 0.09f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.SliderGrabActive, new Vector4(0.44f, 0.25f, 0.24f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.11f, 0.11f, 0.13f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0.34f, 0.34f, 0.35f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.ButtonActive, new Vector4(0.44f, 0.25f, 0.24f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.Header, new Vector4(0.11f, 0.11f, 0.13f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.HeaderHovered, new Vector4(0.34f, 0.34f, 0.35f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.HeaderActive, new Vector4(0.44f, 0.25f, 0.24f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.Separator, new Vector4(0.43f, 0.43f, 0.50f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.SeparatorHovered, new Vector4(0.10f, 0.40f, 0.75f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.SeparatorActive, new Vector4(0.10f, 0.40f, 0.75f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.ResizeGrip, new Vector4(1.00f, 1.00f, 1.00f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.ResizeGripHovered, new Vector4(1.00f, 1.00f, 1.00f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.ResizeGripActive, new Vector4(0.78f, 0.78f, 0.78f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.Tab, new Vector4(0.11f, 0.11f, 0.13f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.TabHovered, new Vector4(0.34f, 0.34f, 0.35f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.TabActive, new Vector4(1.00f, 0.40f, 0.09f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.TabUnfocused, new Vector4(0.07f, 0.10f, 0.15f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.TabUnfocusedActive, new Vector4(0.44f, 0.25f, 0.24f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.PlotLines, new Vector4(0.61f, 0.61f, 0.61f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.PlotLinesHovered, new Vector4(1.00f, 0.43f, 0.35f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.PlotHistogram, new Vector4(0.90f, 0.70f, 0.00f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.PlotHistogramHovered, new Vector4(1.00f, 0.60f, 0.00f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.TableHeaderBg, new Vector4(0.19f, 0.19f, 0.20f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.TableBorderStrong, new Vector4(0.31f, 0.31f, 0.35f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.TableBorderLight, new Vector4(0.23f, 0.23f, 0.25f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.TableRowBg, new Vector4(0.00f, 0.00f, 0.00f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.TableRowBgAlt, new Vector4(1.00f, 1.00f, 1.00f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.TextSelectedBg, new Vector4(0.26f, 0.59f, 0.98f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.DragDropTarget, new Vector4(1.00f, 1.00f, 0.00f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.NavHighlight, new Vector4(0.26f, 0.59f, 0.98f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.NavWindowingHighlight, new Vector4(1.00f, 1.00f, 1.00f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.NavWindowingDimBg, new Vector4(0.80f, 0.80f, 0.80f, 1.00f));
+      ImGui.PushStyleColor(ImGuiCol.ModalWindowDimBg, new Vector4(0.80f, 0.80f, 0.80f, 1.00f));
+    }
+    public static void RestoreDefaultSTyle()
+    {
+      ImGui.PopStyleVar(25);
+      ImGui.PopStyleColor(53);
+    }
+
+    static Stack<float> fontSizeStack = new();
+    public static void PushFontScale(float scale)
+    {
+      var font = ImGui.GetFont();
+      // Font.Scale doesn't work in-place and applies scaling universally, so we scale the FontSize.
+      // And also, larger font size values are actually smaller display size for some reason.
+      fontSizeStack.Push(font.FontSize);
+      font.FontSize /= scale;
+    }
+    public static void PopFontScale()
+    {
+      var font = ImGui.GetFont();
+      font.FontSize = fontSizeStack.Pop();
     }
   }
 
