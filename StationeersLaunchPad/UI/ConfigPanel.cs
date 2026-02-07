@@ -173,13 +173,17 @@ namespace StationeersLaunchPad.UI
       if (wrapper.RequireRestart && changed)
       {
         var newValue = wrapper.BoxedValue;
-        if (requireRestartOriginalValues.TryGetValue(wrapper.Entry, out var originalValue))
+        // Check if the value has actually changed - in case custom drawer returns true when there was no change.
+        if (!Equals(value, newValue))
         {
-          if (Equals(newValue, originalValue))
-            requireRestartOriginalValues.Remove(wrapper.Entry);
+          if (requireRestartOriginalValues.TryGetValue(wrapper.Entry, out var originalValue))
+          {
+            if (Equals(newValue, originalValue))
+              requireRestartOriginalValues.Remove(wrapper.Entry);
+          }
+          else
+            requireRestartOriginalValues.Add(wrapper.Entry, value);
         }
-        else
-          requireRestartOriginalValues.Add(wrapper.Entry, value);
       }
 
       ImGui.EndDisabled();
