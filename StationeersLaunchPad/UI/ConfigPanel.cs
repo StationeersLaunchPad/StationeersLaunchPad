@@ -131,6 +131,7 @@ namespace StationeersLaunchPad.UI
         ImGui.SetNextItemWidth(-float.Epsilon);
 
       bool changed = false;
+      var value = wrapper.BoxedValue;
       if (wrapper.CustomDrawer != null)
       {
         try
@@ -144,7 +145,6 @@ namespace StationeersLaunchPad.UI
       }
       else
       {
-        var value = wrapper.BoxedValue;
         changed = value switch
         {
           Color => DrawColorEntry(wrapper.Entry as ConfigEntry<Color>),
@@ -169,17 +169,17 @@ namespace StationeersLaunchPad.UI
           ulong => DrawULongEntry(wrapper.Entry as ConfigEntry<ulong>),
           _ => DrawDefault(wrapper.Entry),
         };
-        if (wrapper.RequireRestart && changed)
+      }
+      if (wrapper.RequireRestart && changed)
+      {
+        var newValue = wrapper.BoxedValue;
+        if (requireRestartOriginalValues.TryGetValue(wrapper.Entry, out var originalValue))
         {
-          var newValue = wrapper.BoxedValue;
-          if (requireRestartOriginalValues.TryGetValue(wrapper.Entry, out var originalValue))
-          {
-            if (Equals(newValue, originalValue))
-              requireRestartOriginalValues.Remove(wrapper.Entry);
-          }
-          else
-            requireRestartOriginalValues.Add(wrapper.Entry, value);
+          if (Equals(newValue, originalValue))
+            requireRestartOriginalValues.Remove(wrapper.Entry);
         }
+        else
+          requireRestartOriginalValues.Add(wrapper.Entry, value);
       }
 
       ImGui.EndDisabled();
