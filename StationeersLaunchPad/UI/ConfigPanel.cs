@@ -20,10 +20,6 @@ namespace StationeersLaunchPad.UI
       | ImGuiWindowFlags.NoResize
       | ImGuiWindowFlags.NoSavedSettings;
 
-    static Dictionary<Type, ulong[]> enumValuesCache = new();
-    static Dictionary<Type, string[]> enumNamesCache = new();
-    static Dictionary<Type, string[]> enumShortNamesCache = new();
-    static Dictionary<Type, (ulong Value, string Name)[]> enumCacheSorted = new();
     static Dictionary<ConfigEntryBase, object> requireRestartOriginalValues = new();
 
     public static void DrawWorkshopConfig(ModInfo modInfo)
