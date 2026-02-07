@@ -1,6 +1,7 @@
 
 using BepInEx.Configuration;
 using StationeersLaunchPad.Loading;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -157,19 +158,6 @@ namespace StationeersLaunchPad
 
       Sorted = new SortedConfigFile(config);
     }
-
-    // Try reading specified tag from the list of tags of an entry and return it's value by ref argument.
-    // If specified tag isn't found the value argument remains unchanged.
-    public static bool TryReadTag<TValue>(ConfigEntryBase entry, string tag, ref TValue value)
-    {
-      var pair = entry.Description.Tags.OfType<KeyValuePair<string, TValue>>().LastOrDefault(kvp => kvp.Key?.Equals(tag) ?? false);
-      if (pair.Key != null)
-      {
-        value = pair.Value;
-        return true;
-      }
-      return false;
-    }
   }
 
   public class SortedConfigFile
@@ -200,25 +188,65 @@ namespace StationeersLaunchPad
   {
     public readonly ConfigFile ConfigFile;
     public readonly string Category;
-    public readonly List<ConfigEntryBase> Entries;
-    public int Order;
+    public readonly List<ConfigEntryWrapper> Entries;
 
     public SortedConfigCategory(ConfigFile configFile, string category, IEnumerable<ConfigEntryBase> entries)
     {
       this.ConfigFile = configFile;
       this.Category = category;
-      var entriesOrdered = entries.Select(entry =>
-      {
-        var order = 0;
-        Configs.TryReadTag(entry, "Order", ref order);
-        return (Order: order, Entry: entry);
-      }).ToList();
-      entriesOrdered.Sort((a, b) =>
+      this.Entries = entries.Select(entry => new ConfigEntryWrapper(entry)).ToList();
+      this.Entries.Sort((a, b) =>
       {
         var order = a.Order.CompareTo(b.Order);
         return order != 0 ? order : a.Entry.Definition.Key.CompareTo(b.Entry.Definition.Key);
       });
-      this.Entries = entriesOrdered.Select(e => e.Entry).ToList();
+    }
+  }
+
+  public class ConfigEntryWrapper
+  {
+    public readonly ConfigEntryBase Entry;
+    public int Order = 0;
+    public bool RequireRestart = false;
+    public bool Disabled = false;
+    public bool Visible = true;
+    public string DisplayName;
+    public string Format = "%.3f";
+    public Func<ConfigEntryBase, bool> CustomDrawer;
+    public ConfigDefinition Definition => this.Entry.Definition;
+    public ConfigDescription Description => this.Entry.Description;
+    public object BoxedValue => this.Entry.BoxedValue;
+
+    public ConfigEntryWrapper(ConfigEntryBase entry)
+    {
+      this.DisplayName = entry.Definition.Key;
+      foreach (var tag in entry.Description.Tags)
+      {
+        switch (tag)
+        {
+          case KeyValuePair<string, int> { Key: "Order", Value: var order }:
+            this.Order = order;
+            break;
+          case KeyValuePair<string, bool> { Key: "RequireRestart", Value: var requireRestart }:
+            this.RequireRestart = requireRestart;
+            break;
+          case KeyValuePair<string, bool> { Key: "Disabled", Value: var disabled }:
+            this.Disabled = disabled;
+            break;
+          case KeyValuePair<string, bool> { Key: "Visible", Value: var visible }:
+            this.Visible = visible;
+            break;
+          case KeyValuePair<string, string> { Key: "DisplayName", Value: var displayName }:
+            this.DisplayName = displayName;
+            break;
+          case KeyValuePair<string, string> { Key: "Format", Value: var format }:
+            this.Format = format;
+            break;
+          case KeyValuePair<string, Func<ConfigEntryBase, bool>> { Key: "CustomDrawer", Value: var customDrawer }:
+            this.CustomDrawer = customDrawer;
+            break;
+        }
+      }
     }
   }
 }

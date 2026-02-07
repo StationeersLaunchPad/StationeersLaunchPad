@@ -7,7 +7,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Text;
 using UI.ImGuiUi;
 using UnityEngine;
 
@@ -110,9 +109,7 @@ namespace StationeersLaunchPad.UI
 
         foreach (var entry in category.Entries)
         {
-          bool visible = true;
-          Configs.TryReadTag(entry, "Visible", ref visible);
-          if(visible && DrawConfigEntry(entry))
+          if(entry.Visible && DrawConfigEntry(entry))
               changed = true;
         }
       }
@@ -122,32 +119,23 @@ namespace StationeersLaunchPad.UI
       return changed;
     }
 
-    public static bool DrawConfigEntry(ConfigEntryBase entry, bool fill = true)
+    public static bool DrawConfigEntry(ConfigEntryWrapper wrapper, bool fill = true)
     {
-      ImGui.PushID(entry.Definition.Key);
+      ImGui.PushID(wrapper.Definition.Key);
       ImGui.BeginGroup();
 
-      var displayName = entry.Definition.Key;
-      var disabled = false;
-      var requireRestart = false;
-      var isCustomDrawn = false;
-      Func<ConfigEntryBase, bool> customDrawer = null;
-      Configs.TryReadTag(entry, "DisplayName", ref displayName);
-      Configs.TryReadTag(entry, "Disabled", ref disabled);
-      Configs.TryReadTag(entry, "RequireRestart", ref requireRestart);
-      isCustomDrawn = Configs.TryReadTag(entry, "CustomDrawer", ref customDrawer);
-      ImGui.BeginDisabled(disabled);
-      ImGuiHelper.Text(displayName);
+      ImGui.BeginDisabled(wrapper.Disabled);
+      ImGuiHelper.Text(wrapper.DisplayName);
       ImGui.SameLine();
       if (fill)
         ImGui.SetNextItemWidth(-float.Epsilon);
 
       bool changed = false;
-      if (isCustomDrawn)
+      if (wrapper.CustomDrawer != null)
       {
         try
         {
-          changed = customDrawer(entry);
+          changed = wrapper.CustomDrawer(wrapper.Entry);
         }
         // Modern ImGUI supports ErrorRecoveryStoreState/ErrorRecoveryTryToRecoverState, but it's not implemeneted in ImGuiNET
         // and not yet implemented in the version the game uses (1.88).
@@ -156,41 +144,41 @@ namespace StationeersLaunchPad.UI
       }
       else
       {
-        var value = entry.BoxedValue;
+        var value = wrapper.BoxedValue;
         changed = value switch
         {
-          Color => DrawColorEntry(entry as ConfigEntry<Color>),
-          Vector2 => DrawVector2Entry(entry as ConfigEntry<Vector2>),
-          Vector3 => DrawVector3Entry(entry as ConfigEntry<Vector3>),
-          Vector4 => DrawVector4Entry(entry as ConfigEntry<Vector4>),
+          Color => DrawColorEntry(wrapper.Entry as ConfigEntry<Color>),
+          Vector2 => DrawVector2Entry(wrapper.Entry as ConfigEntry<Vector2>, wrapper.Format),
+          Vector3 => DrawVector3Entry(wrapper.Entry as ConfigEntry<Vector3>, wrapper.Format),
+          Vector4 => DrawVector4Entry(wrapper.Entry as ConfigEntry<Vector4>, wrapper.Format),
 
-          Enum => DrawEnumEntry(entry, value as Enum),
-          string => DrawStringEntry(entry as ConfigEntry<string>),
-          char => DrawCharEntry(entry as ConfigEntry<char>),
-          bool => DrawBoolEntry(entry as ConfigEntry<bool>),
-          float => DrawFloatEntry(entry as ConfigEntry<float>),
-          double => DrawDoubleEntry(entry as ConfigEntry<double>),
-          decimal => DrawDecimalEntry(entry as ConfigEntry<decimal>),
-          byte => DrawByteEntry(entry as ConfigEntry<byte>),
-          sbyte => DrawSByteEntry(entry as ConfigEntry<sbyte>),
-          short => DrawShortEntry(entry as ConfigEntry<short>),
-          ushort => DrawUShortEntry(entry as ConfigEntry<ushort>),
-          int => DrawIntEntry(entry as ConfigEntry<int>),
-          uint => DrawUIntEntry(entry as ConfigEntry<uint>),
-          long => DrawLongEntry(entry as ConfigEntry<long>),
-          ulong => DrawULongEntry(entry as ConfigEntry<ulong>),
-          _ => DrawDefault(entry),
+          Enum => DrawEnumEntry(wrapper.Entry, value as Enum),
+          string => DrawStringEntry(wrapper.Entry as ConfigEntry<string>),
+          char => DrawCharEntry(wrapper.Entry as ConfigEntry<char>),
+          bool => DrawBoolEntry(wrapper.Entry as ConfigEntry<bool>),
+          float => DrawFloatEntry(wrapper.Entry as ConfigEntry<float>, wrapper.Format),
+          double => DrawDoubleEntry(wrapper.Entry as ConfigEntry<double>, wrapper.Format),
+          decimal => DrawDecimalEntry(wrapper.Entry as ConfigEntry<decimal>, wrapper.Format),
+          byte => DrawByteEntry(wrapper.Entry as ConfigEntry<byte>),
+          sbyte => DrawSByteEntry(wrapper.Entry as ConfigEntry<sbyte>),
+          short => DrawShortEntry(wrapper.Entry as ConfigEntry<short>),
+          ushort => DrawUShortEntry(wrapper.Entry as ConfigEntry<ushort>),
+          int => DrawIntEntry(wrapper.Entry as ConfigEntry<int>),
+          uint => DrawUIntEntry(wrapper.Entry as ConfigEntry<uint>),
+          long => DrawLongEntry(wrapper.Entry as ConfigEntry<long>),
+          ulong => DrawULongEntry(wrapper.Entry as ConfigEntry<ulong>),
+          _ => DrawDefault(wrapper.Entry),
         };
-        if (requireRestart && changed)
+        if (wrapper.RequireRestart && changed)
         {
-          var newValue = entry.BoxedValue;
-          if (requireRestartOriginalValues.TryGetValue(entry, out var originalValue))
+          var newValue = wrapper.BoxedValue;
+          if (requireRestartOriginalValues.TryGetValue(wrapper.Entry, out var originalValue))
           {
             if (Equals(newValue, originalValue))
-              requireRestartOriginalValues.Remove(entry);
+              requireRestartOriginalValues.Remove(wrapper.Entry);
           }
           else
-            requireRestartOriginalValues.Add(entry, value);
+            requireRestartOriginalValues.Add(wrapper.Entry, value);
         }
       }
 
@@ -198,7 +186,7 @@ namespace StationeersLaunchPad.UI
       ImGui.EndGroup();
       ImGui.PopID();
 
-      var description = entry.Description?.Description;
+      var description = wrapper.Description?.Description;
       if (!string.IsNullOrEmpty(description))
         ImGuiHelper.ItemTooltip(description, 600f);
       return changed;
@@ -245,7 +233,7 @@ namespace StationeersLaunchPad.UI
       return changed;
     }
 
-    private static bool DrawVector2Entry(ConfigEntry<Vector2> entry)
+    private static bool DrawVector2Entry(ConfigEntry<Vector2> entry, string format)
     {
       var changed = false;
 
@@ -254,8 +242,6 @@ namespace StationeersLaunchPad.UI
       ImGui.Spacing();
       ImGuiHelper.Text("X:");
       ImGui.SameLine();
-      string format = "%.3f";
-      Configs.TryReadTag(entry, "Format", ref format);
       if (ImGui.InputFloat("##vector2valuex", ref x, format))
       {
         entry.BoxedValue = new Vector2(x, value.y);
@@ -274,7 +260,7 @@ namespace StationeersLaunchPad.UI
       return changed;
     }
 
-    private static bool DrawVector3Entry(ConfigEntry<Vector3> entry)
+    private static bool DrawVector3Entry(ConfigEntry<Vector3> entry, string format)
     {
       var changed = false;
 
@@ -283,8 +269,6 @@ namespace StationeersLaunchPad.UI
       ImGui.Spacing();
       ImGuiHelper.Text("X:");
       ImGui.SameLine();
-      string format = "%.3f";
-      Configs.TryReadTag(entry, "Format", ref format);
       if (ImGui.InputFloat("##vector3valuex", ref x, format))
       {
         entry.BoxedValue = new Vector3(x, value.y, value.z);
@@ -312,7 +296,7 @@ namespace StationeersLaunchPad.UI
       return changed;
     }
 
-    private static bool DrawVector4Entry(ConfigEntry<Vector4> entry)
+    private static bool DrawVector4Entry(ConfigEntry<Vector4> entry, string format)
     {
       var changed = false;
 
@@ -321,8 +305,6 @@ namespace StationeersLaunchPad.UI
       ImGui.Spacing();
       ImGuiHelper.Text("X:");
       ImGui.SameLine();
-      string format = "%.3f";
-      Configs.TryReadTag(entry, "Format", ref format);
       if (ImGui.InputFloat("##vector4valuex", ref x, format))
       {
         entry.BoxedValue = new Vector4(x, value.y, value.z, value.w);
@@ -446,13 +428,11 @@ namespace StationeersLaunchPad.UI
       return changed;
     }
 
-    public static bool DrawFloatEntry(ConfigEntry<float> entry)
+    public static bool DrawFloatEntry(ConfigEntry<float> entry, string format)
     {
       var changed = false;
 
       var value = entry.Value;
-      string format = "%.3f";
-      Configs.TryReadTag(entry, "Format", ref format);
       if (entry.Description.AcceptableValues is AcceptableValueRange<float> valueRange)
       {
         if (ImGui.SliderFloat("##floatvalue", ref value, valueRange.MinValue, valueRange.MaxValue, format))
@@ -470,13 +450,11 @@ namespace StationeersLaunchPad.UI
       return changed;
     }
 
-    public static unsafe bool DrawDoubleEntry(ConfigEntry<double> entry)
+    public static unsafe bool DrawDoubleEntry(ConfigEntry<double> entry, string format)
     {
       var changed = false;
 
       var value = entry.Value;
-      string format = "%.3f";
-      Configs.TryReadTag(entry, "Format", ref format);
       if (entry.Description.AcceptableValues is AcceptableValueRange<double> valueRange)
       {
         var min = valueRange.MinValue;
@@ -496,13 +474,11 @@ namespace StationeersLaunchPad.UI
       return changed;
     }
 
-    public static unsafe bool DrawDecimalEntry(ConfigEntry<decimal> entry)
+    public static unsafe bool DrawDecimalEntry(ConfigEntry<decimal> entry, string format)
     {
       var changed = false;
 
       var value = (double) entry.Value;
-      string format = "%.3f";
-      Configs.TryReadTag(entry, "Format", ref format);
       if (entry.Description.AcceptableValues is AcceptableValueRange<decimal> valueRange)
       {
         var min = valueRange.MinValue;
