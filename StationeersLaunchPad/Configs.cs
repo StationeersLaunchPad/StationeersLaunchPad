@@ -220,6 +220,7 @@ namespace StationeersLaunchPad
     public ConfigEntryWrapper(ConfigEntryBase entry)
     {
       this.DisplayName = entry.Definition.Key;
+      this.Entry = entry;
       foreach (var tag in entry.Description.Tags)
       {
         switch (tag)
