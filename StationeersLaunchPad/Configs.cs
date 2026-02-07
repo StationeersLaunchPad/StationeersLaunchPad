@@ -1,6 +1,7 @@
 
 using BepInEx.Configuration;
 using StationeersLaunchPad.Loading;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -175,7 +176,7 @@ namespace StationeersLaunchPad
         categories.Add(new SortedConfigCategory(
           configFile,
           group.Key,
-          group.OrderBy(entry => entry.Definition.Key).ToList()
+          group
         ));
       }
       categories.Sort((a, b) => a.Category.CompareTo(b.Category));
@@ -187,13 +188,66 @@ namespace StationeersLaunchPad
   {
     public readonly ConfigFile ConfigFile;
     public readonly string Category;
-    public readonly List<ConfigEntryBase> Entries;
+    public readonly List<ConfigEntryWrapper> Entries;
 
-    public SortedConfigCategory(ConfigFile configFile, string category, List<ConfigEntryBase> entries)
+    public SortedConfigCategory(ConfigFile configFile, string category, IEnumerable<ConfigEntryBase> entries)
     {
       this.ConfigFile = configFile;
       this.Category = category;
-      this.Entries = entries;
+      this.Entries = entries.Select(entry => new ConfigEntryWrapper(entry)).ToList();
+      this.Entries.Sort((a, b) =>
+      {
+        var order = a.Order.CompareTo(b.Order);
+        return order != 0 ? order : a.Entry.Definition.Key.CompareTo(b.Entry.Definition.Key);
+      });
+    }
+  }
+
+  public class ConfigEntryWrapper
+  {
+    public readonly ConfigEntryBase Entry;
+    public int Order = 0;
+    public bool RequireRestart = false;
+    public bool Disabled = false;
+    public bool Visible = true;
+    public string DisplayName;
+    public string Format = "%.3f";
+    public Func<ConfigEntryBase, bool> CustomDrawer;
+    public ConfigDefinition Definition => this.Entry.Definition;
+    public ConfigDescription Description => this.Entry.Description;
+    public object BoxedValue => this.Entry.BoxedValue;
+
+    public ConfigEntryWrapper(ConfigEntryBase entry)
+    {
+      this.DisplayName = entry.Definition.Key;
+      this.Entry = entry;
+      foreach (var tag in entry.Description.Tags)
+      {
+        switch (tag)
+        {
+          case KeyValuePair<string, int> { Key: "Order", Value: var order }:
+            this.Order = order;
+            break;
+          case KeyValuePair<string, bool> { Key: "RequireRestart", Value: var requireRestart }:
+            this.RequireRestart = requireRestart;
+            break;
+          case KeyValuePair<string, bool> { Key: "Disabled", Value: var disabled }:
+            this.Disabled = disabled;
+            break;
+          case KeyValuePair<string, bool> { Key: "Visible", Value: var visible }:
+            this.Visible = visible;
+            break;
+          case KeyValuePair<string, string> { Key: "DisplayName", Value: var displayName }:
+            this.DisplayName = displayName;
+            break;
+          case KeyValuePair<string, string> { Key: "Format", Value: var format }:
+            this.Format = format;
+            break;
+          case KeyValuePair<string, Func<ConfigEntryBase, bool>> { Key: "CustomDrawer", Value: var customDrawer }:
+            this.CustomDrawer = customDrawer;
+            break;
+        }
+      }
     }
   }
 }
