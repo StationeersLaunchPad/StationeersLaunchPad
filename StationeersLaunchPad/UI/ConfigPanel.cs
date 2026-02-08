@@ -130,13 +130,17 @@ namespace StationeersLaunchPad.UI
       ImGui.BeginGroup();
 
       ImGui.BeginDisabled(wrapper.Disabled);
-      ImGuiHelper.Text(wrapper.DisplayName);
-      ImGui.SameLine();
+      var value = wrapper.BoxedValue;
+      if (value is not bool)
+      {
+        ImGuiHelper.Text(wrapper.DisplayName);
+        if (Configs.CompactConfigPanel.Value)
+          ImGui.SameLine();
+      }
       if (fill)
         ImGui.SetNextItemWidth(-float.Epsilon);
 
       bool changed = false;
-      var value = wrapper.BoxedValue;
       if (wrapper.CustomDrawer != null)
       {
         try
@@ -160,7 +164,7 @@ namespace StationeersLaunchPad.UI
           Enum => DrawEnumEntry(wrapper.Entry, value as Enum),
           string => DrawStringEntry(wrapper.Entry as ConfigEntry<string>),
           char => DrawCharEntry(wrapper.Entry as ConfigEntry<char>),
-          bool => DrawBoolEntry(wrapper.Entry as ConfigEntry<bool>),
+          bool => DrawBoolEntry(wrapper.Entry as ConfigEntry<bool>, wrapper.DisplayName),
           float => DrawFloatEntry(wrapper.Entry as ConfigEntry<float>, wrapper.Format),
           double => DrawDoubleEntry(wrapper.Entry as ConfigEntry<double>, wrapper.Format),
           decimal => DrawDecimalEntry(wrapper.Entry as ConfigEntry<decimal>, wrapper.Format),
@@ -319,12 +323,18 @@ namespace StationeersLaunchPad.UI
       return changed;
     }
 
-    public static bool DrawBoolEntry(ConfigEntry<bool> entry)
+    public static bool DrawBoolEntry(ConfigEntry<bool> entry, string displayName)
     {
       var changed = false;
 
       var value = entry.Value;
-      if (ImGui.Checkbox("##boolvalue", ref value))
+      var compact = Configs.CompactConfigPanel.Value;
+      if (compact)
+      {
+        ImGuiHelper.Text(displayName);
+        ImGui.SameLine();
+      }
+      if (ImGui.Checkbox(compact ? "##boolvalue" : displayName, ref value))
       {
         entry.BoxedValue = value;
         changed = true;
