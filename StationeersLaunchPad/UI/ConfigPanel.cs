@@ -25,6 +25,7 @@ namespace StationeersLaunchPad.UI
     static Dictionary<Type, string[]> enumShortNamesCache = new();
     static Dictionary<Type, (ulong Value, string Name)[]> enumCacheSorted = new();
     static Dictionary<ConfigEntryBase, object> requireRestartOriginalValues = new();
+    static Dictionary<ConfigEntryBase, (ulong Value, string Formatted)> formattedValuesCache = new();
 
     public static void DrawWorkshopConfig(ModInfo modInfo)
     {
@@ -263,8 +264,15 @@ namespace StationeersLaunchPad.UI
       var values = GetEnumValues(type);
       var names = GetEnumDisplayNames(type);
       var flags = type.GetCustomAttribute<FlagsAttribute>() != null;
-        
-      var previewValue = FormatEnumValue(type, value);
+
+      string previewValue;
+      if(formattedValuesCache.TryGetValue(entry, out var formatted) && formatted.Value == currentValue)
+        previewValue = formatted.Formatted;
+      else
+      {
+        previewValue = FormatEnumValue(type, value);
+        formattedValuesCache[entry] = (currentValue, previewValue);
+      }
       if (ImGui.BeginCombo("##enumvalue", previewValue))
       {
         for (var i = 0; i < values.Length; i++)
@@ -683,9 +691,9 @@ namespace StationeersLaunchPad.UI
           value -= sorted[i].Value;
           if (result.Length > 0)
             result.Insert(0, ", ");
-          result.Insert(0, sorted[i].Name);
           if (!isFlags)
-            break;
+            return sorted[i].Name; // bypass string building if it's not flags enum, as there will be only one value.
+          result.Insert(0, sorted[i].Name);
         }
       }
       // There's some value that's not defined in the enum? Not sure how to deal with that, so let the enum deal with it instead.
