@@ -8,9 +8,15 @@ namespace StationeersLaunchPad.Metadata
   {
     public static ModConfig LoadConfig()
     {
-      var config = File.Exists(LaunchPadPaths.ConfigPath)
-            ? XmlSerialization.Deserialize<ModConfig>(LaunchPadPaths.ConfigPath)
-            : new ModConfig();
+      var path = LaunchPadPaths.ConfigPath;
+      ModConfig config = null;
+      if (File.Exists(path))
+      {
+        config = XmlSerialization.Deserialize<ModConfig>(path);
+        if (config == null)
+          Logger.Global.LogWarning($"Replacing invalid modconfig at {path}");
+      }
+      config ??= new();
       config.CreateCoreMod();
       return config;
     }
