@@ -41,6 +41,7 @@ namespace StationeersLaunchPad
     public static ConfigEntry<LogSeverity> LogSeverities;
     public static ConfigEntry<bool> CompactLogs;
     public static ConfigEntry<bool> LinuxPathPatch;
+    public static ConfigEntry<bool> CompactConfigPanel;
 
     public static bool RunPostUpdateCleanup => CheckForUpdate.Value && PostUpdateCleanup.Value;
     public static bool RunOneTimeBoosterInstall => CheckForUpdate.Value && OneTimeBoosterInstall.Value;
@@ -155,7 +156,13 @@ namespace StationeersLaunchPad
           "Patch xml mod data loading to properly handle linux path separators"
         )
       );
-
+      CompactConfigPanel = config.Bind(
+        new ConfigDefinition("UI", "CompactConfigPanel"),
+        false,
+        new ConfigDescription(
+          "Display configuration entires on the same line with their names"
+        )
+      );
       Sorted = new SortedConfigFile(config);
     }
   }

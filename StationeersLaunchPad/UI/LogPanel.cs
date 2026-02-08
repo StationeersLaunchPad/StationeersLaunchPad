@@ -52,6 +52,7 @@ namespace StationeersLaunchPad.UI
     private static int tooltipDelay = 0;
     public static void DrawConsole(Logger logger)
     {
+      ImGui.SetNextItemWidth(200);
       ConfigPanel.DrawEnumEntry(Configs.LogSeverities, Configs.LogSeverities.Value);
       ImGui.BeginChild("##logs", ImGuiWindowFlags.HorizontalScrollbar);
 
