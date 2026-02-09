@@ -2,6 +2,7 @@ using Assets.Scripts;
 using Assets.Scripts.Serialization;
 using Assets.Scripts.Util;
 using Cysharp.Threading.Tasks;
+using StationeersLaunchPad.Commands;
 using StationeersLaunchPad.Loading;
 using StationeersLaunchPad.Metadata;
 using StationeersLaunchPad.Repos;
@@ -60,6 +61,8 @@ namespace StationeersLaunchPad
     private static ModList modList = ModList.NewEmpty();
 
     private static LoadStage Stage = LoadStage.Initializing;
+    public static bool ModsLoaded => Stage > LoadStage.Configuring;
+    public static bool GameRunning => Stage == LoadStage.Running;
 
     private static bool AutoSort;
     private static bool AutoLoad = true;
@@ -71,6 +74,16 @@ namespace StationeersLaunchPad
     {
       AutoLoad = false;
       CurWait.Auto = false;
+    }
+
+    public static void ReloadMods()
+    {
+      if (Stage != LoadStage.Configuring)
+        return;
+      Logger.Global.LogInfo("Reloading Mod List");
+      StopAutoLoad();
+      Stage = LoadStage.Searching;
+      CurWait.Skip();
     }
 
     public static void Draw()
@@ -105,9 +118,16 @@ namespace StationeersLaunchPad
 
       await StageInitializing();
       await StageUpdating();
-      await StageSearching();
-      SLPCommand.RunStartup();
-      await StageConfiguring();
+
+      var firstLoad = true;
+      do
+      {
+        await StageSearching(firstLoad);
+        firstLoad = false;
+        SLPCommand.RunStartup();
+        await StageConfiguring();
+      }
+      while (Stage == LoadStage.Searching);
       await StageLoading();
       await StageFinal();
 
@@ -194,17 +214,22 @@ namespace StationeersLaunchPad
         StopAutoLoad();
     }
 
-    private static async UniTask StageSearching()
+    private static async UniTask StageSearching(bool firstLoad)
     {
       if (Stage == LoadStage.Failed) return;
       Stage = LoadStage.Searching;
       try
       {
         Logger.Global.LogInfo("Loading Mod Repos");
-        var modRepos = await ModRepos.LoadConfig();
+        var modRepos = ModRepos.Current = await ModRepos.LoadConfig();
+        if (firstLoad)
+          await ModRepos.UpdateRepos(modRepos);
         ModRepos.SaveConfig(modRepos);
-        await ModRepos.UpdateMods(modRepos);
-        ModRepos.SaveConfig(modRepos);
+        if (firstLoad)
+        {
+          await ModRepos.UpdateMods(modRepos);
+          ModRepos.SaveConfig(modRepos);
+        }
 
         Logger.Global.LogInfo("Listing Mods");
         modList = ModList.FromDefs(await ModSource.ListAll(new()
@@ -315,11 +340,21 @@ namespace StationeersLaunchPad
       Platform.SetBackgroundEnabled(true);
     }
 
-    public static string ExportModPackage()
+    public static string ExportModPackage(string pkgpath = null)
     {
       try
       {
-        var pkgpath = Path.Combine(LaunchPadPaths.SavePath, $"modpkg_{DateTime.Now:yyyy-MM-dd_HH-mm-ss-fff}.zip");
+        if (string.IsNullOrEmpty(pkgpath))
+          pkgpath = Path.Combine(
+            LaunchPadPaths.SavePath,
+            $"modpkg_{DateTime.Now:yyyy-MM-dd_HH-mm-ss-fff}.zip");
+        else
+        {
+          if (!Path.IsPathRooted(pkgpath))
+            pkgpath = Path.Combine(LaunchPadPaths.SavePath, pkgpath);
+          if (!pkgpath.ToLower().EndsWith(".zip"))
+            pkgpath += ".zip";
+        }
         using (var archive = ZipFile.Open(pkgpath, ZipArchiveMode.Create))
         {
           var config = new ModConfig();

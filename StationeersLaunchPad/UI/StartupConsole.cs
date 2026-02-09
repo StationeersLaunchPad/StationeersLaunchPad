@@ -1,11 +1,9 @@
 
 using Assets.Scripts.Util;
 using ImGuiNET;
+using StationeersLaunchPad.Commands;
 using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using UnityEngine;
 using Util.Commands;
 
 namespace StationeersLaunchPad.UI
@@ -14,8 +12,6 @@ namespace StationeersLaunchPad.UI
   {
     private static string input = "";
     private static bool submitted = false;
-    private static string helpText = null;
-    private static string helpInput = null;
 
     public static bool DrawInput(Rect rect)
     {
@@ -31,9 +27,10 @@ namespace StationeersLaunchPad.UI
         submitted = true;
         var args = CmdLineParser.SplitCommandLine(input).ToArray();
         string res = null;
+        Logger.Global.LogInfo($"> {input}");
         try
         {
-          res = SLPCommand.Instance.ExecuteStartup(args);
+          res = RootCommand.StartupInstance.Execute(args);
         }
         catch (Exception ex)
         {
@@ -49,92 +46,7 @@ namespace StationeersLaunchPad.UI
         submitted = false;
       }
 
-      if (ImGui.IsItemActive() && input.Length > 0)
-        DrawPopupWindow(rect);
-
       return false;
-    }
-
-    private static void DrawPopupWindow(Rect inputRect)
-    {
-      BuildHelpText();
-
-      var style = ImGui.GetStyle();
-
-      var textSz = ImGui.CalcTextSize(helpText);
-
-      var popupHeight = style.FramePadding.y * 2 + textSz.y;
-
-      var xoffset = style.WindowPadding.x - style.FramePadding.x;
-      ImGui.SetNextWindowPos(inputRect.TL - new Vector2(xoffset, popupHeight));
-      ImGui.SetNextWindowSizeConstraints(
-        new(200, popupHeight),
-        new(inputRect.Size.x + style.WindowPadding.x, popupHeight));
-      ImGui.PushStyleVar(ImGuiStyleVar.WindowRounding, 0f);
-      ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(style.WindowPadding.x, 0));
-      ImGui.Begin("##console_help", 0
-        | ImGuiWindowFlags.NoDecoration
-        | ImGuiWindowFlags.NoFocusOnAppearing
-        | ImGuiWindowFlags.NoNav
-        | ImGuiWindowFlags.NoInputs
-        | ImGuiWindowFlags.NoSavedSettings
-        | ImGuiWindowFlags.AlwaysAutoResize
-      );
-      ImGui.BringWindowToDisplayFront(ImGui.GetCurrentWindowRead());
-      ImGuiHelper.Text(helpText);
-      ImGui.End();
-      ImGui.PopStyleVar(2);
-    }
-
-    private static void BuildHelpText()
-    {
-      if (helpText != null && ReferenceEquals(input, helpInput))
-        return;
-      // this only runs when the user types a character, so allocations are fine
-      var sb = new StringBuilder();
-      var matching = new List<SLPCmd>();
-
-      foreach (var cmd in SLPCmd.AllCommands)
-      {
-        if (cmd.IsStartup && CommandMatch(cmd.Name))
-          matching.Add(cmd);
-      }
-      if (matching.Count == 0)
-      {
-        foreach (var cmd in SLPCmd.AllCommands)
-          if (cmd.IsStartup)
-            matching.Add(cmd);
-      }
-
-      foreach (var cmd in matching)
-        sb.AppendLine(cmd.StartupDescLine);
-
-      if (matching.Count == 1 && matching[0].ExtendedDescription is string exdesc)
-        sb.AppendLine(exdesc);
-
-      helpText = sb.ToString().TrimEnd();
-      helpInput = input;
-    }
-
-    private static bool CommandMatch(string name)
-    {
-      var inIdx = 0;
-      var nameIdx = 0;
-
-      while (inIdx < input.Length && nameIdx < name.Length)
-      {
-        var ci = input[inIdx];
-        if (char.IsWhiteSpace(ci))
-          return true;
-        ci = char.ToLowerInvariant(ci);
-        while (nameIdx < name.Length && ci != name[nameIdx])
-          nameIdx++;
-        if (nameIdx == name.Length)
-          return false;
-        inIdx++;
-        nameIdx++;
-      }
-      return inIdx >= input.Length || char.IsWhiteSpace(input[inIdx]);
     }
   }
 }

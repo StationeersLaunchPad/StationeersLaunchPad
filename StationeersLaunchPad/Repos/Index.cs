@@ -69,11 +69,13 @@ namespace StationeersLaunchPad.Repos
     private readonly List<IndexEntry> entries;
     private ModRepoIndex(List<IndexEntry> entries) => this.entries = entries;
 
-    public IndexIter ModIDs() => MakeIter(IndexLevel.Mod);
-    public IndexIter ModRepos(string modID) => MakeIter(IndexLevel.Repo, modID);
-    public IndexIter Branches(string modID, string repoID) =>
+    public Iterator GetEnumerator() => new(this, IndexLevel.Version, 0, entries.Count);
+
+    public Iterator ModIDs() => MakeIter(IndexLevel.Mod);
+    public Iterator ModRepos(string modID) => MakeIter(IndexLevel.Repo, modID);
+    public Iterator Branches(string modID, string repoID) =>
       MakeIter(IndexLevel.Branch, modID, repoID);
-    public IndexIter Versions(string modID, string repoID, string branch) =>
+    public Iterator Versions(string modID, string repoID, string branch) =>
       MakeIter(IndexLevel.Version, modID, repoID, branch);
 
     public ModVersionData GetLatest(
@@ -118,7 +120,7 @@ namespace StationeersLaunchPad.Repos
       return entries[latest].Mod;
     }
 
-    private IndexIter MakeIter(IndexLevel level, string modID = null,
+    private Iterator MakeIter(IndexLevel level, string modID = null,
       string repoID = null, string branch = null)
     {
       if (level == IndexLevel.Mod)
@@ -132,9 +134,9 @@ namespace StationeersLaunchPad.Repos
       var entry = entries[start];
       if (entry.ModID != modID)
         return default;
-      if (level >= IndexLevel.Repo && entry.RepoID != repoID)
+      if (level > IndexLevel.Repo && entry.RepoID != repoID)
         return default;
-      if (level >= IndexLevel.Branch && entry.Branch != branch)
+      if (level > IndexLevel.Branch && entry.Branch != branch)
         return default;
       return new(this, level, start, level switch
       {
@@ -145,6 +147,14 @@ namespace StationeersLaunchPad.Repos
       });
     }
 
+    public struct Key
+    {
+      public string ModID;
+      public string RepoID;
+      public string Branch;
+      public string Version;
+    }
+
     public enum IndexLevel { Mod, Repo, Branch, Version }
     private struct IndexEntry : IEquatable<IndexEntry>, IComparable<IndexEntry>
     {
@@ -153,6 +163,13 @@ namespace StationeersLaunchPad.Repos
       public string RepoID;
       public string Branch;
       public string Version;
+      public Key Key => new()
+      {
+        ModID = ModID,
+        RepoID = RepoID,
+        Branch = Branch,
+        Version = Version
+      };
 
       // value
       public ModVersionData Mod;
@@ -183,24 +200,24 @@ namespace StationeersLaunchPad.Repos
         HashCode.Combine(ModID, ModID, Branch, Version);
     }
 
-    public struct IndexIter
+    public struct Iterator
     {
       private readonly List<IndexEntry> entries;
-      private readonly IndexLevel level;
+      public readonly IndexLevel Level;
       private readonly int end;
       private int index;
       private bool first;
 
-      public IndexIter(ModRepoIndex index, IndexLevel level, int start, int end)
+      public Iterator(ModRepoIndex index, IndexLevel level, int start, int end)
       {
         this.entries = index.entries;
-        this.level = level;
+        this.Level = level;
         this.end = end;
         this.index = start;
         first = true;
       }
 
-      public IndexIter GetEnumerator() => this;
+      public Iterator GetEnumerator() => this;
 
       public bool MoveNext()
       {
@@ -212,27 +229,19 @@ namespace StationeersLaunchPad.Repos
         if (index >= end)
           return false;
         var entry = entries[index];
-        index = level switch
+        index = Level switch
         {
           IndexLevel.Mod => entry.NextMod,
           IndexLevel.Repo => entry.NextRepo,
           IndexLevel.Branch => entry.NextBranch,
           IndexLevel.Version => index + 1,
-          _ => throw new InvalidOperationException($"{level}"),
+          _ => throw new InvalidOperationException($"{Level}"),
         };
         return index < end;
       }
 
-      public string Current => level switch
-      {
-        IndexLevel.Mod => entries[index].ModID,
-        IndexLevel.Repo => entries[index].RepoID,
-        IndexLevel.Branch => entries[index].Branch,
-        IndexLevel.Version => entries[index].Version,
-        _ => throw new InvalidOperationException($"{level}"),
-      };
-
-      public ModVersionData CurrentMod => entries[index].Mod;
+      public (Key Key, ModVersionData Version) Current =>
+        new(entries[index].Key, entries[index].Mod);
     }
   }
 }
