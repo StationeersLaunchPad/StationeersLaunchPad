@@ -27,6 +27,8 @@ namespace StationeersLaunchPad
 
     public static ConfigEntry<bool> CheckForUpdate;
     public static ConfigEntry<bool> AutoUpdateOnStart;
+    public static ConfigEntry<int> UpdateCheckTimeout;
+    public static ConfigEntry<int> UpdateDownloadTimeout;
     public static ConfigEntry<bool> AutoLoadOnStart;
     public static ConfigEntry<bool> AutoSortOnStart;
     public static ConfigEntry<int> AutoLoadWaitTime;
@@ -71,6 +73,22 @@ namespace StationeersLaunchPad
           "Automatically update mod loader on startup. Ignored if CheckForUpdate is not also enabled."
         )
       );
+      UpdateCheckTimeout = config.Bind(
+        new ConfigDefinition("Startup", "UpdateCheckTimeout"),
+        10,
+        new ConfigDescription(
+          "Timeout in seconds for fetching the latest StationeersLaunchPad version information.",
+          new AcceptableValueRange<int>(5, 60)
+        )
+      );
+      UpdateCheckTimeout = config.Bind(
+        new ConfigDefinition("Startup", "UpdateDownloadTimeout"),
+        45,
+        new ConfigDescription(
+          "Timeout in seconds for downloading an update to StationeersLaunchPad.",
+          new AcceptableValueRange<int>(10, 300)
+        )
+      );
       AutoLoadWaitTime = config.Bind(
         new ConfigDefinition("Startup", "AutoLoadWaitTime"),
         3,
@@ -83,7 +101,7 @@ namespace StationeersLaunchPad
         new ConfigDefinition("Startup", "AutoSort"),
         true,
         new ConfigDescription(
-          "Automatically sort based on LoadBefore/LoadAfter tags in mod data"
+          "Automatically sort based on OrderBefore/OrderAfter tags in mod data"
         )
       );
       DisableSteamOnStart = config.Bind(

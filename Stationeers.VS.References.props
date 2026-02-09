@@ -7,7 +7,7 @@
     <SystemRefs Include="@(SystemDll->'%(Filename)')">
       <HintPath>$(StationeersManagedDirectory)\%(Identity).dll</HintPath>
     </SystemRefs>
-    <Reference Include="@(SystemRefs)" />
+    <Reference Include="@(SystemRefs)" Private="False" />
 
     <!-- BepInEx DLL's -->
     <Reference Include="BepInEx">
