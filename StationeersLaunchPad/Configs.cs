@@ -1,6 +1,7 @@
 
 using BepInEx.Configuration;
 using StationeersLaunchPad.Loading;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -21,6 +22,8 @@ namespace StationeersLaunchPad
 
     public static ConfigEntry<bool> CheckForUpdate;
     public static ConfigEntry<bool> AutoUpdateOnStart;
+    public static ConfigEntry<int> UpdateCheckTimeout;
+    public static ConfigEntry<int> UpdateDownloadTimeout;
     public static ConfigEntry<bool> AutoLoadOnStart;
     public static ConfigEntry<bool> AutoSortOnStart;
     public static ConfigEntry<int> AutoLoadWaitTime;
@@ -38,6 +41,7 @@ namespace StationeersLaunchPad
     public static ConfigEntry<LogSeverity> LogSeverities;
     public static ConfigEntry<bool> CompactLogs;
     public static ConfigEntry<bool> LinuxPathPatch;
+    public static ConfigEntry<bool> CompactConfigPanel;
     public static ConfigEntry<int> RepoUpdateFrequency;
     public static ConfigEntry<int> RepoFetchTimeout;
     public static ConfigEntry<int> RepoModFetchTimeout;
@@ -71,6 +75,22 @@ namespace StationeersLaunchPad
           "Automatically update mod loader on startup. Ignored if CheckForUpdate is not also enabled."
         )
       );
+      UpdateCheckTimeout = config.Bind(
+        new ConfigDefinition("Startup", "UpdateCheckTimeout"),
+        10,
+        new ConfigDescription(
+          "Timeout in seconds for fetching the latest StationeersLaunchPad version information.",
+          new AcceptableValueRange<int>(5, 60)
+        )
+      );
+      UpdateCheckTimeout = config.Bind(
+        new ConfigDefinition("Startup", "UpdateDownloadTimeout"),
+        45,
+        new ConfigDescription(
+          "Timeout in seconds for downloading an update to StationeersLaunchPad.",
+          new AcceptableValueRange<int>(10, 300)
+        )
+      );
       AutoLoadWaitTime = config.Bind(
         new ConfigDefinition("Startup", "AutoLoadWaitTime"),
         3,
@@ -83,7 +103,7 @@ namespace StationeersLaunchPad
         new ConfigDefinition("Startup", "AutoSort"),
         true,
         new ConfigDescription(
-          "Automatically sort based on LoadBefore/LoadAfter tags in mod data"
+          "Automatically sort based on OrderBefore/OrderAfter tags in mod data"
         )
       );
       DisableSteamOnStart = config.Bind(
@@ -214,7 +234,13 @@ namespace StationeersLaunchPad
           "Patch xml mod data loading to properly handle linux path separators"
         )
       );
-
+      CompactConfigPanel = config.Bind(
+        new ConfigDefinition("UI", "CompactConfigPanel"),
+        false,
+        new ConfigDescription(
+          "Display configuration entires on the same line with their names"
+        )
+      );
       Sorted = new SortedConfigFile(config);
     }
   }
@@ -235,7 +261,7 @@ namespace StationeersLaunchPad
         categories.Add(new SortedConfigCategory(
           configFile,
           group.Key,
-          group.OrderBy(entry => entry.Definition.Key).ToList()
+          group
         ));
       }
       categories.Sort((a, b) => a.Category.CompareTo(b.Category));
@@ -247,13 +273,66 @@ namespace StationeersLaunchPad
   {
     public readonly ConfigFile ConfigFile;
     public readonly string Category;
-    public readonly List<ConfigEntryBase> Entries;
+    public readonly List<ConfigEntryWrapper> Entries;
 
-    public SortedConfigCategory(ConfigFile configFile, string category, List<ConfigEntryBase> entries)
+    public SortedConfigCategory(ConfigFile configFile, string category, IEnumerable<ConfigEntryBase> entries)
     {
       this.ConfigFile = configFile;
       this.Category = category;
-      this.Entries = entries;
+      this.Entries = entries.Select(entry => new ConfigEntryWrapper(entry)).ToList();
+      this.Entries.Sort((a, b) =>
+      {
+        var order = a.Order.CompareTo(b.Order);
+        return order != 0 ? order : a.Entry.Definition.Key.CompareTo(b.Entry.Definition.Key);
+      });
+    }
+  }
+
+  public class ConfigEntryWrapper
+  {
+    public readonly ConfigEntryBase Entry;
+    public int Order = 0;
+    public bool RequireRestart = false;
+    public bool Disabled = false;
+    public bool Visible = true;
+    public string DisplayName;
+    public string Format = "%.3f";
+    public Func<ConfigEntryBase, bool> CustomDrawer;
+    public ConfigDefinition Definition => this.Entry.Definition;
+    public ConfigDescription Description => this.Entry.Description;
+    public object BoxedValue => this.Entry.BoxedValue;
+
+    public ConfigEntryWrapper(ConfigEntryBase entry)
+    {
+      this.DisplayName = entry.Definition.Key;
+      this.Entry = entry;
+      foreach (var tag in entry.Description.Tags)
+      {
+        switch (tag)
+        {
+          case KeyValuePair<string, int> { Key: "Order", Value: var order }:
+            this.Order = order;
+            break;
+          case KeyValuePair<string, bool> { Key: "RequireRestart", Value: var requireRestart }:
+            this.RequireRestart = requireRestart;
+            break;
+          case KeyValuePair<string, bool> { Key: "Disabled", Value: var disabled }:
+            this.Disabled = disabled;
+            break;
+          case KeyValuePair<string, bool> { Key: "Visible", Value: var visible }:
+            this.Visible = visible;
+            break;
+          case KeyValuePair<string, string> { Key: "DisplayName", Value: var displayName }:
+            this.DisplayName = displayName;
+            break;
+          case KeyValuePair<string, string> { Key: "Format", Value: var format }:
+            this.Format = format;
+            break;
+          case KeyValuePair<string, Func<ConfigEntryBase, bool>> { Key: "CustomDrawer", Value: var customDrawer }:
+            this.CustomDrawer = customDrawer;
+            break;
+        }
+      }
     }
   }
 }

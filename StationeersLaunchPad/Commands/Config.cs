@@ -45,7 +45,7 @@ namespace StationeersLaunchPad.Commands
             var def = cfg.Definition;
             if (!fullCat && !def.Key.Contains(key, StringComparison.OrdinalIgnoreCase))
               continue;
-            sb.AppendLine($"{ConfigName(def)}={cfg.GetSerializedValue()}");
+            sb.AppendLine($"{ConfigName(def)}={cfg.Entry.GetSerializedValue()}");
           }
         }
 
@@ -78,7 +78,7 @@ namespace StationeersLaunchPad.Commands
           foreach (var cfg in category.Entries)
           {
             if (cfg.Definition.Key.Equals(key, StringComparison.OrdinalIgnoreCase))
-              matches.Add(cfg);
+              matches.Add(cfg.Entry);
           }
         }
         if (matches.Count == 0)
