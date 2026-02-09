@@ -23,7 +23,7 @@ namespace StationeersLaunchPad
     {
       using (var downloadRequest = UnityWebRequest.Get(asset.BrowserDownloadUrl))
       {
-        downloadRequest.timeout = 45; // max of 45 seconds to download the zip file
+        downloadRequest.timeout = Configs.UpdateDownloadTimeout.Value;
 
         Logger.Global.LogDebug($"Downloading {asset.Name}");
         var downloadResult = await downloadRequest.SendWebRequest();
@@ -50,7 +50,7 @@ namespace StationeersLaunchPad
       {
         using (var request = UnityWebRequest.Get(url))
         {
-          request.timeout = 10; // 10 seconds because we are only fetching a json file
+          request.timeout = Configs.UpdateCheckTimeout.Value;
 
           Logger.Global.LogDebug($"Fetching {url}");
           var result = await request.SendWebRequest();
