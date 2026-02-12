@@ -5,8 +5,7 @@
     Condition="Exists('$(SolutionDir)Stationeers.VS.Extra.props')" />
 
   <PropertyGroup>
-    <TargetFramework>net4.8</TargetFramework>
-    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+    <TargetFramework>netstandard2.1</TargetFramework>
     <LangVersion>9.0</LangVersion>
     <ErrorReport>none</ErrorReport>
     <LanguageTargets>$(MSBuildToolsPath)\Microsoft.CSharp.targets</LanguageTargets>

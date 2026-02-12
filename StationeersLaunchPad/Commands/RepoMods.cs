@@ -4,6 +4,7 @@ using StationeersLaunchPad.Repos;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 
 namespace StationeersLaunchPad.Commands
@@ -50,9 +51,13 @@ namespace StationeersLaunchPad.Commands
       protected override bool RunLeaf(ReadOnlySpan<string> args, out string result)
       {
         var sb = new StringBuilder();
-        sb.AppendLine($"{ModRepos.Current.Mods.Count} mods");
-        foreach (var mod in ModRepos.Current.Mods)
-          sb.AppendLine($"{mod.ModID}@{mod.Branch}[{mod.Version}] from {mod.RepoID}");
+        var mods = ModRepos.Current.Mods;
+        sb.AppendLine($"{mods.Count} mods");
+        for (var i = 0; i < mods.Count; i++)
+        {
+          var mod = mods[i];
+          sb.AppendLine($"[{i}] {mod.ModID}@{mod.Branch}[{mod.Version}] from {mod.RepoID}");
+        }
         result = sb.ToString().TrimEnd();
         return true;
       }
@@ -116,6 +121,7 @@ namespace StationeersLaunchPad.Commands
           Branch = branch,
           RepoID = repo,
           MinVersion = target.Version,
+          Repo = ModRepos.Current.Repos.First(r => r.ID == repo),
         };
         if (version != null)
           mod.MaxVersion = version;
@@ -156,38 +162,44 @@ namespace StationeersLaunchPad.Commands
         }
 
         var config = ModRepos.Current;
+        if (!int.TryParse(modID, out var index) || index >= config.Mods.Count)
+          index = -1;
 
-        var matchIdxs = new List<int>();
-        for (var i = 0; i < config.Mods.Count; i++)
+        if (index < 0)
         {
-          var mod = config.Mods[i];
-          if (mod.ModID != modID) continue;
-          if (branch != null && branch != mod.Branch) continue;
-          if (version != null && version != mod.Version) continue;
-          if (repo != null && repo != mod.RepoID) continue;
-          matchIdxs.Add(i);
-        }
-
-        if (matchIdxs.Count == 0)
-        {
-          result = "No matching repo mods";
-          return true;
-        }
-
-        if (matchIdxs.Count > 1)
-        {
-          var sb = new StringBuilder();
-          sb.AppendLine("Multiple matching mods found");
-          foreach (var idx in matchIdxs)
+          var matchIdxs = new List<int>();
+          for (var i = 0; i < config.Mods.Count; i++)
           {
-            var mod = config.Mods[idx];
-            sb.AppendLine($"{mod.ModID}@{mod.Branch}[{mod.Version}] from {mod.RepoID}");
+            var mod = config.Mods[i];
+            if (mod.ModID != modID) continue;
+            if (branch != null && branch != mod.Branch) continue;
+            if (version != null && version != mod.Version) continue;
+            if (repo != null && repo != mod.RepoID) continue;
+            matchIdxs.Add(i);
           }
-          result = sb.ToString().Trim();
-          return true;
+
+          if (matchIdxs.Count == 0)
+          {
+            result = "No matching repo mods";
+            return true;
+          }
+
+          if (matchIdxs.Count > 1)
+          {
+            var sb = new StringBuilder();
+            sb.AppendLine("Multiple matching mods found");
+            foreach (var idx in matchIdxs)
+            {
+              var mod = config.Mods[idx];
+              sb.AppendLine($"{mod.ModID}@{mod.Branch}[{mod.Version}] from {mod.RepoID}");
+            }
+            result = sb.ToString().Trim();
+            return true;
+          }
+          index = matchIdxs[0];
         }
 
-        var match = config.Mods[matchIdxs[0]];
+        var match = config.Mods[index];
         if (LaunchPadConfig.ModsLoaded && !string.IsNullOrEmpty(match.DirName))
         {
           var dir = Path.Join(LaunchPadPaths.RepoModsPath, match.DirName);
@@ -197,7 +209,7 @@ namespace StationeersLaunchPad.Commands
             return true;
           }
         }
-        config.Mods.RemoveAt(matchIdxs[0]);
+        config.Mods.RemoveAt(index);
         ModRepos.SaveConfig(config);
         ModRepos.CleanRepoModDirs(config);
         LaunchPadConfig.ReloadMods();

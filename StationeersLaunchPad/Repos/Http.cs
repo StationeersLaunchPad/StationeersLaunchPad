@@ -16,6 +16,7 @@ namespace StationeersLaunchPad.Repos
 
     public override UniTask<RepoFetchResult> FetchRemote() => FetchHttp(Url, ETag);
     public override void SetCacheKey(string cacheKey) => ETag = cacheKey;
+    public override bool HasCacheKey => !string.IsNullOrEmpty(ETag);
 
     public static async UniTask<RepoFetchResult> FetchHttp(string url, string etag)
     {

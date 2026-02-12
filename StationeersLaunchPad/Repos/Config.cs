@@ -40,6 +40,7 @@ namespace StationeersLaunchPad.Repos
 
     public abstract UniTask<RepoFetchResult> FetchRemote();
     public abstract void SetCacheKey(string cacheKey);
+    public abstract bool HasCacheKey { get; }
   }
 
   public class RepoModDef
@@ -54,5 +55,9 @@ namespace StationeersLaunchPad.Repos
     [XmlAttribute("DirName")] public string DirName;
 
     [XmlIgnore] public string PrevDirName;
+    [XmlIgnore] public ModRepoDef Repo;
+
+    public string DisplayName =>
+      $"{ModID}@{Branch}[{Version}({MinVersion},{MaxVersion})] from {RepoID}";
   }
 }

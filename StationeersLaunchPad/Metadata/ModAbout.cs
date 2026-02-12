@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 using System.Xml;
+using System.Xml.Schema;
 using System.Xml.Serialization;
 
 namespace StationeersLaunchPad.Metadata
@@ -27,11 +28,11 @@ namespace StationeersLaunchPad.Metadata
     [XmlIgnore]
     public string InGameDescription;
 
-    [XmlElement("InGameDescription", IsNullable = true)]
-    public XmlCDataSection InGameDescriptionCData
+    [XmlElement("InGameDescription", IsNullable =true)]
+    public CDataString InGameDescriptionCData
     {
-      get => !string.IsNullOrEmpty(this.InGameDescription) ? new XmlDocument().CreateCDataSection(this.InGameDescription) : null;
-      set => this.InGameDescription = value?.Value;
+      get => string.IsNullOrEmpty(InGameDescription) ? null : new() { Value = InGameDescription};
+      set => InGameDescription = value?.Value;
     }
 
     [XmlElement("ChangeLog", IsNullable = true)]
@@ -126,5 +127,13 @@ namespace StationeersLaunchPad.Metadata
       get => Version; set => Version = value;
     }
     public bool ShouldSerialize_Legacy_Version() => false;
+  }
+
+  public class CDataString : IXmlSerializable
+  {
+    public string Value;
+    public XmlSchema GetSchema() => null;
+    public void ReadXml(XmlReader reader) => Value = reader.ReadElementContentAsString();
+    public void WriteXml(XmlWriter writer) => writer.WriteCData(Value);
   }
 }
