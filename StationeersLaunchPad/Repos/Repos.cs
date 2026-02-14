@@ -31,6 +31,27 @@ namespace StationeersLaunchPad.Repos
       else
         config = new();
 
+      var repos = new Dictionary<string, ModRepoDef>();
+      var distinctRepos = new List<ModRepoDef>();
+      for (var i = 0; i < config.Repos.Count; i++)
+      {
+        var repo = config.Repos[i];
+        if (!repos.ContainsKey(repo.ID))
+        {
+          repos[repo.ID] = repo;
+          distinctRepos.Add(repo);
+        }
+        else
+          Logger.Global.LogDebug($"Removing duplicate mod repo {repo.ID}");
+      }
+      config.Repos = distinctRepos;
+
+      foreach (var mod in config.Mods)
+      {
+        if (!repos.TryGetValue(mod.RepoID, out mod.Repo))
+          Logger.Global.LogWarning($"No connected repo for {mod.DisplayName}");
+      }
+
       var dirs = new DirAssignment();
       foreach (var repo in config.Repos)
         repo.DirName = dirs.Assign(repo.DirName, repo.ID);
@@ -97,7 +118,7 @@ namespace StationeersLaunchPad.Repos
         return;
       }
 
-      if (repo.Data == null)
+      if (repo.Data == null && repo.HasCacheKey)
       {
         Logger.Global.LogDebug($"{repo.ID}: no data. clearing cache key");
         repo.SetCacheKey(null);
@@ -210,6 +231,12 @@ namespace StationeersLaunchPad.Repos
       ModRepoIndex index, DirAssignment dirs, RepoModDef mod,
       out ModVersionData target, out string newDir)
     {
+      if (mod.Repo == null)
+      {
+        target = null;
+        newDir = null;
+        return false;
+      }
       mod.PrevDirName = mod.DirName;
       target = index.GetLatest(
         mod.ModID, mod.RepoID, mod.Branch, mod.MinVersion, mod.MaxVersion);
@@ -233,6 +260,9 @@ namespace StationeersLaunchPad.Repos
 
     public static void CleanRepoModDirs(ModReposConfig config)
     {
+      if (!Directory.Exists(LaunchPadPaths.RepoModsPath))
+        Directory.CreateDirectory(LaunchPadPaths.RepoModsPath);
+
       var modDirs = new HashSet<string>();
       foreach (var mod in config.Mods)
         if (!string.IsNullOrEmpty(mod.DirName))

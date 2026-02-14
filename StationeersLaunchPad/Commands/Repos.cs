@@ -25,21 +25,18 @@ namespace StationeersLaunchPad.Commands
 
       protected override bool RunLeaf(ReadOnlySpan<string> args, out string result)
       {
+        var matches = new List<(int, ModRepoDef)>();
         var repos = ModRepos.Current?.Repos ?? new();
-        if (args.Length > 0)
+        for (var i = 0; i < repos.Count; i++)
         {
-          var matches = new List<ModRepoDef>();
-          foreach (var repo in ModRepos.Current?.Repos ?? new())
-          {
-            if (repo.ID.Contains(args[0], StringComparison.OrdinalIgnoreCase))
-              matches.Add(repo);
-          }
-          repos = matches;
+          var repo = repos[i];
+          if (args.Length == 0 || repo.ID.Contains(args[0], StringComparison.OrdinalIgnoreCase))
+            matches.Add((i, repo));
         }
         var sb = new StringBuilder();
-        sb.AppendLine($"{repos.Count} repos");
-        foreach (var repo in repos)
-          sb.AppendLine($"{repo.ID}: {repo.Data?.ModVersions.Count ?? 0} mod versions");
+        sb.AppendLine($"{matches.Count} repos");
+        foreach (var (index, repo) in matches)
+          sb.AppendLine($"[{index}] {repo.ID}: {repo.Data?.ModVersions.Count ?? 0} mod versions");
         result = sb.ToString().TrimEnd();
         return true;
       }
@@ -102,7 +99,7 @@ namespace StationeersLaunchPad.Commands
     public class RemoveCommand : SubCommand
     {
       public RemoveCommand() : base("remove") { }
-      public override string UsageDescription => "<RepoID> -- remove a connected repo";
+      public override string UsageDescription => "<RepoID|Index> -- remove a connected repo";
 
       protected override bool RunLeaf(ReadOnlySpan<string> args, out string result)
       {
@@ -111,19 +108,21 @@ namespace StationeersLaunchPad.Commands
           result = null;
           return false;
         }
-        var repoID = args[0];
-
         var config = ModRepos.Current;
-        var idx = config.Repos.FindIndex(r => r.ID == repoID);
-        if (idx == -1)
+        var repoID = args[0];
+        if (!int.TryParse(repoID, out var index) || index >= config.Repos.Count)
+          index = config.Repos.FindIndex(r => r.ID == repoID);
+
+        if (index < 0)
         {
           result = $"No repo with ID {repoID}";
           return true;
         }
 
-        config.Repos.RemoveAt(idx);
+        var removed = config.Repos[index];
+        config.Repos.RemoveAt(index);
         ModRepos.SaveConfig(config);
-        result = $"Removed repo {repoID}";
+        result = $"Removed repo {removed.ID}";
         return true;
       }
     }
