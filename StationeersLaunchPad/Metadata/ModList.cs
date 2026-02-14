@@ -10,7 +10,7 @@ namespace StationeersLaunchPad.Metadata
 {
   public class ModList
   {
-    private readonly List<ModInfo> mods;
+    private List<ModInfo> mods;
 
     public IEnumerable<ModInfo> AllMods => this.mods;
     public IEnumerable<ModInfo> EnabledMods => this.mods.Where(mod => mod.Enabled);
@@ -64,7 +64,8 @@ namespace StationeersLaunchPad.Metadata
       }
 
       var localBasePath = SteamTransport.WorkshopType.Mod.GetLocalDirInfo().FullName;
-      var count = 0;
+
+      var newMods = new List<ModInfo>();
 
       foreach (var modcfg in config.Mods)
       {
@@ -79,7 +80,7 @@ namespace StationeersLaunchPad.Metadata
           if (modsByPath.TryGetValue("Core", out var coreMod))
           {
             coreMod.Enabled = modcfg.Enabled;
-            mods[count++] = coreMod;
+            newMods.Add(coreMod);
             modsByPath.Remove("Core");
           }
           continue;
@@ -99,7 +100,7 @@ namespace StationeersLaunchPad.Metadata
         if (modsByPath.TryGetValue(normalizedModPath, out var mod))
         {
           mod.Enabled = modcfg.Enabled;
-          mods[count++] = mod;
+          newMods.Add(mod);
           modsByPath.Remove(normalizedModPath);
         }
         else if (modcfg.Enabled)
@@ -110,9 +111,10 @@ namespace StationeersLaunchPad.Metadata
       foreach (var mod in modsByPath.Values)
       {
         Logger.Global.LogDebug($"new mod added at {mod.DirectoryPath}");
-        mods[count++] = mod;
+        newMods.Add(mod);
         mod.Enabled = true;
       }
+      mods = newMods;
     }
 
     // returns true if the mod was moved (even if it wasn't moved all the way to the target index)
@@ -125,7 +127,9 @@ namespace StationeersLaunchPad.Metadata
       if (curIndex == index)
         return false;
 
-      var graph = OrderGraph.Build(this.mods);
+      var newMods = new List<ModInfo>(mods);
+
+      var graph = OrderGraph.Build(newMods);
 
       var dir = index > curIndex ? 1 : -1;
       var deps = index > curIndex ? graph.Afters[mod] : graph.Befores[mod];
@@ -133,11 +137,11 @@ namespace StationeersLaunchPad.Metadata
       bool shift(int idx)
       {
         var next = idx + dir;
-        if (next < 0 || next >= this.mods.Count)
+        if (next < 0 || next >= newMods.Count)
           return false;
-        if (keepOrder && deps.Contains(this.mods[next]) && !shift(next))
+        if (keepOrder && deps.Contains(newMods[next]) && !shift(next))
           return false;
-        (this.mods[idx], this.mods[next]) = (this.mods[next], this.mods[idx]);
+        (newMods[idx], newMods[next]) = (newMods[next], newMods[idx]);
         return true;
       }
 
@@ -149,6 +153,7 @@ namespace StationeersLaunchPad.Metadata
         anyMove = true;
         curIndex += dir;
       }
+      mods = newMods;
       return anyMove;
     }
 
@@ -303,9 +308,7 @@ namespace StationeersLaunchPad.Metadata
       if (newOrder.Count != this.mods.Count)
         throw new InvalidOperationException($"Sort did not add all mods: {newOrder.Count} != {this.mods.Count}");
 
-      for (var i = 0; i < newOrder.Count; i++)
-        this.mods[i] = newOrder[i];
-
+      this.mods = newOrder;
       return true;
     }
 
