@@ -222,12 +222,15 @@ namespace StationeersLaunchPad
       {
         Logger.Global.LogInfo("Loading Mod Repos");
         var modRepos = ModRepos.Current = await ModRepos.LoadConfig();
-        if (firstLoad)
+        if (firstLoad && Configs.RepoCheckUpdates.Value)
           await ModRepos.UpdateRepos(modRepos);
         ModRepos.SaveConfig(modRepos);
-        if (firstLoad)
+        if (firstLoad && Configs.RepoModCheckUpdates.Value)
         {
-          await ModRepos.UpdateMods(modRepos);
+          var updates = ModRepos.GetModUpdateTargets(modRepos);
+          // TODO: prompt user when auto-update not enabled
+          if (updates.Count > 0)
+            await ModRepos.UpdateMods(modRepos, updates);
           ModRepos.SaveConfig(modRepos);
         }
 

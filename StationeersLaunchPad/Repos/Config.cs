@@ -60,4 +60,11 @@ namespace StationeersLaunchPad.Repos
     public string DisplayName =>
       $"{ModID}@{Branch}[{Version}({MinVersion},{MaxVersion})] from {RepoID}";
   }
+
+  public class RepoModUpdateTarget
+  {
+    public RepoModDef Mod;
+    public ModVersionData Version;
+    public string DirName;
+  }
 }

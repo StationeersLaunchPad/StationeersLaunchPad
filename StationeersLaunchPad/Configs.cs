@@ -42,10 +42,13 @@ namespace StationeersLaunchPad
     public static ConfigEntry<bool> CompactLogs;
     public static ConfigEntry<bool> LinuxPathPatch;
     public static ConfigEntry<bool> CompactConfigPanel;
+    public static ConfigEntry<bool> RepoCheckUpdates;
     public static ConfigEntry<int> RepoUpdateFrequency;
     public static ConfigEntry<int> RepoFetchTimeout;
+    public static ConfigEntry<bool> RepoModCheckUpdates;
     public static ConfigEntry<int> RepoModFetchTimeout;
     public static ConfigEntry<bool> RepoModValidateDigest;
+    public static ConfigEntry<bool> RepoModValidateVersion;
 
     public static bool RunPostUpdateCleanup => CheckForUpdate.Value && PostUpdateCleanup.Value;
     public static bool RunOneTimeBoosterInstall => CheckForUpdate.Value && OneTimeBoosterInstall.Value;
@@ -171,6 +174,13 @@ namespace StationeersLaunchPad
           "This setting allows you to override the default path that config and save files are stored. Notice, due to how this path is implemented in the base game, this setting can only be applied on server start.  Changing it while in game will not have an effect until after a restart."
         )
       );
+      RepoCheckUpdates = config.Bind(
+        new ConfigDefinition("Mod Repos", "RepoCheckUpdates"),
+        true,
+        new ConfigDescription(
+          "Check mod repos for new available mod versions on startup"
+        )
+      );
       RepoUpdateFrequency = config.Bind(
         new ConfigDefinition("Mod Repos", "RepoUpdateFrequency"),
         300,
@@ -185,6 +195,13 @@ namespace StationeersLaunchPad
           "Maximum time in seconds to wait for listing available versions in a mod repo."
         )
       );
+      RepoModCheckUpdates = config.Bind(
+        new ConfigDefinition("Mod Repos", "RepoModCheckUpdates"),
+        true,
+        new ConfigDescription(
+          "Check configured repo mods for new versions on startup."
+        )
+      );
       RepoModFetchTimeout = config.Bind(
         new ConfigDefinition("Mod Repos", "RepoModFetchTimeout"),
         60,
@@ -197,6 +214,13 @@ namespace StationeersLaunchPad
         true,
         new ConfigDescription(
           "Reject new mod versions when they don't match the digest provided by the repo."
+        )
+      );
+      RepoModValidateVersion = config.Bind(
+        new ConfigDefinition("Mod Repos", "RepoModValidateVersion"),
+        true,
+        new ConfigDescription(
+          "Reject new mod versions when they don't match the target ModID and Version."
         )
       );
       AutoScrollLogs = config.Bind(
