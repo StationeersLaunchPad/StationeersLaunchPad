@@ -39,6 +39,7 @@ namespace StationeersLaunchPad
     public static ConfigEntry<bool> OneTimeBoosterInstall;
     public static ConfigEntry<bool> AutoScrollLogs;
     public static ConfigEntry<LogSeverity> LogSeverities;
+    public static ConfigEntryWrapper LogSeveritiesWrapper;
     public static ConfigEntry<bool> CompactLogs;
     public static ConfigEntry<bool> LinuxPathPatch;
     public static ConfigEntry<bool> CompactConfigPanel;
@@ -237,6 +238,7 @@ namespace StationeersLaunchPad
           "This setting will filter what log severities will appear in the logging window."
         )
       );
+      LogSeveritiesWrapper = new(LogSeverities);
       CompactLogs = config.Bind(
         new ConfigDefinition("Logging", "CompactLogs"),
         false,
@@ -320,11 +322,10 @@ namespace StationeersLaunchPad
     public bool Disabled = false;
     public bool Visible = true;
     public string DisplayName;
-    public string Format = "%.3f";
+    public string Format;
     public Func<ConfigEntryBase, bool> CustomDrawer;
     public ConfigDefinition Definition => this.Entry.Definition;
     public ConfigDescription Description => this.Entry.Description;
-    public object BoxedValue => this.Entry.BoxedValue;
 
     public ConfigEntryWrapper(ConfigEntryBase entry)
     {
