@@ -6,26 +6,20 @@ using StationeersLaunchPad.Sources;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
-using System.Text;
+using System.Linq.Expressions;
 using UI.ImGuiUi;
 using UnityEngine;
 
 namespace StationeersLaunchPad.UI
 {
-  internal class ConfigPanel
+  internal static class ConfigPanel
   {
     private const ImGuiWindowFlags StaticWindowFlags = 0
       | ImGuiWindowFlags.NoMove
       | ImGuiWindowFlags.NoResize
       | ImGuiWindowFlags.NoSavedSettings;
 
-    static Dictionary<Type, ulong[]> enumValuesCache = new();
-    static Dictionary<Type, string[]> enumNamesCache = new();
-    static Dictionary<Type, string[]> enumShortNamesCache = new();
-    static Dictionary<Type, (ulong Value, string Name)[]> enumCacheSorted = new();
     static Dictionary<ConfigEntryBase, object> requireRestartOriginalValues = new();
-    static Dictionary<ConfigEntryBase, (ulong Value, string Formatted)> formattedValuesCache = new();
 
     public static void DrawWorkshopConfig(ModInfo modInfo)
     {
@@ -113,11 +107,13 @@ namespace StationeersLaunchPad.UI
         if (!ImGui.CollapsingHeader(category.Category, ImGuiTreeNodeFlags.DefaultOpen))
           continue;
 
+        ImGui.PushID(category.Category);
         foreach (var entry in category.Entries)
         {
-          if(entry.Visible && DrawConfigEntry(entry))
-              changed = true;
+          if (entry.Visible && DrawConfigEntry(entry))
+            changed = true;
         }
+        ImGui.PopID();
       }
 
       ImGui.PopID();
@@ -125,15 +121,33 @@ namespace StationeersLaunchPad.UI
       return changed;
     }
 
+    private delegate bool DrawConfigEntryFunc(ConfigEntryWrapper wrapper, bool fill);
+    private static readonly Dictionary<Type, DrawConfigEntryFunc> drawFuncs = new();
     public static bool DrawConfigEntry(ConfigEntryWrapper wrapper, bool fill = true)
+    {
+      var type = wrapper.Entry.SettingType;
+      if (!drawFuncs.TryGetValue(type, out var draw))
+      {
+        var lambda = (Expression<DrawConfigEntryFunc>) ((w, f) => DrawConfigEntry<object>(w, f));
+        var gmethod = (lambda.Body as MethodCallExpression).Method.GetGenericMethodDefinition();
+        var method = gmethod.MakeGenericMethod(type);
+        drawFuncs[type] = draw = (DrawConfigEntryFunc) method.CreateDelegate(typeof(DrawConfigEntryFunc));
+      }
+      return draw(wrapper, fill);
+    }
+
+    private static bool DrawConfigEntry<T>(ConfigEntryWrapper wrapper, bool fill)
     {
       ImGui.PushID(wrapper.Definition.Key);
       ImGui.BeginGroup();
 
       ImGui.BeginDisabled(wrapper.Disabled);
-      var value = wrapper.BoxedValue;
+      var entry = wrapper.Entry as ConfigEntry<T>;
+      var value = entry.Value;
       if (value is not bool)
       {
+        if (Configs.CompactConfigPanel.Value)
+          ImGui.AlignTextToFramePadding();
         ImGuiHelper.Text(wrapper.DisplayName);
         if (Configs.CompactConfigPanel.Value)
           ImGui.SameLine();
@@ -141,48 +155,28 @@ namespace StationeersLaunchPad.UI
       if (fill)
         ImGui.SetNextItemWidth(-float.Epsilon);
 
-      bool changed = false;
+      var changed = false;
       if (wrapper.CustomDrawer != null)
       {
         try
         {
           changed = wrapper.CustomDrawer(wrapper.Entry);
         }
-        // Modern ImGUI supports ErrorRecoveryStoreState/ErrorRecoveryTryToRecoverState, but it's not implemeneted in ImGuiNET
-        // and not yet implemented in the version the game uses (1.88).
-        // If it would be updated/replaced, error recovery might be possible, currently this try .. catch block is a homeopathy.
-        catch { }
+        catch (Exception ex)
+        {
+          // Modern ImGUI supports ErrorRecoveryStoreState/ErrorRecoveryTryToRecoverState, but it's not implemeneted in ImGuiNET
+          // and not yet implemented in the version the game uses (1.88).
+          // If it would be updated/replaced, error recovery might be possible, currently this try .. catch block is a homeopathy.
+          Logger.Global.LogException(ex);
+        }
       }
       else
       {
-        changed = value switch
-        {
-          Color => DrawColorEntry(wrapper.Entry as ConfigEntry<Color>),
-          Vector2 => DrawVector2Entry(wrapper.Entry as ConfigEntry<Vector2>, wrapper.Format),
-          Vector3 => DrawVector3Entry(wrapper.Entry as ConfigEntry<Vector3>, wrapper.Format),
-          Vector4 => DrawVector4Entry(wrapper.Entry as ConfigEntry<Vector4>, wrapper.Format),
-
-          Enum => DrawEnumEntry(wrapper.Entry, value as Enum),
-          string => DrawStringEntry(wrapper.Entry as ConfigEntry<string>),
-          char => DrawCharEntry(wrapper.Entry as ConfigEntry<char>),
-          bool => DrawBoolEntry(wrapper.Entry as ConfigEntry<bool>, wrapper.DisplayName),
-          float => DrawFloatEntry(wrapper.Entry as ConfigEntry<float>, wrapper.Format),
-          double => DrawDoubleEntry(wrapper.Entry as ConfigEntry<double>, wrapper.Format),
-          decimal => DrawDecimalEntry(wrapper.Entry as ConfigEntry<decimal>, wrapper.Format),
-          byte => DrawByteEntry(wrapper.Entry as ConfigEntry<byte>),
-          sbyte => DrawSByteEntry(wrapper.Entry as ConfigEntry<sbyte>),
-          short => DrawShortEntry(wrapper.Entry as ConfigEntry<short>),
-          ushort => DrawUShortEntry(wrapper.Entry as ConfigEntry<ushort>),
-          int => DrawIntEntry(wrapper.Entry as ConfigEntry<int>),
-          uint => DrawUIntEntry(wrapper.Entry as ConfigEntry<uint>),
-          long => DrawLongEntry(wrapper.Entry as ConfigEntry<long>),
-          ulong => DrawULongEntry(wrapper.Entry as ConfigEntry<ulong>),
-          _ => DrawDefault(wrapper.Entry),
-        };
+        changed = DrawFuncs<T>.Draw(wrapper, fill);
       }
       if (wrapper.RequireRestart && changed)
       {
-        var newValue = wrapper.BoxedValue;
+        var newValue = entry.Value;
         // Check if the value has actually changed - in case custom drawer returns true when there was no change.
         if (!Equals(value, newValue))
         {
@@ -206,98 +200,127 @@ namespace StationeersLaunchPad.UI
       return changed;
     }
 
-    private static bool DrawColorEntry(ConfigEntry<Color> entry)
+    private static bool Equals<T>(T val, object other)
+    {
+      if (val == null)
+        return other == null;
+      return val.Equals(other);
+    }
+
+    static ConfigPanel()
+    {
+      AddDrawFunc<Color>(DrawColorEntry);
+      AddDrawFunc<Vector2>(DrawVector2Entry);
+      AddDrawFunc<Vector3>(DrawVector3Entry);
+      AddDrawFunc<Vector4>(DrawVector4Entry);
+      AddDrawFunc<string>(DrawStringEntry);
+      AddDrawFunc<char>(DrawCharEntry);
+      AddDrawFunc<bool>(DrawBoolEntry);
+      AddDrawFunc<float>(DrawFloatEntry);
+      AddDrawFunc<double>(DrawDoubleEntry);
+      AddDrawFunc<decimal>(DrawDecimalEntry);
+      AddDrawFunc<byte>(DrawByteEntry);
+      AddDrawFunc<sbyte>(DrawSByteEntry);
+      AddDrawFunc<short>(DrawShortEntry);
+      AddDrawFunc<ushort>(DrawUShortEntry);
+      AddDrawFunc<int>(DrawIntEntry);
+      AddDrawFunc<uint>(DrawUIntEntry);
+      AddDrawFunc<long>(DrawLongEntry);
+      AddDrawFunc<ulong>(DrawULongEntry);
+    }
+    private static void AddDrawFunc<T>(DrawFuncs<T>.DrawFunc fn) => DrawFuncs<T>.Fn = fn;
+    private static class DrawFuncs<T>
+    {
+      public delegate bool DrawFunc(ConfigEntry<T> entry, ConfigEntryWrapper wrapper, bool fill);
+      public static DrawFunc Fn;
+      public static bool Draw(ConfigEntryWrapper wrapper, bool fill)
+      {
+        EnsureFn();
+        return Fn(wrapper.Entry as ConfigEntry<T>, wrapper, fill);
+      }
+
+      private enum DummyEnum { }
+      private static void EnsureFn()
+      {
+        if (Fn != null)
+          return;
+        if (typeof(Enum).IsAssignableFrom(typeof(T)))
+          SetFn<DummyEnum>((e, w, f) => DrawEnumEntry(e, w, f));
+        else
+          SetFn<T>((e, w, f) => DrawDefault(e, w, f));
+      }
+
+      private static void SetFn<T2>(Expression<DrawFuncs<T2>.DrawFunc> lambda)
+      {
+        var gmethod = (lambda.Body as MethodCallExpression).Method.GetGenericMethodDefinition();
+        var method = gmethod.MakeGenericMethod(typeof(T));
+        Fn = (DrawFunc) method.CreateDelegate(typeof(DrawFunc));
+      }
+    }
+
+    private static bool DrawColorEntry(ConfigEntry<Color> entry, ConfigEntryWrapper wrapper, bool fill)
     {
       var value = entry.Value;
-      var r = value.r;
       ImGui.Spacing();
       var vector4 = new Vector4(value.r, value.g, value.b, value.a);
       if (ImGui.ColorEdit4("##color", ref vector4))
       {
-        entry.BoxedValue = new Color(vector4.x, vector4.y, vector4.z, vector4.w);
+        entry.Value = new Color(vector4.x, vector4.y, vector4.z, vector4.w);
         return true;
       }
       return false;
     }
 
-    private static bool DrawVector2Entry(ConfigEntry<Vector2> entry, string format)
-    {
-      var value = entry.Value;
-      ImGui.Spacing();
-      if (ImGui.DragFloat2("##vector2", ref value, format))
-      {
-        entry.BoxedValue = value;
-        return true;
-      }
-      return false;
-    }
-
-    private static bool DrawVector3Entry(ConfigEntry<Vector3> entry, string format)
-    {
-      var value = entry.Value;
-      ImGui.Spacing();
-      if (ImGui.DragFloat3("##vector3", ref value, format))
-      {
-        entry.BoxedValue = value;
-        return true;
-      }
-      return false;
-    }
-
-    private static bool DrawVector4Entry(ConfigEntry<Vector4> entry, string format)
-    {
-      var value = entry.Value;
-      ImGui.Spacing();
-      if (ImGui.DragFloat4("##vector4", ref value, format))
-      {
-        entry.BoxedValue = value;
-        return true;
-      }
-      return false;
-    }
-
-    public static bool DrawEnumEntry(ConfigEntryBase entry, Enum value)
+    public static bool DrawEnumEntry<T>(ConfigEntry<T> entry, ConfigEntryWrapper wrapper, bool fill) where T : unmanaged, Enum
     {
       var changed = false;
-      var currentValue = Convert.ToUInt64(value);
-      var type = value.GetType();
-      var values = GetEnumValues(type);
-      var names = GetEnumDisplayNames(type);
-      var flags = type.GetCustomAttribute<FlagsAttribute>() != null;
+      var value = entry.Value;
+      var currentValue = Cast<T>.To<ulong>(value);
+      var previewValue = EnumInfo<T>.FormatValue(value);
 
-      string previewValue;
-      if(formattedValuesCache.TryGetValue(entry, out var formatted) && formatted.Value == currentValue)
-        previewValue = formatted.Formatted;
-      else
+      if (!fill)
       {
-        previewValue = FormatEnumValue(type, value);
-        formattedValuesCache[entry] = (currentValue, previewValue);
+        var previewSize = ImGui.CalcTextSize(previewValue);
+        var style = ImGui.GetStyle();
+        var fullWidth = previewSize.x + ImGui.GetFrameHeight() + style.FramePadding.x * 2;
+        ImGui.SetNextItemWidth(Math.Min(fullWidth, ImGui.GetContentRegionAvail().x));
       }
       if (ImGui.BeginCombo("##enumvalue", previewValue))
       {
+        var values = EnumInfo<T>.Values;
+        var isFlags = EnumInfo<T>.IsFlags;
         for (var i = 0; i < values.Length; i++)
         {
+          ImGui.PushID(i);
+
           var item = values[i];
-          if (flags)
+          var itemVal = item.UlongValue;
+          if (isFlags)
           {
-            var isChecked = item == 0 ? currentValue == item : (currentValue & item) == item;
-            if (ImGui.Checkbox(names.GetValue(i).ToString(), ref isChecked))
+            var isChecked = itemVal == 0
+              ? currentValue == itemVal
+              : (currentValue & itemVal) == itemVal;
+            if (ImGui.Checkbox(item.DisplayName, ref isChecked))
             {
-              entry.BoxedValue = Enum.ToObject(type, isChecked ? currentValue | item : currentValue & ~item);
+              entry.Value = Cast<ulong>.To<T>(isChecked
+                ? currentValue | itemVal
+                : currentValue & ~itemVal);
               changed = true;
             }
           }
           else
           {
-            var selected = currentValue == values[i];
+            var selected = currentValue == itemVal;
             if (selected)
               ImGui.SetItemDefaultFocus();
-            if (ImGui.Selectable(names[i], selected))
+            if (ImGui.Selectable(item.DisplayName, selected))
             {
-              entry.BoxedValue = Enum.ToObject(type, values[i]);
+              entry.Value = Cast<ulong>.To<T>(item.UlongValue);
               changed = true;
             }
           }
+
+          ImGui.PopID();
         }
         ImGui.EndCombo();
       }
@@ -305,33 +328,37 @@ namespace StationeersLaunchPad.UI
       return changed;
     }
 
-    public static bool DrawStringEntry(ConfigEntry<string> entry)
+    public static bool DrawStringEntry(ConfigEntry<string> entry, ConfigEntryWrapper wrapper, bool fill)
     {
       var changed = false;
       var value = entry.Value;
       if (ImGui.InputText("##stringvalue", ref value, 512, ImGuiInputTextFlags.EnterReturnsTrue) || ImGui.IsItemDeactivatedAfterEdit())
       {
-        entry.BoxedValue = value;
+        entry.Value = value;
         changed = true;
       }
 
       return changed;
     }
 
-    public static bool DrawCharEntry(ConfigEntry<char> entry)
+    private static readonly Dictionary<char, string> charStrings = new();
+    public static bool DrawCharEntry(ConfigEntry<char> entry, ConfigEntryWrapper wrapper, bool fill)
     {
+      var value = entry.Value;
+      if (!charStrings.TryGetValue(value, out var str))
+        str = charStrings[value] = value.ToString();
+
       var changed = false;
-      var value = $"{entry.Value}";
-      if (ImGui.InputText("##charvalue", ref value, 1, ImGuiInputTextFlags.EnterReturnsTrue) || ImGui.IsItemDeactivatedAfterEdit())
+      if (ImGui.InputText("##charvalue", ref str, 1, ImGuiInputTextFlags.EnterReturnsTrue) || ImGui.IsItemDeactivatedAfterEdit())
       {
-        entry.BoxedValue = value[0];
+        entry.Value = str.Length > 0 ? str[0] : default;
         changed = true;
       }
 
       return changed;
     }
 
-    public static bool DrawBoolEntry(ConfigEntry<bool> entry, string displayName)
+    public static bool DrawBoolEntry(ConfigEntry<bool> entry, ConfigEntryWrapper wrapper, bool fill)
     {
       var changed = false;
 
@@ -339,368 +366,135 @@ namespace StationeersLaunchPad.UI
       var compact = Configs.CompactConfigPanel.Value;
       if (compact)
       {
-        ImGuiHelper.Text(displayName);
+        ImGuiHelper.Text(wrapper.DisplayName);
         ImGui.SameLine();
       }
-      if (ImGui.Checkbox(compact ? "##boolvalue" : displayName, ref value))
+      if (ImGui.Checkbox(compact ? "##boolvalue" : wrapper.DisplayName, ref value))
       {
-        entry.BoxedValue = value;
+        entry.Value = value;
         changed = true;
       }
 
       return changed;
     }
 
-    public static bool DrawFloatEntry(ConfigEntry<float> entry, string format)
+    public static bool DrawDecimalEntry(ConfigEntry<decimal> entry, ConfigEntryWrapper wrapper, bool fill)
     {
-      var changed = false;
-
-      var value = entry.Value;
-      if (entry.Description.AcceptableValues is AcceptableValueRange<float> valueRange)
-      {
-        if (ImGui.SliderFloat("##floatvalue", ref value, valueRange.MinValue, valueRange.MaxValue, format))
-        {
-          entry.BoxedValue = value;
-          changed = true;
-        }
-      }
-      else if (ImGui.InputFloat("##floatvalue", ref value, step: 0, format))
-      {
-        entry.BoxedValue = value;
-        changed = true;
-      }
-
-      return changed;
-    }
-
-    public static unsafe bool DrawDoubleEntry(ConfigEntry<double> entry, string format)
-    {
-      var changed = false;
-
-      var value = entry.Value;
-      if (entry.Description.AcceptableValues is AcceptableValueRange<double> valueRange)
-      {
-        var min = valueRange.MinValue;
-        var max = valueRange.MaxValue;
-        if (ImGui.SliderScalar("##doublevalue", ImGuiDataType.Double, (IntPtr) (&value), (IntPtr) (&min), (IntPtr) (&max), format))
-        {
-          entry.BoxedValue = value;
-          changed = true;
-        }
-      }
-      else if (ImGui.InputDouble("##doublevalue", ref value, step: 0, format))
-      {
-        entry.BoxedValue = value;
-        changed = true;
-      }
-
-      return changed;
-    }
-
-    public static unsafe bool DrawDecimalEntry(ConfigEntry<decimal> entry, string format)
-    {
-      var changed = false;
-
-      var value = (double) entry.Value;
+      (double, double)? range = null;
       if (entry.Description.AcceptableValues is AcceptableValueRange<decimal> valueRange)
+        range = ((double) valueRange.MinValue, (double) valueRange.MaxValue);
+      var value = (double) entry.Value;
+      if (DrawScalarEntry(ref value, "##decimalvalue", ImGuiDataType.Double, wrapper.Format ?? "%.3f", range))
       {
-        var min = valueRange.MinValue;
-        var max = valueRange.MaxValue;
-        if (ImGui.SliderScalar("##decimalvalue", ImGuiDataType.Double, (IntPtr) (&value), (IntPtr) (&min), (IntPtr) (&max), format))
-        {
-          entry.BoxedValue = value;
-          changed = true;
-        }
+        entry.Value = (decimal) value;
+        return true;
       }
-      else if (ImGui.InputDouble("##decimalvalue", ref value, step: 0, format))
-      {
-        entry.BoxedValue = value;
-        changed = true;
-      }
-
-      return changed;
+      return false;
     }
 
-    public static bool DrawByteEntry(ConfigEntry<byte> entry)
+    private static bool DrawVector2Entry(ConfigEntry<Vector2> entry, ConfigEntryWrapper wrapper, bool fill) =>
+      DrawScalarNEntry(entry, "##vector2", 2, ImGuiDataType.Float, wrapper.Format ?? "%.3f");
+
+    private static bool DrawVector3Entry(ConfigEntry<Vector3> entry, ConfigEntryWrapper wrapper, bool fill) =>
+      DrawScalarNEntry(entry, "##vector3", 3, ImGuiDataType.Float, wrapper.Format ?? "%.3f");
+
+    private static bool DrawVector4Entry(ConfigEntry<Vector4> entry, ConfigEntryWrapper wrapper, bool fill) =>
+      DrawScalarNEntry(entry, "##vector4", 4, ImGuiDataType.Float, wrapper.Format ?? "%.3f");
+
+    public static bool DrawFloatEntry(ConfigEntry<float> entry, ConfigEntryWrapper wrapper, bool fill) =>
+      DrawScalarEntry(entry, "##floatvalue", ImGuiDataType.Float, wrapper.Format ?? "%.3f");
+
+    public static bool DrawDoubleEntry(ConfigEntry<double> entry, ConfigEntryWrapper wrapper, bool fill) =>
+      DrawScalarEntry(entry, "##doublevalue", ImGuiDataType.Double, wrapper.Format ?? "%.3f");
+
+    public static bool DrawByteEntry(ConfigEntry<byte> entry, ConfigEntryWrapper wrapper, bool fill) =>
+      DrawScalarEntry(entry, "##bytevalue", ImGuiDataType.U8, wrapper.Format);
+
+    public static bool DrawSByteEntry(ConfigEntry<sbyte> entry, ConfigEntryWrapper wrapper, bool fill) =>
+      DrawScalarEntry(entry, "##sbytevalue", ImGuiDataType.S8, wrapper.Format);
+
+    public static bool DrawShortEntry(ConfigEntry<short> entry, ConfigEntryWrapper wrapper, bool fill) =>
+      DrawScalarEntry(entry, "##shortvalue", ImGuiDataType.S16, wrapper.Format);
+
+    public static bool DrawUShortEntry(ConfigEntry<ushort> entry, ConfigEntryWrapper wrapper, bool fill) =>
+      DrawScalarEntry(entry, "##ushortvalue", ImGuiDataType.U16, wrapper.Format);
+
+    public static bool DrawIntEntry(ConfigEntry<int> entry, ConfigEntryWrapper wrapper, bool fill) =>
+      DrawScalarEntry(entry, "##intvalue", ImGuiDataType.S32, wrapper.Format);
+
+    public static bool DrawUIntEntry(ConfigEntry<uint> entry, ConfigEntryWrapper wrapper, bool fill) =>
+      DrawScalarEntry(entry, "##uintvalue", ImGuiDataType.U32, wrapper.Format);
+
+    public static bool DrawLongEntry(ConfigEntry<long> entry, ConfigEntryWrapper wrapper, bool fill) =>
+      DrawScalarEntry(entry, "##longvalue", ImGuiDataType.S64, wrapper.Format);
+
+    public static bool DrawULongEntry(ConfigEntry<ulong> entry, ConfigEntryWrapper wrapper, bool fill) =>
+      DrawScalarEntry(entry, "##ulongvalue", ImGuiDataType.U64, wrapper.Format);
+
+    private static bool DrawScalarEntry<T>(ConfigEntry<T> entry, string label, ImGuiDataType dataType, string format)
+      where T : unmanaged, IComparable
     {
-      var changed = false;
-
-      var value = (int) entry.Value;
-      if (entry.Description.AcceptableValues is AcceptableValueRange<byte> valueRange)
-      {
-        if (ImGui.SliderInt("##bytevalue", ref value, valueRange.MinValue, valueRange.MaxValue))
-        {
-          entry.BoxedValue = (byte) value;
-          changed = true;
-        }
-      }
-      else if (ImGui.InputInt("##bytevalue", ref value, step: 0))
-      {
-        entry.BoxedValue = (byte) value;
-        changed = true;
-      }
-
-      return changed;
-    }
-
-    public static bool DrawSByteEntry(ConfigEntry<sbyte> entry)
-    {
-      var changed = false;
-      var value = (int) entry.Value;
-      if (entry.Description.AcceptableValues is AcceptableValueRange<sbyte> valueRange)
-      {
-        if (ImGui.SliderInt("##sbytevalue", ref value, valueRange.MinValue, valueRange.MaxValue))
-        {
-          entry.BoxedValue = (sbyte) value;
-          changed = true;
-        }
-      }
-      else if (ImGui.InputInt("##sbytevalue", ref value, step: 0))
-      {
-        entry.BoxedValue = (sbyte) value;
-        changed = true;
-      }
-
-      return changed;
-    }
-
-    public static bool DrawShortEntry(ConfigEntry<short> entry)
-    {
-      var changed = false;
-
-      var value = (int) entry.Value;
-      if (entry.Description.AcceptableValues is AcceptableValueRange<short> valueRange)
-      {
-        if (ImGui.SliderInt("##shortvalue", ref value, valueRange.MinValue, valueRange.MaxValue))
-        {
-          entry.BoxedValue = (short) value;
-          changed = true;
-        }
-      }
-      else if (ImGui.InputInt("##shortvalue", ref value, step: 0))
-      {
-        entry.BoxedValue = (short) value;
-        changed = true;
-      }
-
-      return changed;
-    }
-
-    public static bool DrawUShortEntry(ConfigEntry<ushort> entry)
-    {
-      var changed = false;
-
-      var value = (int) entry.Value;
-      if (entry.Description.AcceptableValues is AcceptableValueRange<ushort> valueRange)
-      {
-        if (ImGui.SliderInt("##ushortvalue", ref value, valueRange.MinValue, valueRange.MaxValue))
-        {
-          entry.BoxedValue = (ushort) value;
-          changed = true;
-        }
-      }
-      else if (ImGui.InputInt("##ushortvalue", ref value, step: 0))
-      {
-        entry.BoxedValue = (ushort) value;
-        changed = true;
-      }
-
-      return changed;
-    }
-
-    public static bool DrawIntEntry(ConfigEntry<int> entry)
-    {
-      var changed = false;
+      (T, T)? range = null;
+      if (entry.Description.AcceptableValues is AcceptableValueRange<T> valueRange)
+        range = (valueRange.MinValue, valueRange.MaxValue);
 
       var value = entry.Value;
-      if (entry.Description.AcceptableValues is AcceptableValueRange<int> valueRange)
+      if (DrawScalarEntry(ref value, label, dataType, format, range))
       {
-        if (ImGui.SliderInt("##intvalue", ref value, valueRange.MinValue, valueRange.MaxValue))
+        entry.Value = value;
+        return true;
+      }
+      return false;
+    }
+
+    private static unsafe bool DrawScalarEntry<T>(
+      ref T curValue, string label, ImGuiDataType dataType, string format, (T Min, T Max)? range
+    ) where T : unmanaged
+    {
+      var changed = false;
+
+      var value = curValue;
+      if (range.HasValue)
+      {
+        var min = range.Value.Min;
+        var max = range.Value.Max;
+        if (ImGui.SliderScalar(label, dataType, (IntPtr) (&value), (IntPtr) (&min), (IntPtr) (&max), format))
         {
-          entry.BoxedValue = value;
+          curValue = value;
           changed = true;
         }
       }
-      else if (ImGui.InputInt("##intvalue", ref value, step: 0))
+      else if (ImGui.InputScalar(label, dataType, (IntPtr) (&value), format))
       {
-        entry.BoxedValue = value;
+        curValue = value;
         changed = true;
       }
 
       return changed;
     }
 
-    public static bool DrawUIntEntry(ConfigEntry<uint> entry)
+    private static unsafe bool DrawScalarNEntry<T>(ConfigEntry<T> entry, string label, int n, ImGuiDataType dataType, string format)
+      where T : unmanaged
     {
-      var changed = false;
-
-      var value = (int) entry.Value;
-      if (entry.Description.AcceptableValues is AcceptableValueRange<uint> valueRange)
+      var value = entry.Value;
+      ImGui.Spacing();
+      if (ImGui.DragScalarN(label, dataType, (IntPtr) (&value), n, format))
       {
-        if (ImGui.SliderInt("##uintvalue", ref value, (int) valueRange.MinValue, (int) valueRange.MaxValue))
-        {
-          entry.BoxedValue = (uint) value;
-          changed = true;
-        }
+        entry.Value = value;
+        return true;
       }
-      else if (ImGui.InputInt("##uintvalue", ref value, step: 0))
-      {
-        entry.BoxedValue = (uint) value;
-        changed = true;
-      }
-
-      return changed;
+      return false;
     }
 
-    public static bool DrawLongEntry(ConfigEntry<long> entry)
+    public static bool DrawDefault<T>(ConfigEntry<T> entry, ConfigEntryWrapper wrapper, bool fill)
     {
-      var changed = false;
-
-      var value = (int) entry.Value;
-      if (entry.Description.AcceptableValues is AcceptableValueRange<long> valueRange)
-      {
-        if (ImGui.SliderInt("##longvalue", ref value, (int) valueRange.MinValue, (int) valueRange.MaxValue))
-        {
-          entry.BoxedValue = (long) value;
-          changed = true;
-        }
-      }
-      else if (ImGui.InputInt("##longvalue", ref value, step: 0))
-      {
-        entry.BoxedValue = (long) value;
-        changed = true;
-      }
-
-      return changed;
-    }
-
-    public static bool DrawULongEntry(ConfigEntry<ulong> entry)
-    {
-      var changed = false;
-
-      var value = (int) entry.Value;
-      if (entry.Description.AcceptableValues is AcceptableValueRange<ulong> valueRange)
-      {
-        if (ImGui.SliderInt("##ulongvalue", ref value, (int) valueRange.MinValue, (int) valueRange.MaxValue))
-        {
-          entry.BoxedValue = (ulong) value;
-          changed = true;
-        }
-      }
-      else if (ImGui.InputInt("##ulongvalue", ref value, step: 0))
-      {
-        entry.BoxedValue = (ulong) value;
-        changed = true;
-      }
-
-      return changed;
-    }
-
-    public static bool DrawDefault(ConfigEntryBase entry)
-    {
-      var changed = false;
-
-      var value = entry.BoxedValue;
+      var value = entry.Value;
       if (value != null)
         ImGuiHelper.TextDisabled($"{value}");
       else
         ImGuiHelper.TextDisabled("is null");
 
-      return changed;
-    }
-
-    private static ulong[] GetEnumValues(Type enumType)
-    {
-      if (!enumValuesCache.TryGetValue(enumType, out var values))
-      {
-        // Can't use GetValues because order is different from enumType.GetFields.
-        var fields = enumType.GetFields(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-        values = new ulong[fields.Length];
-        for (int i = 0; i < fields.Length; i++)
-          values[i] = (ulong)Convert.ChangeType(fields[i].GetValue(null), TypeCode.UInt64);
-        enumValuesCache.Add(enumType, values);
-      }
-      return values;
-    }
-    private static string[] GetEnumDisplayNames(Type enumType)
-    {
-      if (!enumNamesCache.TryGetValue(enumType, out var result))
-      {
-        var fields = enumType.GetFields(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-        result = new string[fields.Length];
-        for (int i = 0; i < fields.Length; i++)
-        {
-          var field = fields[i];
-          var attr = field.GetCustomAttribute<System.ComponentModel.DataAnnotations.DisplayAttribute>();
-          if (attr != null)
-            result[i] = attr.GetName();
-          else
-            result[i] = field.Name;
-        }
-        enumNamesCache.Add(enumType, result);
-      }
-      return result;
-    }
-    private static string[] GetEnumDisplayShortNames(Type enumType)
-    {
-      if (!enumShortNamesCache.TryGetValue(enumType, out var result))
-      {
-        var fields = enumType.GetFields(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-        result = new string[fields.Length];
-        for (int i = 0; i < fields.Length; i++)
-        {
-          var field = fields[i];
-          var attr = field.GetCustomAttribute<System.ComponentModel.DataAnnotations.DisplayAttribute>();
-          if (attr != null)
-            result[i] = attr.GetShortName();
-          else
-            result[i] = field.Name;
-        }
-        enumShortNamesCache.Add(enumType, result);
-      }
-      return result;
-    }
-
-    private static string FormatEnumValue(Type enumType, object enumValue)
-    {
-      if(!enumCacheSorted.TryGetValue(enumType, out var sorted))
-      {
-        var names = GetEnumDisplayShortNames(enumType);
-        var values = GetEnumValues(enumType);
-        sorted = values.Zip(names, (val, name) => (val, name)).OrderBy(tuple => tuple.val).ToArray();
-        enumCacheSorted.Add(enumType, sorted);
-      }
-
-      var value = Convert.ToUInt64(enumValue);
-      bool isFlags = enumType.GetCustomAttribute<FlagsAttribute>() != null;
-      // Fast-path - zero value.
-      if (value == 0L)
-      {
-        if (sorted.Length != 0 && sorted[0].Value == 0L)
-          return sorted[0].Name;
-        return "<None>";
-      }
-      var result = new StringBuilder();
-      ulong saveValue = value;
-      // Make the string in reverse order - if there's compound values, they'll be first and we'll exclude their components from the value,
-      // thus minimizing the resulting string.
-      for(int i = sorted.Length - 1; i >= 0; i--)
-      {
-        if ((value & sorted[i].Value) == sorted[i].Value)
-        {
-          value -= sorted[i].Value;
-          if (result.Length > 0)
-            result.Insert(0, ", ");
-          if (!isFlags)
-            return sorted[i].Name; // bypass string building if it's not flags enum, as there will be only one value.
-          result.Insert(0, sorted[i].Name);
-        }
-      }
-      // There's some value that's not defined in the enum? Not sure how to deal with that, so let the enum deal with it instead.
-      if (value != 0L)
-        return Enum.Format(enumType, enumValue, "G");
-
-      return result.ToString();
+      return false;
     }
   }
 }
