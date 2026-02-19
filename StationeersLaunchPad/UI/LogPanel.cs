@@ -53,7 +53,7 @@ namespace StationeersLaunchPad.UI
     public static void DrawConsole(Logger logger)
     {
       ImGui.SetNextItemWidth(200);
-      ConfigPanel.DrawEnumEntry(Configs.LogSeverities, Configs.LogSeverities.Value);
+      ConfigPanel.DrawEnumEntry(Configs.LogSeverities, Configs.LogSeveritiesWrapper, false);
       ImGui.BeginChild("##logs", ImGuiWindowFlags.HorizontalScrollbar);
 
       var shouldScroll = false;
@@ -98,7 +98,7 @@ namespace StationeersLaunchPad.UI
       if (line == null)
         return;
 
-      if (!force && !Configs.LogSeverities.Value.HasFlag(line.Severity))
+      if (!force && (Configs.LogSeverities.Value & line.Severity) == 0)
         return;
 
       var text = Configs.CompactLogs.Value ? line.CompactString : line.FullString;
