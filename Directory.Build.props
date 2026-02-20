@@ -1,5 +1,8 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
+    <Deterministic>true</Deterministic>
+    <DeterministicSourcePaths>true</DeterministicSourcePaths>
+    <PathMap>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)'))=./</PathMap>
     <MSBuildProjectExtensionsPath>$(SolutionDir)obj\</MSBuildProjectExtensionsPath>
     <BaseIntermediateOutputPath>$(SolutionDir)obj\</BaseIntermediateOutputPath>
   </PropertyGroup>
