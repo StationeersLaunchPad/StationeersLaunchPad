@@ -21,13 +21,19 @@ namespace StationeersLaunchPad.UI
 
     static Dictionary<ConfigEntryBase, object> requireRestartOriginalValues = new();
 
-    public static void DrawWorkshopConfig(ModInfo modInfo)
+    private static (Vector2 topleft, Vector2 bottomRight) GetConfigWindowRect()
     {
       var screenSize = ImguiHelper.ScreenSize;
       var padding = new Vector2(25, 25);
-      var topLeft = new Vector2(screenSize.x - 800f - padding.x, padding.y);
+      var width = Mathf.Min(screenSize.x / 2 - padding.x, 800f);
       var bottomRight = screenSize - padding;
+      var topLeft = new Vector2(bottomRight.x - width, padding.y);
+      return (topLeft, bottomRight);
+    }
 
+    public static void DrawWorkshopConfig(ModInfo modInfo)
+    {
+      var (topLeft, bottomRight) = GetConfigWindowRect();
       ImGuiHelper.Draw(() =>
       {
         ImGui.SetNextWindowSize(bottomRight - topLeft);
@@ -42,11 +48,7 @@ namespace StationeersLaunchPad.UI
 
     public static void DrawSettingsWindow()
     {
-      var screenSize = ImguiHelper.ScreenSize;
-      var padding = new Vector2(25, 25);
-      var topLeft = new Vector2(screenSize.x - 800f - padding.x, padding.y);
-      var bottomRight = screenSize - padding;
-
+      var (topLeft, bottomRight) = GetConfigWindowRect();
       ImGuiHelper.Draw(() =>
       {
         ImGui.SetNextWindowSize(bottomRight - topLeft);
