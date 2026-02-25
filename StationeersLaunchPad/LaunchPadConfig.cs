@@ -296,6 +296,8 @@ namespace StationeersLaunchPad
 
       stopwatch.Stop();
       Logger.Global.LogWarning($"Took {stopwatch.Elapsed:m\\:ss\\.fff} to load mods.");
+
+      await SLPRefCheck.RunRefCheck();
     }
 
     private static async UniTask StageFinal()
@@ -305,6 +307,9 @@ namespace StationeersLaunchPad
 
       CurWait = new(Configs.AutoLoadWaitTime.Value, AutoLoad);
       await Platform.Wait(CurWait);
+      await SLPRefCheck.RunRefCheck();
+
+      WorldManager.OnGameDataLoaded += () => SLPRefCheck.RunRefCheck().Forget();
     }
 
     public static ModInfo MatchMod(ModData modData) =>
