@@ -28,7 +28,11 @@ namespace StationeersLaunchPad.Commands
 
       protected override bool RunLeaf(ReadOnlySpan<string> args, out string result)
       {
-        var filter = args.Length > 0 ? args[0] : "";
+        if (!ArgP(args).Positional(out var filter, "").Validate())
+        {
+          result = null;
+          return false;
+        }
         var parts = filter.Split('.', 2);
         var (section, key) = parts.Length == 2 ? (parts[0], parts[1]) : (null, filter);
 
@@ -61,14 +65,14 @@ namespace StationeersLaunchPad.Commands
 
       protected override bool RunLeaf(ReadOnlySpan<string> args, out string result)
       {
-        if (args.Length < 2)
+        if (!ArgP(args).Positional(out var name).Positional(out var value).Validate())
         {
           result = null;
           return false;
         }
 
-        var parts = args[0].Split('.', 2);
-        var (section, key) = parts.Length == 2 ? (parts[0], parts[1]) : (null, args[0]);
+        var parts = name.Split('.', 2);
+        var (section, key) = parts.Length == 2 ? (parts[0], parts[1]) : (null, name);
 
         var matches = new List<ConfigEntryBase>();
         foreach (var category in Configs.Sorted.Categories)
@@ -83,22 +87,22 @@ namespace StationeersLaunchPad.Commands
         }
         if (matches.Count == 0)
         {
-          result = $"No configs found for \"{args[0]}\"";
+          result = $"No configs found for \"{name}\"";
           return true;
         }
 
         if (matches.Count > 1)
         {
           var matchstr = string.Join(", ", matches.Select(cfg => $"\"{cfg.Definition}\""));
-          result = $"\"{args[0]}\" is ambiguous between {matchstr}";
+          result = $"\"{name}\" is ambiguous between {matchstr}";
           return true;
         }
 
         var prevVal = matches[0].GetSerializedValue();
-        matches[0].SetSerializedValue(args[1]);
+        matches[0].SetSerializedValue(value);
         var newVal = matches[0].GetSerializedValue();
         result = $"Changed \"{matches[0].Definition}\" from \"{prevVal}\" to \"{newVal}\"";
-        return false;
+        return true;
       }
     }
   }

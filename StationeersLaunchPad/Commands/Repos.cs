@@ -25,12 +25,17 @@ namespace StationeersLaunchPad.Commands
 
       protected override bool RunLeaf(ReadOnlySpan<string> args, out string result)
       {
+        if (!ArgP(args).Positional(out var filter, null).Validate())
+        {
+          result = null;
+          return false;
+        }
         var matches = new List<(int, ModRepoDef)>();
         var repos = ModRepos.Current?.Repos ?? new();
         for (var i = 0; i < repos.Count; i++)
         {
           var repo = repos[i];
-          if (args.Length == 0 || repo.ID.Contains(args[0], StringComparison.OrdinalIgnoreCase))
+          if (filter is null || repo.ID.Contains(filter, StringComparison.OrdinalIgnoreCase))
             matches.Add((i, repo));
         }
         var sb = new StringBuilder();
@@ -56,14 +61,13 @@ namespace StationeersLaunchPad.Commands
 
       protected override bool RunLeaf(ReadOnlySpan<string> args, out string result)
       {
-        if (args.Length < 1)
+        if (!ArgP(args).Flag("novalidate", out var novalidate)
+                      .Positional(out var repoUrl)
+                      .Validate())
         {
           result = null;
           return false;
         }
-        var repoUrl = args[0];
-        var validate = args.Length < 2 || args[1].ToLower() != "novalidate";
-
         var repo = HttpRepoDef.FromURL(repoUrl);
         if (repo == null)
         {
@@ -71,7 +75,7 @@ namespace StationeersLaunchPad.Commands
           return true;
         }
 
-        Add(repo, validate).Forget();
+        Add(repo, !novalidate).Forget();
         result = null;
         return true;
       }
@@ -104,13 +108,12 @@ namespace StationeersLaunchPad.Commands
 
       protected override bool RunLeaf(ReadOnlySpan<string> args, out string result)
       {
-        if (args.Length == 0)
+        if (!ArgP(args).Positional(out var repoID).Validate())
         {
           result = null;
           return false;
         }
         var config = ModRepos.Current;
-        var repoID = args[0];
         if (!int.TryParse(repoID, out var index) || index >= config.Repos.Count)
           index = config.Repos.FindIndex(r => r.ID == repoID);
 
@@ -136,30 +139,19 @@ namespace StationeersLaunchPad.Commands
 
       protected override bool RunLeaf(ReadOnlySpan<string> args, out string result)
       {
-        string mod = null;
-        string repo = null;
-        string branch = null;
-        string vmin = null;
-        string vmax = null;
-
-        foreach (var arg in args)
+        if (!ArgP(args).Named("mod", out var mod)
+                      .Named("repo", out var repo)
+                      .Named("branch", out var branch)
+                      .Named("minversion", out var vmin)
+                      .Named("maxversion", out var vmax)
+                      .Named("version", out var version)
+                      .Validate())
         {
-          var ps = arg.Split('=', 2);
-          if (ps.Length != 2)
-          {
-            result = null;
-            return false;
-          }
-          switch (ps[0].ToLower())
-          {
-            case "mod": mod = ps[1]; break;
-            case "repo": repo = ps[1]; break;
-            case "branch": branch = ps[1]; break;
-            case "version": vmin = vmax = ps[1]; break;
-            case "minversion": vmin = ps[1]; break;
-            case "maxversion": vmax = ps[1]; break;
-          }
+          result = null;
+          return false;
         }
+        vmin ??= version;
+        vmax ??= version;
 
         if (vmin != null && vmax != null && Version.Compare(vmin, vmax) > 0)
         {

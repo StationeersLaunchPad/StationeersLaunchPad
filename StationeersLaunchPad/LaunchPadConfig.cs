@@ -322,7 +322,7 @@ namespace StationeersLaunchPad
       var sortChanged = changed.HasFlag(ManualLoadWindow.ChangeFlags.AutoSort);
       var modsChanged = changed.HasFlag(ManualLoadWindow.ChangeFlags.Mods);
       if (sortChanged)
-        Configs.AutoLoadOnStart.Value = AutoSort = !AutoSort;
+        Configs.AutoSortOnStart.Value = AutoSort = !AutoSort;
       if (sortChanged || modsChanged)
       {
         modList.CheckDependencies();

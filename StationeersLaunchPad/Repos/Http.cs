@@ -59,11 +59,9 @@ namespace StationeersLaunchPad.Repos
 
     public static HttpRepoDef FromURL(string rawUrl)
     {
-      Logger.Global.LogDebug($"'{rawUrl}'");
       if (!Uri.TryCreate(rawUrl, UriKind.Absolute, out var uri) &&
           !Uri.TryCreate($"https://{rawUrl}", UriKind.Absolute, out uri))
         return null;
-      Logger.Global.LogDebug($"'{uri.Scheme.ToLower()}'");
       if (uri.Scheme.ToLower() is not ("http" or "https"))
         return null;
 
