@@ -10,7 +10,6 @@ namespace StationeersLaunchPad.Repos
   [XmlRoot("ModRepos")]
   public class ModReposConfig
   {
-    [XmlElement("GitHub", typeof(GitHubRepoDef))]
     [XmlElement("Http", typeof(HttpRepoDef))]
     public List<ModRepoDef> Repos = new();
 
@@ -26,12 +25,15 @@ namespace StationeersLaunchPad.Repos
   }
   public abstract class ModRepoDef
   {
+    [XmlAttribute("DisplayName")] public string Name;
     [XmlAttribute("DirName")] public string DirName;
     [XmlAttribute("LastFetch")] public DateTime LastFetch;
     [XmlAttribute("Digest")] public string Digest;
 
     [XmlIgnore]
     public ModRepoData Data;
+
+    public string DisplayName => string.IsNullOrEmpty(Name) ? ID : Name;
 
     public string LocalDirPath => Path.Join(LaunchPadPaths.ModReposPath, DirName);
     public string LocalDataPath => Path.Join(LocalDirPath, "modrepo.xml");
