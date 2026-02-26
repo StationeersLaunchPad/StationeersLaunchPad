@@ -36,7 +36,13 @@ namespace StationeersLaunchPad.Commands
         var sb = new StringBuilder();
         sb.AppendLine($"{matches.Count} repos");
         foreach (var (index, repo) in matches)
-          sb.AppendLine($"[{index}] {repo.ID}: {repo.Data?.ModVersions.Count ?? 0} mod versions");
+        {
+          sb.Append($"[{index}] {repo.DisplayName}: ");
+          sb.Append($"{repo.Data?.ModVersions.Count ?? 0} mod versions");
+          if (repo.DisplayName != repo.ID)
+            sb.Append($"  ({repo.ID})");
+          sb.AppendLine();
+        }
         result = sb.ToString().TrimEnd();
         return true;
       }
@@ -46,7 +52,7 @@ namespace StationeersLaunchPad.Commands
     {
       public AddCommand() : base("add") { }
       public override string UsageDescription =>
-        "<RepoID> [novalidate] -- connect to a repo";
+        "<RepoURL> [novalidate] -- connect to a repo";
 
       protected override bool RunLeaf(ReadOnlySpan<string> args, out string result)
       {
@@ -58,18 +64,13 @@ namespace StationeersLaunchPad.Commands
         var repoUrl = args[0];
         var validate = args.Length < 2 || args[1].ToLower() != "novalidate";
 
-        var httpUrl = repoUrl;
-        if (httpUrl.ToLower().StartsWith("http://"))
-          httpUrl = $"https://{httpUrl[7..]}";
-        if (!httpUrl.ToLower().StartsWith("https://"))
-          httpUrl = $"https://{httpUrl}";
-
-        var match = Github.RepoRegex.Match(repoUrl);
-        ModRepoDef repo = match.Success ? new GitHubRepoDef()
+        var repo = HttpRepoDef.FromURL(repoUrl);
+        if (repo == null)
         {
-          Owner = match.Groups[1].Value,
-          Name = match.Groups[2].Value
-        } : new HttpRepoDef() { Url = httpUrl };
+          result = $"invalid repo url '{repoUrl}'";
+          return true;
+        }
+
         Add(repo, validate).Forget();
         result = null;
         return true;

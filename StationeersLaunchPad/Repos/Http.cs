@@ -56,5 +56,32 @@ namespace StationeersLaunchPad.Repos
         return new();
       }
     }
+
+    public static HttpRepoDef FromURL(string rawUrl)
+    {
+      Logger.Global.LogDebug($"'{rawUrl}'");
+      if (!Uri.TryCreate(rawUrl, UriKind.Absolute, out var uri) &&
+          !Uri.TryCreate($"https://{rawUrl}", UriKind.Absolute, out uri))
+        return null;
+      Logger.Global.LogDebug($"'{uri.Scheme.ToLower()}'");
+      if (uri.Scheme.ToLower() is not ("http" or "https"))
+        return null;
+
+      // special case github urls if they are simple repo paths
+      if (uri.Host.ToLower() is "github.com")
+      {
+        var pathParts = uri.PathAndQuery.Trim('/').Split('/');
+        if (pathParts.Length == 2)
+          return FromGithubRepo(pathParts[0], pathParts[1]);
+      }
+
+      return new() { Url = uri.ToString() };
+    }
+
+    public static HttpRepoDef FromGithubRepo(string owner, string name) => new()
+    {
+      Name = $"github:{owner}/{name}",
+      Url = $"https://raw.githubusercontent.com/{owner}/{name}/refs/heads/modrepo/modrepo.xml",
+    };
   }
 }
