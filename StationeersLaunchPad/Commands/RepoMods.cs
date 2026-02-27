@@ -23,6 +23,7 @@ namespace StationeersLaunchPad.Commands
       public ListCommand() : base("list") { }
       public override string UsageDescription => "-- list installed repo mods";
 
+      protected override CommandStage LeafStage => CommandStage.ConfigLoaded;
       protected override bool RunLeaf(ReadOnlySpan<string> args, out string result)
       {
         if (!ArgP(args).Validate())
@@ -49,6 +50,7 @@ namespace StationeersLaunchPad.Commands
       public override string UsageDescription =>
         "<ModID> [version=<Version>] [branch=<Branch>] [repo=<RepoID>]";
 
+      protected override CommandStage LeafStage => CommandStage.ConfigLoaded;
       protected override bool RunLeaf(ReadOnlySpan<string> args, out string result)
       {
         if (!ArgP(args).Named("version", out var version)
@@ -109,7 +111,7 @@ namespace StationeersLaunchPad.Commands
         if (version != null)
           mod.MaxVersion = version;
 
-        Add(mod).Forget();
+        SLPCommand.AsyncCommand(Add(mod)).Forget();
 
         result = null;
         return true;
@@ -135,6 +137,7 @@ namespace StationeersLaunchPad.Commands
       public override string UsageDescription =>
         "<ModID> [version=<Version>] [branch=<Branch>] [repo=<RepoID>]";
 
+      protected override CommandStage LeafStage => CommandStage.ConfigLoaded;
       protected override bool RunLeaf(ReadOnlySpan<string> args, out string result)
       {
         if (!ArgP(args).Named("version", out var version)

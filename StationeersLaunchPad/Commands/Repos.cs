@@ -23,6 +23,7 @@ namespace StationeersLaunchPad.Commands
       public ListCommand() : base("list") { }
       public override string UsageDescription => "[<searchtext>] -- list connected repos";
 
+      protected override CommandStage LeafStage => CommandStage.ConfigLoaded;
       protected override bool RunLeaf(ReadOnlySpan<string> args, out string result)
       {
         if (!ArgP(args).Positional(out var filter, null).Validate())
@@ -59,6 +60,7 @@ namespace StationeersLaunchPad.Commands
       public override string UsageDescription =>
         "<RepoURL> [novalidate] -- connect to a repo";
 
+      protected override CommandStage LeafStage => CommandStage.ConfigLoaded;
       protected override bool RunLeaf(ReadOnlySpan<string> args, out string result)
       {
         if (!ArgP(args).Flag("novalidate", out var novalidate)
@@ -75,7 +77,7 @@ namespace StationeersLaunchPad.Commands
           return true;
         }
 
-        Add(repo, !novalidate).Forget();
+        SLPCommand.AsyncCommand(Add(repo, !novalidate)).Forget();
         result = null;
         return true;
       }
@@ -106,6 +108,7 @@ namespace StationeersLaunchPad.Commands
       public RemoveCommand() : base("remove") { }
       public override string UsageDescription => "<RepoID|Index> -- remove a connected repo";
 
+      protected override CommandStage LeafStage => CommandStage.ConfigLoaded;
       protected override bool RunLeaf(ReadOnlySpan<string> args, out string result)
       {
         if (!ArgP(args).Positional(out var repoID).Validate())
@@ -137,6 +140,7 @@ namespace StationeersLaunchPad.Commands
       public override string UsageDescription =>
         "[mod=<ModID>] [repo=<RepoID>] [branch=<Branch>] [version/minversion/maxversion=<Version>] -- search connected mod repos";
 
+      protected override CommandStage LeafStage => CommandStage.ConfigLoaded;
       protected override bool RunLeaf(ReadOnlySpan<string> args, out string result)
       {
         if (!ArgP(args).Named("mod", out var mod)
