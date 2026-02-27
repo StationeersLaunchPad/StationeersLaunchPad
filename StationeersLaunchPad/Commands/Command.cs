@@ -66,6 +66,8 @@ namespace StationeersLaunchPad.Commands
       Logger.Global.Log(message);
     }
 
+    protected static ArgParser ArgP(ReadOnlySpan<string> args) => new(args);
+
     public readonly string Name;
     public readonly List<SubCommand> Children;
     public readonly Dictionary<string, SubCommand> ChildrenMap;
@@ -134,6 +136,122 @@ namespace StationeersLaunchPad.Commands
     }
   }
 
+  public ref struct ArgParser
+  {
+    private readonly ReadOnlySpan<string> args;
+    private ulong used;
+    private bool valid;
+
+    public ArgParser(ReadOnlySpan<string> args)
+    {
+      this.args = args;
+      used = 0;
+      valid = true;
+    }
+
+    public ArgParser Positional(out string argVal, string defaultVal)
+    {
+      for (var i = 0; i < args.Length; i++)
+      {
+        var flag = 1ul << i;
+        if ((used & flag) != 0)
+          continue;
+        argVal = args[i];
+        used |= flag;
+        return this;
+      }
+      argVal = defaultVal;
+      return this;
+    }
+
+    public ArgParser Positional(out string argVal)
+    {
+      for (var i = 0; i < args.Length; i++)
+      {
+        var flag = 1ul << i;
+        if ((used & flag) != 0)
+          continue;
+        argVal = args[i];
+        used |= flag;
+        return this;
+      }
+      argVal = null;
+      valid = false;
+      return this;
+    }
+
+    public ArgParser Named(string name, out string argVal, string defaultVal = null)
+    {
+      if (!valid)
+      {
+        argVal = defaultVal;
+        return this;
+      }
+      for (var i = 0; i < args.Length; i++)
+      {
+        var flag = 1ul << i;
+        if ((used & flag) != 0)
+          continue;
+        if (!SplitNamedArg(args[i], out var aname, out var aval))
+          continue;
+        if (!aname.Equals(name, StringComparison.OrdinalIgnoreCase))
+          continue;
+        argVal = new(aval);
+        used |= flag;
+        return this;
+      }
+      argVal = defaultVal;
+      return this;
+    }
+
+    private static bool SplitNamedArg(
+      string arg, out ReadOnlySpan<char> name, out ReadOnlySpan<char> value)
+    {
+      var split = arg.IndexOf('=');
+      if (split == -1)
+      {
+        name = value = default;
+        return false;
+      }
+      name = arg.AsSpan(0, split);
+      value = arg.AsSpan(split + 1);
+      return true;
+    }
+
+    public ArgParser Flag(string name, out bool argVal)
+    {
+      if (!valid)
+      {
+        argVal = false;
+        return this;
+      }
+      for (var i = 0; i < args.Length; i++)
+      {
+        var flag = 1ul << i;
+        if ((used & flag) != 0)
+          continue;
+        var arg = args[i];
+        if (arg.Equals(name, StringComparison.OrdinalIgnoreCase))
+        {
+          argVal = true;
+          used |= flag;
+          return this;
+        }
+        if (!SplitNamedArg(arg, out var aname, out var aval))
+          continue;
+        if (!aname.Equals(name, StringComparison.OrdinalIgnoreCase))
+          continue;
+        argVal = aval == "1" || aname.Equals("true", StringComparison.OrdinalIgnoreCase);
+        used |= flag;
+        return this;
+      }
+      argVal = false;
+      return this;
+    }
+
+    public bool Validate() => valid && (1ul << args.Length) - 1 == used;
+  }
+
   public class RootCommand : SubCommand
   {
     private static readonly SubCommand[] StartupCommands = new SubCommand[]
@@ -183,7 +301,11 @@ namespace StationeersLaunchPad.Commands
 
     protected override bool RunLeaf(ReadOnlySpan<string> args, out string result)
     {
-      var pkgpath = args.Length > 0 ? args[0] : null;
+      if (!ArgP(args).Positional(out var pkgpath, null).Validate())
+      {
+        result = null;
+        return false;
+      }
       result = LaunchPadConfig.ExportModPackage(pkgpath);
       return true;
     }

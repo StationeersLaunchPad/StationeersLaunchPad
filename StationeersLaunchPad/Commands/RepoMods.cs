@@ -18,31 +18,6 @@ namespace StationeersLaunchPad.Commands
     { }
     public override string UsageDescription => "-- manage Repo Mods";
 
-    private static bool ParseAddRemove(ReadOnlySpan<string> args,
-      out string modID, out string branch, out string version, out string repo)
-    {
-      if (args.Length == 0)
-      {
-        modID = branch = version = repo = null;
-        return false;
-      }
-      modID = args[0];
-      branch = version = repo = null;
-      foreach (var arg in args[1..])
-      {
-        var ps = arg.Split('=', 2);
-        switch (ps[0].ToLower())
-        {
-          case "branch": branch = ps[1]; break;
-          case "version": version = ps[1]; break;
-          case "repo": repo = ps[1]; break;
-          default:
-            return false;
-        }
-      }
-      return true;
-    }
-
     public class ListCommand : SubCommand
     {
       public ListCommand() : base("list") { }
@@ -50,6 +25,11 @@ namespace StationeersLaunchPad.Commands
 
       protected override bool RunLeaf(ReadOnlySpan<string> args, out string result)
       {
+        if (!ArgP(args).Validate())
+        {
+          result = null;
+          return false;
+        }
         var sb = new StringBuilder();
         var mods = ModRepos.Current.Mods;
         sb.AppendLine($"{mods.Count} mods");
@@ -71,8 +51,11 @@ namespace StationeersLaunchPad.Commands
 
       protected override bool RunLeaf(ReadOnlySpan<string> args, out string result)
       {
-        if (!ParseAddRemove(
-              args, out var modID, out var branch, out var version, out var repo))
+        if (!ArgP(args).Named("version", out var version)
+                      .Named("branch", out var branch)
+                      .Named("repo", out var repo)
+                      .Positional(out var modID)
+                      .Validate())
         {
           result = null;
           return false;
@@ -154,8 +137,11 @@ namespace StationeersLaunchPad.Commands
 
       protected override bool RunLeaf(ReadOnlySpan<string> args, out string result)
       {
-        if (!ParseAddRemove(
-              args, out var modID, out var branch, out var version, out var repo))
+        if (!ArgP(args).Named("version", out var version)
+                      .Named("branch", out var branch)
+                      .Named("repo", out var repo)
+                      .Positional(out var modID)
+                      .Validate())
         {
           result = null;
           return false;
