@@ -1,5 +1,6 @@
 
 using Assets.Scripts;
+using Cysharp.Threading.Tasks;
 using StationeersLaunchPad.UI;
 using System;
 using System.Collections.Generic;
@@ -10,31 +11,88 @@ using Util.Commands;
 
 namespace StationeersLaunchPad.Commands
 {
+  public enum CommandStage
+  {
+    PreInit, // before SLP is initialized (shouldn't run any commands yet)
+    Init, // wait for SLP initialization
+    ConfigLoaded, // wait for mod config to be loaded (mod/repo list)
+    ModsLoaded, // wait for mods to be loaded
+    GameRunning, // wait for game to be running
+  };
+
   public class SLPCommand : CommandBase
   {
     public static readonly SLPCommand Instance = new();
 
-    public static bool StartupRun = false;
-    public static readonly List<string[]> StartupCommands = new();
+    private static bool inCommandExec = false;
+    private static bool inCommandAsync = false;
 
-    public static void RunStartup()
+    public static CommandStage Stage { get; private set; } = CommandStage.PreInit;
+    public static bool CommandRunning => inCommandExec || inCommandAsync;
+    private static readonly Queue<string[]> CommandQueue = new();
+
+    public static CommandStage QueuedStage
     {
-      StartupRun = true;
-      var instance = new SLPCommand();
-      foreach (var cmd in StartupCommands)
+      get
       {
-        try
-        {
-          var res = instance.ExecuteStartup(cmd);
-          if (!string.IsNullOrEmpty(res))
-            Compat.ConsoleWindowPrint($"slp: {res}");
-        }
-        catch (Exception ex)
-        {
-          ConsoleWindow.PrintError($"Exception: {ex}", true);
-        }
+        if (CommandQueue.Count == 0)
+          return CommandStage.Init;
+        return CurrentRoot.Stage(CommandQueue.Peek());
       }
-      StartupCommands.Clear();
+    }
+
+    public static string RunCommand(string[] args)
+    {
+      if (CommandRunning || CommandQueue.Count > 0 || CurrentRoot.Stage(args) > Stage)
+      {
+        CommandQueue.Enqueue(args);
+        return null;
+      }
+      return DoExecute(args);
+    }
+
+    public static async UniTask AsyncCommand(UniTask cmd)
+    {
+      try
+      {
+        inCommandAsync = true;
+        await cmd;
+      }
+      catch (Exception ex)
+      {
+        Logger.Global.LogException(ex);
+      }
+      finally
+      {
+        inCommandAsync = false;
+      }
+      TryRunNext();
+    }
+
+    private static void TryRunNext()
+    {
+      while (!CommandRunning && CommandQueue.Count > 0 && QueuedStage <= Stage)
+      {
+        var res = DoExecute(CommandQueue.Dequeue());
+        if (res != null)
+          SubCommand.Print(res);
+      }
+    }
+
+    // move the stage backwards and don't try to immediately run commands
+    public static void RevertStage(CommandStage stage)
+    {
+      if (stage > Stage)
+        throw new InvalidOperationException($"{stage} > {Stage}");
+      Stage = stage;
+    }
+
+    public static async UniTask MoveToStage(CommandStage stage)
+    {
+      Stage = stage;
+      TryRunNext();
+      while (CommandRunning)
+        await UniTask.Yield();
     }
 
     public override string HelpText => RootCommand.Instance.UsageDescription;
@@ -43,25 +101,30 @@ namespace StationeersLaunchPad.Commands
 
     public override bool IsLaunchCmd => true;
 
-    public override string Execute(string[] args) => Execute(args, false);
-    public string ExecuteStartup(string[] args) => Execute(args, true);
+    public override string Execute(string[] args) => RunCommand(args);
 
-    private string Execute(string[] args, bool startup)
+    private static string DoExecute(string[] args)
     {
-      if (!StartupRun)
+      inCommandExec = true;
+      try
       {
-        StartupCommands.Add(args);
-        return null;
+        return CurrentRoot.Execute(args);
       }
-      return (startup ? RootCommand.StartupInstance : RootCommand.Instance).Execute(args);
+      finally
+      {
+        inCommandExec = false;
+      }
     }
+
+    private static RootCommand CurrentRoot =>
+      Stage < CommandStage.GameRunning ? RootCommand.StartupInstance : RootCommand.Instance;
   }
 
   public abstract class SubCommand
   {
-    protected static void Print(string message)
+    public static void Print(string message)
     {
-      if (LaunchPadConfig.GameRunning)
+      if (SLPCommand.Stage >= CommandStage.GameRunning)
         Compat.ConsoleWindowPrint(message);
       Logger.Global.Log(message);
     }
@@ -113,6 +176,13 @@ namespace StationeersLaunchPad.Commands
       return LongUsage;
     }
 
+    public CommandStage Stage(ReadOnlySpan<string> args)
+    {
+      if (args.Length == 0 || !ChildrenMap.TryGetValue(args[0].ToLower(), out var child))
+        return LeafStage;
+      return child.Stage(args[1..]);
+    }
+
     protected bool RunChild(ReadOnlySpan<string> args, out string result)
     {
       if (args.Length == 0)
@@ -129,6 +199,7 @@ namespace StationeersLaunchPad.Commands
       return true;
     }
 
+    protected virtual CommandStage LeafStage => CommandStage.Init;
     protected virtual bool RunLeaf(ReadOnlySpan<string> args, out string result)
     {
       result = null;
@@ -284,6 +355,7 @@ namespace StationeersLaunchPad.Commands
     public LogsCommand() : base("logs") { }
     public override string UsageDescription => "-- open mods log window";
 
+    protected override CommandStage LeafStage => CommandStage.Init;
     protected override bool RunLeaf(ReadOnlySpan<string> args, out string result)
     {
       LogPanel.OpenStandaloneLogs();
@@ -299,6 +371,7 @@ namespace StationeersLaunchPad.Commands
     public override string UsageDescription =>
       "[<path.zip>] -- generate mod package for dedicated server or debugging";
 
+    protected override CommandStage LeafStage => CommandStage.ConfigLoaded;
     protected override bool RunLeaf(ReadOnlySpan<string> args, out string result)
     {
       if (!ArgP(args).Positional(out var pkgpath, null).Validate())
@@ -316,6 +389,7 @@ namespace StationeersLaunchPad.Commands
     public ExitCommand() : base("exit") { }
     public override string UsageDescription => "-- exit the game";
 
+    protected override CommandStage LeafStage => CommandStage.Init;
     protected override bool RunLeaf(ReadOnlySpan<string> args, out string result)
     {
       Application.Quit();

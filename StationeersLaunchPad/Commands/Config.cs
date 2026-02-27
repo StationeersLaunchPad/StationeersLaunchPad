@@ -26,6 +26,7 @@ namespace StationeersLaunchPad.Commands
       public ListCommand() : base("list") { }
       public override string UsageDescription => "[<searchtext>]";
 
+      protected override CommandStage LeafStage => CommandStage.ConfigLoaded;
       protected override bool RunLeaf(ReadOnlySpan<string> args, out string result)
       {
         if (!ArgP(args).Positional(out var filter, "").Validate())
@@ -63,6 +64,7 @@ namespace StationeersLaunchPad.Commands
       public SetCommand() : base("set") { }
       public override string UsageDescription => "<name> <value>";
 
+      protected override CommandStage LeafStage => CommandStage.ConfigLoaded;
       protected override bool RunLeaf(ReadOnlySpan<string> args, out string result)
       {
         if (!ArgP(args).Positional(out var name).Positional(out var value).Validate())

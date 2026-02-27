@@ -81,9 +81,9 @@ namespace StationeersLaunchPad
       if (Stage != LoadStage.Configuring)
         return;
       Logger.Global.LogInfo("Reloading Mod List");
-      StopAutoLoad();
       Stage = LoadStage.Searching;
       CurWait.Skip();
+      SLPCommand.RevertStage(CommandStage.Init);
     }
 
     public static void Draw()
@@ -124,7 +124,6 @@ namespace StationeersLaunchPad
       {
         await StageSearching(firstLoad);
         firstLoad = false;
-        SLPCommand.RunStartup();
         await StageConfiguring();
       }
       while (Stage == LoadStage.Searching);
@@ -132,6 +131,7 @@ namespace StationeersLaunchPad
       await StageFinal();
 
       StartGame();
+      await SLPCommand.MoveToStage(CommandStage.GameRunning);
     }
 
     private static void OnStartupError(Exception ex)
@@ -178,6 +178,10 @@ namespace StationeersLaunchPad
         StopAutoLoad();
         SteamDisabled = true;
       }
+
+      WorldManager.OnGameDataLoaded += () => SLPRefCheck.RunRefCheck().Forget();
+
+      await SLPCommand.MoveToStage(CommandStage.Init);
     }
 
     private static async UniTask StageUpdating()
@@ -269,6 +273,13 @@ namespace StationeersLaunchPad
       Stage = LoadStage.Configuring;
 
       CurWait = new(Configs.AutoLoadWaitTime.Value, AutoLoad);
+
+      await SLPCommand.MoveToStage(CommandStage.ConfigLoaded);
+
+      // if we have a command queued, don't wait
+      if (!CurWait.Done && SLPCommand.QueuedStage > CommandStage.ConfigLoaded)
+        CurWait.Skip();
+
       await Platform.Wait(CurWait);
     }
 
@@ -305,11 +316,14 @@ namespace StationeersLaunchPad
       if (Stage != LoadStage.Failed)
         Stage = LoadStage.Loaded;
 
+      await SLPCommand.MoveToStage(CommandStage.ModsLoaded);
+
       CurWait = new(Configs.AutoLoadWaitTime.Value, AutoLoad);
+      // if we have a command queued, don't wait
+      if (!CurWait.Done && SLPCommand.QueuedStage > CommandStage.ModsLoaded)
+        CurWait.Skip();
       await Platform.Wait(CurWait);
       await SLPRefCheck.RunRefCheck();
-
-      WorldManager.OnGameDataLoaded += () => SLPRefCheck.RunRefCheck().Forget();
     }
 
     public static ModInfo MatchMod(ModData modData) =>

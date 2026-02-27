@@ -30,7 +30,7 @@ namespace StationeersLaunchPad.UI
         Logger.Global.LogInfo($"> {input}");
         try
         {
-          res = RootCommand.StartupInstance.Execute(args);
+          res = SLPCommand.RunCommand(args);
         }
         catch (Exception ex)
         {
