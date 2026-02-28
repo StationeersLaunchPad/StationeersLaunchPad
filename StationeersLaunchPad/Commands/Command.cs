@@ -328,6 +328,7 @@ namespace StationeersLaunchPad.Commands
     private static readonly SubCommand[] StartupCommands = new SubCommand[]
     {
       new ConfigCommand(),
+      new SelfUpdateCommand(),
       new ReposCommand(),
       new RepoModsCommand(),
       new ModPkgCommand(),

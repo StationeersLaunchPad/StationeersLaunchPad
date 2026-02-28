@@ -14,6 +14,8 @@ namespace StationeersLaunchPad.Commands
       new ListCommand(),
       new AddCommand(),
       new RemoveCommand(),
+      new UpdateCommand(),
+      new UpdateAllCommand(),
       new IndexCommand())
     { }
     public override string UsageDescription => "-- manage Mod Repos";
@@ -131,6 +133,67 @@ namespace StationeersLaunchPad.Commands
         ModRepos.SaveConfig(config);
         result = $"Removed repo {removed.ID}";
         return true;
+      }
+    }
+
+    public class UpdateCommand : SubCommand
+    {
+      public UpdateCommand() : base("update") { }
+      public override string UsageDescription => "<RepoID|Index> -- fetch updated repo data";
+
+      protected override CommandStage LeafStage => CommandStage.ConfigLoaded;
+      protected override bool RunLeaf(ReadOnlySpan<string> args, out string result)
+      {
+        if (!ArgP(args).Positional(out var repoID).Validate())
+        {
+          result = null;
+          return false;
+        }
+
+        var config = ModRepos.Current;
+        if (!int.TryParse(repoID, out var index) || index >= config.Repos.Count)
+          index = config.Repos.FindIndex(repo => repo.ID == repoID);
+        if (index < 0)
+        {
+          result = $"No repo with ID {repoID}";
+          return true;
+        }
+        SLPCommand.AsyncCommand(UpdateOne(config.Repos[index])).Forget();
+        result = null;
+        return true;
+      }
+
+      private static async UniTask UpdateOne(ModRepoDef repo)
+      {
+        var config = ModRepos.Current;
+        await ModRepos.UpdateRepoData(repo, true);
+        ModRepos.SaveConfig(config);
+      }
+    }
+
+    public class UpdateAllCommand : SubCommand
+    {
+      public UpdateAllCommand() : base("updateall") { }
+      public override string UsageDescription => "-- fetch updated repo data for all connected repos";
+
+      protected override CommandStage LeafStage => CommandStage.ConfigLoaded;
+      protected override bool RunLeaf(ReadOnlySpan<string> args, out string result)
+      {
+        if (!ArgP(args).Validate())
+        {
+          result = null;
+          return false;
+        }
+        SLPCommand.AsyncCommand(UpdateAll()).Forget();
+        result = null;
+        return true;
+      }
+
+      private static async UniTask UpdateAll()
+      {
+        var config = ModRepos.Current;
+        await ModRepos.UpdateRepos(config, true);
+        ModRepos.SaveConfig(config);
       }
     }
 
