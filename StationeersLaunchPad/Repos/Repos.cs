@@ -64,10 +64,10 @@ namespace StationeersLaunchPad.Repos
       return config;
     }
 
-    public static async UniTask UpdateRepos(ModReposConfig config)
+    public static async UniTask UpdateRepos(ModReposConfig config, bool force = false)
     {
       Logger.Global.LogDebug("Fetching repo updates");
-      await UniTask.WhenAll(config.Repos.Select(repo => UpdateRepoData(repo)));
+      await UniTask.WhenAll(config.Repos.Select(repo => UpdateRepoData(repo, force)));
     }
 
     public static void AssignNewRepoDir(ModReposConfig config, ModRepoDef repo)
@@ -110,10 +110,10 @@ namespace StationeersLaunchPad.Repos
       }
     }
 
-    public static async UniTask UpdateRepoData(ModRepoDef repo)
+    public static async UniTask UpdateRepoData(ModRepoDef repo, bool force = false)
     {
       var lastFetchSeconds = DateTime.UtcNow.Subtract(repo.LastFetch).TotalSeconds;
-      if (repo.Data != null && lastFetchSeconds < Configs.RepoUpdateFrequency.Value)
+      if (!force && repo.Data != null && lastFetchSeconds < Configs.RepoUpdateFrequency.Value)
       {
         Logger.Global.LogDebug($"{repo.ID}: up to date");
         return;
@@ -233,6 +233,14 @@ namespace StationeersLaunchPad.Repos
       return dirs;
     }
 
+    public static bool TryPickModUpdate(
+      ModReposConfig config, RepoModDef mod, out RepoModUpdateTarget update)
+    {
+      var index = ModRepoIndex.Build(config);
+      var dirs = InitRepoModsAssignment(config);
+      return TryPickModUpdate(index, dirs, mod, out update);
+    }
+
     private static bool TryPickModUpdate(
       ModRepoIndex index, DirAssignment dirs, RepoModDef mod, out RepoModUpdateTarget update)
     {
@@ -279,7 +287,7 @@ namespace StationeersLaunchPad.Repos
       }
     }
 
-    private static async UniTask<bool> PerformModUpdate(RepoModUpdateTarget update)
+    public static async UniTask<bool> PerformModUpdate(RepoModUpdateTarget update)
     {
       var mod = update.Mod;
       var target = update.Version;

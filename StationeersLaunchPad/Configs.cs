@@ -87,7 +87,7 @@ namespace StationeersLaunchPad
           new AcceptableValueRange<int>(5, 60)
         )
       );
-      UpdateCheckTimeout = config.Bind(
+      UpdateDownloadTimeout = config.Bind(
         new ConfigDefinition("Startup", "UpdateDownloadTimeout"),
         45,
         new ConfigDescription(
