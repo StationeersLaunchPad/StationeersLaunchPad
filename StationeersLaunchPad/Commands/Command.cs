@@ -18,6 +18,7 @@ namespace StationeersLaunchPad.Commands
     ConfigLoaded, // wait for mod config to be loaded (mod/repo list)
     ModsLoaded, // wait for mods to be loaded
     GameRunning, // wait for game to be running
+    GameDataLoaded, // wait for game data to be loaded
   };
 
   public class SLPCommand : CommandBase
@@ -332,6 +333,8 @@ namespace StationeersLaunchPad.Commands
       new ReposCommand(),
       new RepoModsCommand(),
       new ModPkgCommand(),
+      new DebugPkgCommand(),
+      new LoadToCommand(),
       new ExitCommand(),
     };
     private static readonly SubCommand[] InGameCommands = new SubCommand[]
@@ -382,6 +385,54 @@ namespace StationeersLaunchPad.Commands
       }
       result = LaunchPadConfig.ExportModPackage(pkgpath);
       return true;
+    }
+  }
+
+  public class DebugPkgCommand : SubCommand
+  {
+    public DebugPkgCommand() : base("debugpkg") { }
+    public override string UsageDescription => "[<path.zip>] -- generate debug package";
+
+    protected override bool RunLeaf(ReadOnlySpan<string> args, out string result)
+    {
+      if (!ArgP(args).Positional(out var pkgpath, null).Validate())
+      {
+        result = null;
+        return false;
+      }
+      result = DebugPackage.Export(pkgpath);
+      return true;
+    }
+  }
+
+  public class LoadToCommand : SubCommand
+  {
+    public LoadToCommand() : base("loadto",
+      new LoadToStageCommand("config", CommandStage.ConfigLoaded),
+      new LoadToStageCommand("mods", CommandStage.ModsLoaded),
+      new LoadToStageCommand("gamedata", CommandStage.GameDataLoaded)
+    )
+    { }
+    public override string UsageDescription =>
+      "-- wait for load step to complete before following commands";
+
+    public class LoadToStageCommand : SubCommand
+    {
+      private readonly CommandStage stage;
+      private readonly string usage;
+      public LoadToStageCommand(string name, CommandStage stage) : base(name)
+      {
+        this.stage = stage;
+        usage = $"-- wait for {stage}";
+      }
+      public override string UsageDescription => usage;
+
+      protected override CommandStage LeafStage => stage;
+      protected override bool RunLeaf(ReadOnlySpan<string> args, out string result)
+      {
+        result = $"loaded to {stage}";
+        return true;
+      }
     }
   }
 

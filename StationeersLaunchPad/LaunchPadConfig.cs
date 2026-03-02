@@ -180,6 +180,7 @@ namespace StationeersLaunchPad
       }
 
       WorldManager.OnGameDataLoaded += () => SLPRefCheck.RunRefCheck().Forget();
+      WorldManager.OnGameDataLoaded += () => OnGameDataLoaded().Forget();
 
       await SLPCommand.MoveToStage(CommandStage.Init);
     }
@@ -275,12 +276,7 @@ namespace StationeersLaunchPad
       CurWait = new(Configs.AutoLoadWaitTime.Value, AutoLoad);
 
       await SLPCommand.MoveToStage(CommandStage.ConfigLoaded);
-
-      // if we have a command queued, don't wait
-      if (!CurWait.Done && SLPCommand.QueuedStage > CommandStage.ConfigLoaded)
-        CurWait.Skip();
-
-      await Platform.Wait(CurWait);
+      await Platform.Wait(CurWait, CommandStage.ConfigLoaded);
     }
 
     private static async UniTask StageLoading()
@@ -319,10 +315,7 @@ namespace StationeersLaunchPad
       await SLPCommand.MoveToStage(CommandStage.ModsLoaded);
 
       CurWait = new(Configs.AutoLoadWaitTime.Value, AutoLoad);
-      // if we have a command queued, don't wait
-      if (!CurWait.Done && SLPCommand.QueuedStage > CommandStage.ModsLoaded)
-        CurWait.Skip();
-      await Platform.Wait(CurWait);
+      await Platform.Wait(CurWait, CommandStage.ModsLoaded);
       await SLPRefCheck.RunRefCheck();
     }
 
@@ -360,6 +353,12 @@ namespace StationeersLaunchPad
 
       AlertPopup.Close();
       Platform.SetBackgroundEnabled(true);
+    }
+
+    private static async UniTask OnGameDataLoaded()
+    {
+      await UniTask.SwitchToMainThread();
+      await SLPCommand.MoveToStage(CommandStage.GameDataLoaded);
     }
 
     public static string ExportModPackage(string pkgpath = null)

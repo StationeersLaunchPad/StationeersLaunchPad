@@ -1,5 +1,6 @@
 
 using Cysharp.Threading.Tasks;
+using StationeersLaunchPad.Commands;
 using StationeersLaunchPad.UI;
 using System.Collections.Generic;
 using System.IO;
@@ -48,8 +49,9 @@ namespace StationeersLaunchPad
     public static LoadState InitLoadState => Current.PlatformInitLoadState;
     protected abstract LoadState PlatformInitLoadState { get; }
 
-    public static UniTask Wait(StageWait wait) => Current.PlatformWait(wait);
-    protected abstract UniTask PlatformWait(StageWait wait);
+    public static UniTask Wait(StageWait wait, CommandStage stage) =>
+      Current.PlatformWait(wait, stage);
+    protected abstract UniTask PlatformWait(StageWait wait, CommandStage stage);
 
     public static UniTask<bool> ContinueAfterUpdate() =>
       Current.PlatformContinueAfterUpdate();
@@ -80,9 +82,9 @@ namespace StationeersLaunchPad
       SteamDisabled = Configs.DisableSteamOnStart.Value,
     };
 
-    protected override async UniTask PlatformWait(StageWait wait)
+    protected override async UniTask PlatformWait(StageWait wait, CommandStage stage)
     {
-      while (!wait.Done) await UniTask.Yield();
+      while (!wait.Done && SLPCommand.QueuedStage <= stage) await UniTask.Yield();
     }
 
     protected override UniTask<bool> PlatformContinueAfterUpdate() =>
@@ -125,7 +127,7 @@ namespace StationeersLaunchPad
       SteamDisabled = true,
     };
 
-    protected override async UniTask PlatformWait(StageWait wait)
+    protected override async UniTask PlatformWait(StageWait wait, CommandStage stage)
     {
       // don't wait on server
       if (wait.Auto)
