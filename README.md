@@ -4,6 +4,13 @@
 
 A simple mod loader for Stationeers that allows you to edit mod configuration at game startup. This is compatible with Bepinex and StationeersMods mods installed locally in the home folder or downloaded from steam workshop.
 
+## v0.2.25 Update Error
+StationeersLaunchPad v0.2.25 contains a bug that prevents the auto-update from functioning.
+
+Please follow the [Manual Update Instructions](https://stationeerslaunchpad.github.io/docs/slp/update_error_0.2.25/) if you are encountering this error.
+
+![Update Error](https://stationeerslaunchpad.github.io/docs/img/update_error_0.2.25.png)
+
 ## Installation
 
 ### Fresh
