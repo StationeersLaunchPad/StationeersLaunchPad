@@ -26,6 +26,8 @@ namespace StationeersLaunchPad.UI
       {
         submitted = true;
         var args = CmdLineParser.SplitCommandLine(input).ToArray();
+        if (args.Length > 0 && args[0].Equals("slp", StringComparison.OrdinalIgnoreCase))
+          args = args[1..];
         string res = null;
         Logger.Global.LogInfo($"> {input}");
         try

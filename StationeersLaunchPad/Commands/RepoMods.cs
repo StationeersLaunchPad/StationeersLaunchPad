@@ -46,26 +46,22 @@ namespace StationeersLaunchPad.Commands
       }
     }
 
-    private static bool ParseSelectArgs(
-      ReadOnlySpan<string> args,
-      out string modID, out string version, out string branch, out string repo
-    ) =>
-      ArgP(args).Named("version", out version)
-                .Named("branch", out branch)
-                .Named("repo", out repo)
-                .Positional(out modID)
-                .Validate();
-
     public class AddCommand : SubCommand
     {
       public AddCommand() : base("add") { }
       public override string UsageDescription =>
-        "<ModID> [version=<Version>] [branch=<Branch>] [repo=<RepoID>]";
+        "<ModID> [version/minversion/maxversion=<Version>] [branch=<Branch>] [repo=<RepoID>]";
 
       protected override CommandStage LeafStage => CommandStage.ConfigLoaded;
       protected override bool RunLeaf(ReadOnlySpan<string> args, out string result)
       {
-        if (!ParseSelectArgs(args, out var modID, out var version, out var branch, out var repo))
+        if (!ArgP(args).Named("version", out var version)
+                        .Named("minversion", out var minv)
+                        .Named("maxversion", out var maxv)
+                        .Named("branch", out var branch)
+                        .Named("repo", out var repo)
+                        .Positional(out var modID)
+                        .Validate())
         {
           result = null;
           return false;
@@ -92,19 +88,21 @@ namespace StationeersLaunchPad.Commands
           }
           repo = matching[0];
         }
+        minv ??= version;
 
         ModVersionData target = null;
         foreach (var (k, v) in index.Versions(modID, repo, branch))
         {
-          if (version == null)
-            target = v;
-          else if (version == k.Version)
-            target = v;
+          if (minv is not null && Version.Compare(k.Version, minv) < 0)
+            continue;
+          if (maxv is not null && Version.Compare(k.Version, maxv) > 0)
+            continue;
+          target = v;
         }
 
         if (target == null)
         {
-          result = $"Could not find {modID}@{branch}[{version}] in {repo}";
+          result = $"No available mod versions matching {modID}@{branch}[{minv},{maxv}] in {repo}";
           return true;
         }
 
@@ -113,7 +111,8 @@ namespace StationeersLaunchPad.Commands
           ModID = modID,
           Branch = branch,
           RepoID = repo,
-          MinVersion = target.Version,
+          MinVersion = minv ?? target.Version,
+          MaxVersion = maxv,
           Repo = ModRepos.Current.Repos.First(r => r.ID == repo),
         };
         if (version != null)
@@ -138,6 +137,16 @@ namespace StationeersLaunchPad.Commands
         LaunchPadConfig.ReloadMods();
       }
     }
+
+    private static bool ParseSelectArgs(
+      ReadOnlySpan<string> args,
+      out string modID, out string version, out string branch, out string repo
+    ) =>
+      ArgP(args).Named("version", out version)
+                .Named("branch", out branch)
+                .Named("repo", out repo)
+                .Positional(out modID)
+                .Validate();
 
     private static int SelectMod(ModReposConfig config,
       string modID, string version, string branch, string repo, out string error)
