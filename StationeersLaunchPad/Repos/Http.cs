@@ -57,7 +57,7 @@ namespace StationeersLaunchPad.Repos
       }
     }
 
-    public static HttpRepoDef FromURL(string rawUrl)
+    public static HttpRepoDef FromURL(string rawUrl, string displayName)
     {
       if (!Uri.TryCreate(rawUrl, UriKind.Absolute, out var uri) &&
           !Uri.TryCreate($"https://{rawUrl}", UriKind.Absolute, out uri))
@@ -69,16 +69,17 @@ namespace StationeersLaunchPad.Repos
       if (uri.Host.ToLower() is "github.com")
       {
         var pathParts = uri.PathAndQuery.Trim('/').Split('/');
-        if (pathParts.Length == 2)
-          return FromGithubRepo(pathParts[0], pathParts[1]);
+        if (pathParts.Length == 2 && Github.UserRegex.Match(pathParts[0]).Success
+            && Github.RepoNameRegex.Match(pathParts[1]).Success)
+          return FromGithubRepo(pathParts[0], pathParts[1], displayName);
       }
 
-      return new() { Url = uri.ToString() };
+      return new() { Url = uri.ToString(), Name = displayName };
     }
 
-    public static HttpRepoDef FromGithubRepo(string owner, string name) => new()
+    public static HttpRepoDef FromGithubRepo(string owner, string name, string displayName) => new()
     {
-      Name = $"github:{owner}/{name}",
+      Name = displayName ?? $"github.com/{owner}/{name}",
       Url = $"https://raw.githubusercontent.com/{owner}/{name}/refs/heads/modrepo/modrepo.xml",
     };
   }

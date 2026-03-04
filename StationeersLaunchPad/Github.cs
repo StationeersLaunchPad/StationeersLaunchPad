@@ -18,6 +18,8 @@ namespace StationeersLaunchPad
     private const string RepoPattern = @"[\w\.\-]+";
     private static readonly Regex PullPrefixRegex = new($"https://github.com/({UserPattern})/({RepoPattern})/pull/");
     private static readonly Regex ComparePrefixRegex = new($"https://github.com/({UserPattern})/({RepoPattern})/compare/");
+    public static readonly Regex UserRegex = new(UserPattern);
+    public static readonly Regex RepoNameRegex = new(RepoPattern);
     public static readonly Regex RepoRegex =
       new($"^(?:https?://)?github.com/({UserPattern})/({RepoPattern})/?$", RegexOptions.IgnoreCase);
 

@@ -48,7 +48,7 @@ namespace StationeersLaunchPad.Commands
           sb.Append($"[{index}] {repo.DisplayName}: ");
           sb.Append($"{repo.Data?.ModVersions.Count ?? 0} mod versions");
           if (repo.DisplayName != repo.ID)
-            sb.Append($"  ({repo.ID})");
+            sb.Append($" ({repo.ID})");
           sb.AppendLine();
         }
         result = sb.ToString().TrimEnd();
@@ -60,19 +60,20 @@ namespace StationeersLaunchPad.Commands
     {
       public AddCommand() : base("add") { }
       public override string UsageDescription =>
-        "<RepoURL> [novalidate] -- connect to a repo";
+        "<RepoURL> [name=<DisplayName>] [novalidate] -- connect to a repo";
 
       protected override CommandStage LeafStage => CommandStage.ConfigLoaded;
       protected override bool RunLeaf(ReadOnlySpan<string> args, out string result)
       {
         if (!ArgP(args).Flag("novalidate", out var novalidate)
+                      .Named("name", out var name, null)
                       .Positional(out var repoUrl)
                       .Validate())
         {
           result = null;
           return false;
         }
-        var repo = HttpRepoDef.FromURL(repoUrl);
+        var repo = HttpRepoDef.FromURL(repoUrl, name);
         if (repo == null)
         {
           result = $"invalid repo url '{repoUrl}'";
