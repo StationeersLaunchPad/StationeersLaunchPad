@@ -8,7 +8,7 @@
       <CopyOutputDir>%(CopyOutputDir.Identity)</CopyOutputDir>
     </PropertyGroup>
     <ItemGroup>
-      <InputFiles Include="$(OutputPath)$(AssemblyName).*" />
+      <InputFiles Include="$(OutputPath)$(AssemblyName).dll" />
 
       <_CopyFiles_Dest Include="@(InputFiles)">
         <Dest>$(CopyOutputDir)\%(Filename)%(Extension)</Dest>
