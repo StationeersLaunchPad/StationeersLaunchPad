@@ -1,19 +1,17 @@
 
+using System.Collections.Generic;
 using BepInEx.Configuration;
 using StationeersLaunchPad.Loading;
 using StationeersMods.Interface;
-using System.Collections.Generic;
 using UnityEngine;
 
 namespace StationeersLaunchPad.Entrypoints;
 
-public class PrefabEntrypoint : ModEntrypoint
+public class PrefabEntrypoint(GameObject prefab) : ModEntrypoint
 {
-  public readonly GameObject Prefab;
+  public readonly GameObject Prefab = prefab;
   public GameObject Instance;
   public ModBehaviour[] Behaviours;
-
-  public PrefabEntrypoint(GameObject prefab) => Prefab = prefab;
 
   public override string DebugName() => $"Prefab Entry {Prefab.name}";
 

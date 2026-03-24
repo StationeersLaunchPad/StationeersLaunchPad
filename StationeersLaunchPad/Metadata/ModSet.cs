@@ -5,9 +5,9 @@ namespace StationeersLaunchPad.Metadata;
 
 public class ModSet
 {
-  private Dictionary<ulong, ModInfo> byWorkshopHandle = new();
-  private Dictionary<string, ModInfo> byModID = new();
-  private HashSet<ModInfo> all = new();
+  private readonly Dictionary<ulong, ModInfo> byWorkshopHandle = [];
+  private readonly Dictionary<string, ModInfo> byModID = [];
+  private readonly HashSet<ModInfo> all = [];
 
   public void Add(ModInfo mod)
   {

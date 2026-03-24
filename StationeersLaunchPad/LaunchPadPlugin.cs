@@ -1,9 +1,9 @@
+using System;
+using System.Linq;
 using BepInEx;
 using Cysharp.Threading.Tasks;
 using HarmonyLib;
 using StationeersLaunchPad.Commands;
-using System;
-using System.Linq;
 using UnityEngine;
 using UnityEngine.LowLevel;
 using Util.Commands;
@@ -49,7 +49,7 @@ public class LaunchPadPlugin : BaseUnityPlugin
     if (!LaunchPadPatches.RunPatches(new Harmony(LaunchPadInfo.GUID)))
       LaunchPadConfig.StopAutoLoad();
 
-    Configs.Initialize(this.Config);
+    Configs.Initialize(Config);
 
     if (Configs.LinuxPathPatch.Value)
       LaunchPadPatches.RunLinuxPathPatch();

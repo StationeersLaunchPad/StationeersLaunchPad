@@ -1,10 +1,10 @@
 
+using System.Collections.Generic;
+using System.IO;
 using Assets.Scripts.Networking.Transports;
 using Assets.Scripts.Serialization;
 using Cysharp.Threading.Tasks;
 using StationeersLaunchPad.Metadata;
-using System.Collections.Generic;
-using System.IO;
 
 namespace StationeersLaunchPad.Sources;
 
@@ -46,11 +46,10 @@ public class LocalModSource : ModSource
   }
 }
 
-public class LocalModDefinition : ModDefinition
+public class LocalModDefinition(string modDir, ModAboutEx about) : ModDefinition(about)
 {
-  public readonly string ModDirectory;
-  public LocalModDefinition(string modDir, ModAboutEx about) : base(about) =>
-    ModDirectory = modDir;
+  public readonly string ModDirectory = modDir;
+
   public override ModSourceType Type => ModSourceType.Local;
   public override ulong WorkshopHandle => About.WorkshopHandle;
   public override string DirectoryPath => ModDirectory;

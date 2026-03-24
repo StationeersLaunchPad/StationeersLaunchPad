@@ -1,7 +1,7 @@
 
+using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using StationeersLaunchPad.Metadata;
-using System.Collections.Generic;
 
 namespace StationeersLaunchPad.Sources;
 
@@ -10,7 +10,7 @@ public class CoreModSource : ModSource
   public static readonly CoreModSource Instance = new();
   private CoreModSource() { }
   public override async UniTask<List<ModDefinition>> ListMods(ModSourceState state) =>
-    new() { new CoreModDefinition() };
+    [new CoreModDefinition()];
 }
 
 public class CoreModDefinition : ModDefinition

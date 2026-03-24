@@ -200,22 +200,13 @@ public class ModRepoIndex
       HashCode.Combine(ModID, ModID, Branch, Version);
   }
 
-  public struct Iterator
+  public struct Iterator(ModRepoIndex index, ModRepoIndex.IndexLevel level, int start, int end)
   {
-    private readonly List<IndexEntry> entries;
-    public readonly IndexLevel Level;
-    private readonly int end;
-    private int index;
-    private bool first;
-
-    public Iterator(ModRepoIndex index, IndexLevel level, int start, int end)
-    {
-      this.entries = index.entries;
-      this.Level = level;
-      this.end = end;
-      this.index = start;
-      first = true;
-    }
+    private readonly List<IndexEntry> entries = index.entries;
+    public readonly IndexLevel Level = level;
+    private readonly int end = end;
+    private int index = start;
+    private bool first = true;
 
     public Iterator GetEnumerator() => this;
 

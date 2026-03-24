@@ -1,19 +1,19 @@
-using Cysharp.Threading.Tasks;
-using StationeersMods.Shared;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
+using Cysharp.Threading.Tasks;
+using StationeersMods.Shared;
 using UnityEngine;
 
 namespace StationeersLaunchPad.Loading;
 
 public static class ModLoader
 {
-  public static readonly List<LoadedMod> LoadedMods = new();
+  public static readonly List<LoadedMod> LoadedMods = [];
 
-  private static object AssembliesLock = new();
-  private static readonly Dictionary<Assembly, LoadedMod> AssemblyToMod = new();
+  private static readonly object AssembliesLock = new();
+  private static readonly Dictionary<Assembly, LoadedMod> AssemblyToMod = [];
 
   public static void RegisterAssembly(Assembly assembly, LoadedMod mod)
   {
@@ -61,7 +61,7 @@ public static class ModLoader
   {
     var request = bundle.LoadAllAssetsAsync<GameObject>();
     await WaitFor(request);
-    return request.allAssets.Select(obj => (GameObject) obj).ToList();
+    return [.. request.allAssets.Select(obj => (GameObject) obj)];
   }
 
   public static async UniTask<ExportSettings> LoadBundleExportSettings(AssetBundle bundle)

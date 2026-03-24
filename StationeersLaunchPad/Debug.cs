@@ -1,11 +1,4 @@
 
-using Assets.Scripts;
-using Assets.Scripts.Objects;
-using Assets.Scripts.Serialization;
-using Assets.Scripts.Util;
-using BepInEx;
-using HarmonyLib;
-using StationeersLaunchPad.Metadata;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -13,6 +6,13 @@ using System.IO;
 using System.IO.Compression;
 using System.Reflection;
 using System.Xml.Serialization;
+using Assets.Scripts;
+using Assets.Scripts.Objects;
+using Assets.Scripts.Serialization;
+using Assets.Scripts.Util;
+using BepInEx;
+using HarmonyLib;
+using StationeersLaunchPad.Metadata;
 using UnityEngine;
 
 namespace StationeersLaunchPad;
@@ -217,7 +217,7 @@ public static class DebugPackage
     try
     {
       var field = typeof(WorldManager).GetField("_recipeComparables", ANY_FLAGS);
-      foreach (var (key, recipes) in (Dictionary<RecipeType, RecipeComparable>) field.GetValue(null))
+      foreach (var (key, recipes) in (Dictionary<RecipeType, RecipeComparable>)field.GetValue(null))
       {
         archive.TryWriteEntry(Path.Join("recipes", $"{key}.txt"), f => WriteRecipes(f, recipes));
       }
@@ -234,7 +234,7 @@ public static class DebugPackage
     if (recipes is not RecipeDataComparable)
       return;
     var field = typeof(RecipeDataComparable).GetField("_recipeDataList", ANY_FLAGS);
-    var rlist = (List<WorldManager.RecipeData>) field.GetValue(recipes);
+    var rlist = (List<WorldManager.RecipeData>)field.GetValue(recipes);
     f.WriteLine($"{rlist.Count} recipes");
     for (var i = 0; i < rlist.Count; i++)
     {

@@ -1,22 +1,22 @@
 
-using BepInEx;
-using Cysharp.Threading.Tasks;
-using HarmonyLib;
-using StationeersLaunchPad.Loading;
-using StationeersLaunchPad.UI;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Xml.Serialization;
+using BepInEx;
+using Cysharp.Threading.Tasks;
+using HarmonyLib;
+using StationeersLaunchPad.Loading;
+using StationeersLaunchPad.UI;
 
 namespace StationeersLaunchPad;
 
 public static class SLPRefCheck
 {
-  private static HashSet<Assembly> offendingAssemblies = new();
-  private static HashSet<LoadedMod> offendingMods = new();
+  private static HashSet<Assembly> offendingAssemblies = [];
+  private static HashSet<LoadedMod> offendingMods = [];
 
   public static async UniTask RunRefCheck()
   {
@@ -75,8 +75,8 @@ public static class SLPRefCheck
   {
     await UniTask.SwitchToMainThread();
 
-    offendingAssemblies ??= new();
-    offendingMods ??= new();
+    offendingAssemblies ??= [];
+    offendingMods ??= [];
 
     var assemblyToMod = new Dictionary<Assembly, LoadedMod>();
     for (var i = 0; i < ModLoader.LoadedMods.Count; i++)
@@ -139,7 +139,7 @@ public static class SLPRefCheck
     if (!showWarning)
       return;
 
-    await RefWarningPanel.Show(offendingMods.Select(mod => mod.Info).ToList());
+    await RefWarningPanel.Show([.. offendingMods.Select(mod => mod.Info)]);
     SaveUnsupportedCache();
   }
 
@@ -151,7 +151,7 @@ public static class SLPRefCheck
       if (!File.Exists(UnsupportedCachePath))
         return null;
       using var f = File.OpenRead(UnsupportedCachePath);
-      return (UnsupportedData) new XmlSerializer(typeof(UnsupportedData)).Deserialize(f);
+      return (UnsupportedData)new XmlSerializer(typeof(UnsupportedData)).Deserialize(f);
     }
     catch (Exception ex)
     {
@@ -188,7 +188,7 @@ public static class SLPRefCheck
     [XmlAttribute]
     public string SLPVersion;
     [XmlElement("Mod")]
-    public List<UnsupportedModData> Mods = new();
+    public List<UnsupportedModData> Mods = [];
   }
 
   public class UnsupportedModData

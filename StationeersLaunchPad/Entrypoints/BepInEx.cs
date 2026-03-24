@@ -1,26 +1,22 @@
 
+using System;
+using System.Collections.Generic;
 using BepInEx;
 using BepInEx.Configuration;
 using StationeersLaunchPad.Loading;
 using StationeersMods.Interface;
-using System;
-using System.Collections.Generic;
 using UnityEngine;
 
 namespace StationeersLaunchPad.Entrypoints;
 
-public class BepInExEntrypoint : BehaviourEntrypoint<BaseUnityPlugin>
+public class BepInExEntrypoint(Type type) : BehaviourEntrypoint<BaseUnityPlugin>(type)
 {
-  public BepInExEntrypoint(Type type) : base(type) { }
-
   public override string DebugName() => $"BepInEx Entry {Type.FullName}";
 
   public override void Instantiate(GameObject parent) =>
-    Instance = (BaseUnityPlugin) parent.AddComponent(Type);
+    Instance = (BaseUnityPlugin)parent.AddComponent(Type);
 
-  public override void Initialize(LoadedMod mod)
-  {
-  }
+  public override void Initialize(LoadedMod mod) { }
 
   public override IEnumerable<ConfigFile> Configs()
   {

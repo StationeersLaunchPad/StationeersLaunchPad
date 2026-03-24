@@ -1,12 +1,12 @@
-﻿using BepInEx.Configuration;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Linq.Expressions;
+using BepInEx.Configuration;
 using ImGuiNET;
 using StationeersLaunchPad.Loading;
 using StationeersLaunchPad.Metadata;
 using StationeersLaunchPad.Sources;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Linq.Expressions;
 using UI.ImGuiUi;
 using UnityEngine;
 
@@ -19,7 +19,7 @@ internal static class ConfigPanel
     | ImGuiWindowFlags.NoResize
     | ImGuiWindowFlags.NoSavedSettings;
 
-  static Dictionary<ConfigEntryBase, object> requireRestartOriginalValues = new();
+  static readonly Dictionary<ConfigEntryBase, object> requireRestartOriginalValues = [];
 
   private static (Vector2 topleft, Vector2 bottomRight) GetConfigWindowRect()
   {
@@ -124,16 +124,16 @@ internal static class ConfigPanel
   }
 
   private delegate bool DrawConfigEntryFunc(ConfigEntryWrapper wrapper, bool fill);
-  private static readonly Dictionary<Type, DrawConfigEntryFunc> drawFuncs = new();
+  private static readonly Dictionary<Type, DrawConfigEntryFunc> drawFuncs = [];
   public static bool DrawConfigEntry(ConfigEntryWrapper wrapper, bool fill = true)
   {
     var type = wrapper.Entry.SettingType;
     if (!drawFuncs.TryGetValue(type, out var draw))
     {
-      var lambda = (Expression<DrawConfigEntryFunc>) ((w, f) => DrawConfigEntry<object>(w, f));
+      var lambda = (Expression<DrawConfigEntryFunc>)((w, f) => DrawConfigEntry<object>(w, f));
       var gmethod = (lambda.Body as MethodCallExpression).Method.GetGenericMethodDefinition();
       var method = gmethod.MakeGenericMethod(type);
-      drawFuncs[type] = draw = (DrawConfigEntryFunc) method.CreateDelegate(typeof(DrawConfigEntryFunc));
+      drawFuncs[type] = draw = (DrawConfigEntryFunc)method.CreateDelegate(typeof(DrawConfigEntryFunc));
     }
     return draw(wrapper, fill);
   }
@@ -256,7 +256,7 @@ internal static class ConfigPanel
     {
       var gmethod = (lambda.Body as MethodCallExpression).Method.GetGenericMethodDefinition();
       var method = gmethod.MakeGenericMethod(typeof(T));
-      Fn = (DrawFunc) method.CreateDelegate(typeof(DrawFunc));
+      Fn = (DrawFunc)method.CreateDelegate(typeof(DrawFunc));
     }
   }
 
@@ -343,7 +343,7 @@ internal static class ConfigPanel
     return changed;
   }
 
-  private static readonly Dictionary<char, string> charStrings = new();
+  private static readonly Dictionary<char, string> charStrings = [];
   public static bool DrawCharEntry(ConfigEntry<char> entry, ConfigEntryWrapper wrapper, bool fill)
   {
     var value = entry.Value;
@@ -384,11 +384,11 @@ internal static class ConfigPanel
   {
     (double, double)? range = null;
     if (entry.Description.AcceptableValues is AcceptableValueRange<decimal> valueRange)
-      range = ((double) valueRange.MinValue, (double) valueRange.MaxValue);
-    var value = (double) entry.Value;
+      range = ((double)valueRange.MinValue, (double)valueRange.MaxValue);
+    var value = (double)entry.Value;
     if (DrawScalarEntry(ref value, "##decimalvalue", ImGuiDataType.Double, wrapper.Format ?? "%.3f", range))
     {
-      entry.Value = (decimal) value;
+      entry.Value = (decimal)value;
       return true;
     }
     return false;
@@ -460,13 +460,13 @@ internal static class ConfigPanel
     {
       var min = range.Value.Min;
       var max = range.Value.Max;
-      if (ImGui.SliderScalar(label, dataType, (IntPtr) (&value), (IntPtr) (&min), (IntPtr) (&max), format))
+      if (ImGui.SliderScalar(label, dataType, (IntPtr)(&value), (IntPtr)(&min), (IntPtr)(&max), format))
       {
         curValue = value;
         changed = true;
       }
     }
-    else if (ImGui.InputScalar(label, dataType, (IntPtr) (&value), format))
+    else if (ImGui.InputScalar(label, dataType, (IntPtr)(&value), format))
     {
       curValue = value;
       changed = true;
@@ -480,7 +480,7 @@ internal static class ConfigPanel
   {
     var value = entry.Value;
     ImGui.Spacing();
-    if (ImGui.DragScalarN(label, dataType, (IntPtr) (&value), n, format))
+    if (ImGui.DragScalarN(label, dataType, (IntPtr)(&value), n, format))
     {
       entry.Value = value;
       return true;

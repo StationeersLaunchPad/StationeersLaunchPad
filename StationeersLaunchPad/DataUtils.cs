@@ -81,7 +81,7 @@ public static class EnumInfo<T> where T : unmanaged, Enum
 
     public ValueInfo(FieldInfo field)
     {
-      Value = (T) field.GetValue(null);
+      Value = (T)field.GetValue(null);
       UlongValue = Convert.ToUInt64(Value);
       var attr = field.GetCustomAttribute<System.ComponentModel.DataAnnotations.DisplayAttribute>();
       DisplayName = attr?.GetName() ?? field.Name;
@@ -92,7 +92,7 @@ public static class EnumInfo<T> where T : unmanaged, Enum
   public static readonly ValueInfo[] Values;
   public static readonly ValueInfo[] SortedValues;
   public static readonly bool IsFlags;
-  private static readonly Dictionary<ulong, string> formatCache = new();
+  private static readonly Dictionary<ulong, string> formatCache = [];
 
   static EnumInfo()
   {

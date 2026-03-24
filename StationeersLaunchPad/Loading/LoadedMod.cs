@@ -1,33 +1,33 @@
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Reflection;
 using BepInEx.Configuration;
 using Cysharp.Threading.Tasks;
 using StationeersLaunchPad.Entrypoints;
 using StationeersLaunchPad.Metadata;
 using StationeersMods.Interface;
 using StationeersMods.Shared;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Reflection;
 using UnityEngine;
 
 namespace StationeersLaunchPad.Loading;
 
 public class LoadedMod
 {
-  private object _lock = new();
+  private readonly object _lock = new();
 
   public ModInfo Info;
 
   public Logger Logger;
 
-  public List<Assembly> Assemblies = new();
-  public List<GameObject> Prefabs = new();
-  public List<ExportSettings> Exports = new();
+  public List<Assembly> Assemblies = [];
+  public List<GameObject> Prefabs = [];
+  public List<ExportSettings> Exports = [];
   public ContentHandler ContentHandler;
 
-  public List<ModEntrypoint> Entrypoints = new();
+  public List<ModEntrypoint> Entrypoints = [];
 
-  public List<ConfigFile> ConfigFiles = new();
+  public List<ConfigFile> ConfigFiles = [];
 
   public bool LoadedAssemblies;
   public bool LoadedAssets;
@@ -37,122 +37,121 @@ public class LoadedMod
 
   public LoadedMod(ModInfo info)
   {
-    this.Logger = Logger.Global.CreateChild(info.Name);
-    this.Info = info;
+    Logger = Logger.Global.CreateChild(info.Name);
+    Info = info;
     var resource = new DummyResource(info.DirectoryPath);
-    this.ContentHandler = new(resource, new List<IResource>().AsReadOnly(), this.Prefabs.AsReadOnly());
+    ContentHandler = new(resource, new List<IResource>().AsReadOnly(), Prefabs.AsReadOnly());
   }
 
   private UniTask<Assembly> LoadAssemblySingle(string path) => UniTask.RunOnThreadPool(() =>
   {
-    this.Logger.LogDebug($"Loading Assembly {path}");
+    Logger.LogDebug($"Loading Assembly {path}");
     var assembly = Assembly.LoadFrom(path);
     ModLoader.RegisterAssembly(assembly, this);
-    this.Logger.LogInfo($"Loaded Assembly");
+    Logger.LogInfo($"Loaded Assembly");
     return assembly;
   });
 
   public async UniTask LoadAssembliesSerial()
   {
-    foreach (var path in this.Info.Assemblies)
-      this.Assemblies.Add(await this.LoadAssemblySingle(path));
+    foreach (var path in Info.Assemblies)
+      Assemblies.Add(await LoadAssemblySingle(path));
   }
 
   public async UniTask LoadAssembliesParallel()
   {
     var assemblies = await UniTask.WhenAll(
-      this.Info.Assemblies.Select(path => this.LoadAssemblySingle(path))
+      Info.Assemblies.Select(LoadAssemblySingle)
     );
-    this.Assemblies.AddRange(assemblies);
+    Assemblies.AddRange(assemblies);
   }
 
   private async UniTask LoadAssetsSingle(string path)
   {
-    var bundle = await this.LoadAssetBundle(path);
-    var prefabs = await this.LoadAssetBundleGameObjects(path, bundle);
-    lock (this._lock)
-      this.Prefabs.AddRange(prefabs);
+    var bundle = await LoadAssetBundle(path);
+    var prefabs = await LoadAssetBundleGameObjects(path, bundle);
+    lock (_lock)
+      Prefabs.AddRange(prefabs);
 
-    var exportSettings = await this.LoadAssetBundleExportSettings(path, bundle);
+    var exportSettings = await LoadAssetBundleExportSettings(path, bundle);
     if (exportSettings != null)
-      lock (this._lock)
-        this.Exports.Add(exportSettings);
+      lock (_lock)
+        Exports.Add(exportSettings);
   }
 
   public async UniTask LoadAssetsSerial()
   {
-    foreach (var path in this.Info.AssetBundles)
-      await this.LoadAssetsSingle(path);
+    foreach (var path in Info.AssetBundles)
+      await LoadAssetsSingle(path);
   }
 
   public async UniTask LoadAssetsParallel()
   {
-    await UniTask.WhenAll(this.Info.AssetBundles.Select(path => this.LoadAssetsSingle(path)));
+    await UniTask.WhenAll(Info.AssetBundles.Select(LoadAssetsSingle));
   }
 
   public UniTask FindEntrypoints()
   {
     return UniTask.RunOnThreadPool(() =>
     {
-      this.Logger.LogDebug("Finding Entrypoints");
+      Logger.LogDebug("Finding Entrypoints");
 
       Entrypoints.AddRange(EntrypointSearch.FindEntrypoints(this, Assemblies, Exports));
 
-      this.Logger.LogInfo($"Found {this.Entrypoints.Count} Entrypoints");
+      Logger.LogInfo($"Found {Entrypoints.Count} Entrypoints");
     });
   }
 
   public void PrintEntrypoints()
   {
     // getting prefab names fails on a thread in the debug player, so just print all the entrypoints after we finish
-    foreach (var entry in this.Entrypoints)
-      this.Logger.LogDebug($"- {entry.DebugName()}");
+    foreach (var entry in Entrypoints)
+      Logger.LogDebug($"- {entry.DebugName()}");
   }
 
 
   public void LoadEntrypoints()
   {
-    this.Logger.LogDebug("Loading Entrypoints");
+    Logger.LogDebug("Loading Entrypoints");
 
-    var gameObj = new GameObject();
-    gameObj.name = this.Info.Name;
-    GameObject.DontDestroyOnLoad(gameObj);
+    var gameObj = new GameObject { name = Info.Name };
+    Object.DontDestroyOnLoad(gameObj);
 
     // instantiate all entrypoints
-    foreach (var entrypoint in this.Entrypoints)
+    foreach (var entrypoint in Entrypoints)
       entrypoint.Instantiate(gameObj);
 
     // initialize all entrypoints
-    foreach (var entrypoint in this.Entrypoints)
+    foreach (var entrypoint in Entrypoints)
     {
       entrypoint.Initialize(this);
-      this.ConfigFiles.AddRange(entrypoint.Configs());
+      ConfigFiles.AddRange(entrypoint.Configs());
     }
 
-    foreach (var config in this.ConfigFiles)
-      config.SettingChanged += (_, _) => this.DirtyConfig();
+    foreach (var config in ConfigFiles)
+      config.SettingChanged += (_, _) => DirtyConfig();
 
-    this.ConfigFiles.Sort((a, b) => a.ConfigFilePath.CompareTo(b.ConfigFilePath));
+    ConfigFiles.Sort((a, b) => a.ConfigFilePath.CompareTo(b.ConfigFilePath));
 
-    this.Logger.LogInfo("Loaded Entrypoints");
-    this.LoadFinished = true;
+    Logger.LogInfo("Loaded Entrypoints");
+    LoadFinished = true;
   }
 
   private UniTask<AssetBundle> LoadAssetBundle(string path)
   {
     var name = Path.GetFileName(path);
-    this.Logger.LogDebug($"Loading AssetBundle {name}");
+    Logger.LogDebug($"Loading AssetBundle {name}");
     return ModLoader.LoadAssetBundle(path);
   }
 
   private async UniTask<List<GameObject>> LoadAssetBundleGameObjects(string path, AssetBundle bundle)
   {
     var name = Path.GetFileName(path);
-    this.Logger.LogDebug($"Loading AssetBundle {name} Prefabs");
+    Logger.LogDebug($"Loading AssetBundle {name} Prefabs");
     var assets = await ModLoader.LoadAllBundleAssets(bundle);
 
     foreach (var asset in assets)
-      this.Logger.LogDebug($"- Asset {asset.name}");
+      Logger.LogDebug($"- Asset {asset.name}");
 
     return assets;
   }
@@ -160,35 +159,35 @@ public class LoadedMod
   private UniTask<ExportSettings> LoadAssetBundleExportSettings(string path, AssetBundle bundle)
   {
     var name = Path.GetFileName(path);
-    this.Logger.LogDebug($"Loading AssetBundle {name} ExportSettings");
+    Logger.LogDebug($"Loading AssetBundle {name} ExportSettings");
     return ModLoader.LoadBundleExportSettings(bundle);
   }
 
   private bool _configDirty = true;
   private void DirtyConfig()
   {
-    this._configDirty = true;
+    _configDirty = true;
   }
 
-  private List<SortedConfigFile> _cachedSortedConfigs = new();
+  private List<SortedConfigFile> _cachedSortedConfigs = [];
   private int _cachedTotalConfigs = 0;
 
   public List<SortedConfigFile> GetSortedConfigs()
   {
     var totalCount = 0;
-    foreach (var config in this.ConfigFiles)
+    foreach (var config in ConfigFiles)
       totalCount += config.Count;
-    if (this._configDirty || totalCount != this._cachedTotalConfigs)
+    if (_configDirty || totalCount != _cachedTotalConfigs)
     {
       var sortedConfigs = new List<SortedConfigFile>();
-      foreach (var config in this.ConfigFiles)
+      foreach (var config in ConfigFiles)
         if (config.Count > 0)
           sortedConfigs.Add(new SortedConfigFile(config));
 
-      this._cachedTotalConfigs = totalCount;
-      this._cachedSortedConfigs = sortedConfigs;
-      this._configDirty = false;
+      _cachedTotalConfigs = totalCount;
+      _cachedSortedConfigs = sortedConfigs;
+      _configDirty = false;
     }
-    return this._cachedSortedConfigs;
+    return _cachedSortedConfigs;
   }
 }

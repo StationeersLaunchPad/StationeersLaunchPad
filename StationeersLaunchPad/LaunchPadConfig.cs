@@ -1,3 +1,11 @@
+using System;
+using System.Collections;
+using System.Diagnostics;
+using System.IO;
+using System.IO.Compression;
+using System.Linq;
+using System.Reflection;
+using System.Xml.Serialization;
 using Assets.Scripts;
 using Assets.Scripts.Serialization;
 using Assets.Scripts.Util;
@@ -10,14 +18,6 @@ using StationeersLaunchPad.Sources;
 using StationeersLaunchPad.UI;
 using StationeersLaunchPad.Update;
 using Steamworks;
-using System;
-using System.Collections;
-using System.Diagnostics;
-using System.IO;
-using System.IO.Compression;
-using System.Linq;
-using System.Reflection;
-using System.Xml.Serialization;
 
 namespace StationeersLaunchPad;
 
@@ -39,19 +39,16 @@ public struct LoadState
   public bool SteamDisabled;
 }
 
-public class StageWait
+public class StageWait(double seconds, bool auto)
 {
   private readonly Stopwatch stopwatch = Stopwatch.StartNew();
-  public readonly double Seconds;
-  public bool Auto;
-  private bool skipped = false;
-
-  public StageWait(double seconds, bool auto) => (Seconds, Auto) = (seconds, auto);
+  public readonly double Seconds = seconds;
+  public bool Auto = auto;
 
   public double SecondsRemaining => Seconds - stopwatch.Elapsed.TotalSeconds;
-  public bool Done => skipped || (Auto && SecondsRemaining <= 0);
+  public bool Done { get => field || (Auto && SecondsRemaining <= 0); private set; } = false;
 
-  public void Skip() => skipped = true;
+  public void Skip() => Done = true;
 }
 
 public static class LaunchPadConfig
@@ -346,7 +343,7 @@ public static class LaunchPadConfig
   private static void StartGame()
   {
     Stage = LoadStage.Running;
-    var co = (IEnumerator) typeof(SplashBehaviour).GetMethod("AwakeCoroutine", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(SplashBehaviour, new object[] { });
+    var co = (IEnumerator)typeof(SplashBehaviour).GetMethod("AwakeCoroutine", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(SplashBehaviour, []);
     SplashBehaviour.StartCoroutine(co);
 
     EssentialPatches.GameStarted = true;
@@ -391,18 +388,16 @@ public static class LaunchPadConfig
           var root = mod.DirectoryPath;
           foreach (var file in Directory.GetFiles(root, "*", SearchOption.AllDirectories))
           {
-            var entryPath = Path.Combine("mods", dirName, file.Substring(root.Length + 1)).Replace('\\', '/');
+            var entryPath = Path.Combine("mods", dirName, file[(root.Length + 1)..]).Replace('\\', '/');
             archive.CreateEntryFromFile(file, entryPath);
           }
           config.Mods.Add(new LocalModData(dirName, true));
         }
 
         var configEntry = archive.CreateEntry("modconfig.xml");
-        using (var stream = configEntry.Open())
-        {
-          var serializer = new XmlSerializer(typeof(ModConfig));
-          serializer.Serialize(stream, config);
-        }
+        using var stream = configEntry.Open();
+        var serializer = new XmlSerializer(typeof(ModConfig));
+        serializer.Serialize(stream, config);
       }
       if (!Platform.IsServer)
         ProcessUtil.OpenExplorerSelectFile(pkgpath);

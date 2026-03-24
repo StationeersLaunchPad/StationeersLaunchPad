@@ -1,6 +1,6 @@
 
-using Assets.Scripts.Serialization;
 using System.IO;
+using Assets.Scripts.Serialization;
 
 namespace StationeersLaunchPad.Metadata;
 

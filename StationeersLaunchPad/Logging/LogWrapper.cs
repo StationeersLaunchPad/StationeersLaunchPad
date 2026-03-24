@@ -1,14 +1,13 @@
-﻿using StationeersLaunchPad.Loading;
-using System;
+﻿using System;
 using System.Diagnostics;
+using StationeersLaunchPad.Loading;
 using UnityEngine;
 
 namespace StationeersLaunchPad;
 
-public class LogWrapper : ILogHandler
+public class LogWrapper(ILogHandler inner) : ILogHandler
 {
-  private readonly ILogHandler Inner;
-  public LogWrapper(ILogHandler inner) => this.Inner = inner;
+  private readonly ILogHandler Inner = inner;
 
   private bool IsLaunchpadLog()
   {
@@ -24,8 +23,8 @@ public class LogWrapper : ILogHandler
 
   public void LogException(Exception exception, UnityEngine.Object context)
   {
-    this.Inner.LogException(exception, context);
-    if (this.IsLaunchpadLog())
+    Inner.LogException(exception, context);
+    if (IsLaunchpadLog())
       return;
     if (ModLoader.TryGetExecutingMod(out var mod))
       mod.Logger.LogException(exception, false);
@@ -35,8 +34,8 @@ public class LogWrapper : ILogHandler
 
   public void LogFormat(LogType logType, UnityEngine.Object context, string format, params object[] args)
   {
-    this.Inner.LogFormat(logType, context, format, args);
-    if (this.IsLaunchpadLog())
+    Inner.LogFormat(logType, context, format, args);
+    if (IsLaunchpadLog())
       return;
     if (ModLoader.TryGetExecutingMod(out var mod))
       mod.Logger.LogFormat(false, MapSeverity(logType), format, args);

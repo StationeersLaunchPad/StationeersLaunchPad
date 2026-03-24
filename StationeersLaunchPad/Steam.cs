@@ -1,13 +1,13 @@
 
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using Cysharp.Threading.Tasks;
 using StationeersLaunchPad.Metadata;
 using StationeersLaunchPad.Sources;
 using Steamworks;
 using Steamworks.Ugc;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using UnityEngine;
 
 namespace StationeersLaunchPad;
@@ -73,8 +73,8 @@ public static class Steam
     using var result = await query.AllowCachedResponse(0).WhereUserSubscribed().GetPageAsync(page);
 
     return !result.HasValue || result.Value.ResultCount == 0
-      ? Array.Empty<Item>()
-      : result.Value.Entries.Where(item => item.Result != Result.FileNotFound).ToArray();
+      ? []
+      : [.. result.Value.Entries.Where(item => item.Result != Result.FileNotFound)];
   }
 
   public static (bool, string) ValidateForWorkshop(ModInfo mod)

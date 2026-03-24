@@ -1,9 +1,9 @@
 
-using Cysharp.Threading.Tasks;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Xml.Serialization;
+using Cysharp.Threading.Tasks;
 
 namespace StationeersLaunchPad.Repos;
 
@@ -11,10 +11,10 @@ namespace StationeersLaunchPad.Repos;
 public class ModReposConfig
 {
   [XmlElement("Http", typeof(HttpRepoDef))]
-  public List<ModRepoDef> Repos = new();
+  public List<ModRepoDef> Repos = [];
 
   [XmlElement("RepoMod", typeof(RepoModDef))]
-  public List<RepoModDef> Mods = new();
+  public List<RepoModDef> Mods = [];
 }
 
 public struct RepoFetchResult

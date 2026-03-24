@@ -274,7 +274,7 @@ public static class TextFormatting
     public int Start;
     public int End;
 
-    public int Length => this.End - this.Start;
+    public int Length => End - Start;
   }
 
   private enum ElementType

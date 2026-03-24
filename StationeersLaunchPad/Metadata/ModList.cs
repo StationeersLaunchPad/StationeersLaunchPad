@@ -1,10 +1,10 @@
 
-using Assets.Scripts.Networking.Transports;
-using StationeersLaunchPad.Sources;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Assets.Scripts.Networking.Transports;
+using StationeersLaunchPad.Sources;
 
 namespace StationeersLaunchPad.Metadata;
 
@@ -12,9 +12,9 @@ public class ModList
 {
   private List<ModInfo> mods;
 
-  public IEnumerable<ModInfo> AllMods => this.mods;
-  public IEnumerable<ModInfo> EnabledMods => this.mods.Where(mod => mod.Enabled);
-  public int IndexOf(ModInfo mod) => this.mods.IndexOf(mod);
+  public IEnumerable<ModInfo> AllMods => mods;
+  public IEnumerable<ModInfo> EnabledMods => mods.Where(mod => mod.Enabled);
+  public int IndexOf(ModInfo mod) => mods.IndexOf(mod);
 
   public static ModList NewEmpty() => new();
   public static ModList FromDefs(List<ModDefinition> defs)
@@ -25,7 +25,7 @@ public class ModList
     return new(mods);
   }
 
-  private ModList() => this.mods = new();
+  private ModList() => mods = [];
   private ModList(List<ModInfo> mods) => this.mods = mods;
 
   public ModConfig ToModConfig()
@@ -86,7 +86,7 @@ public class ModList
         continue;
       }
 
-      var modPath = (string) modcfg.DirectoryPath;
+      var modPath = (string)modcfg.DirectoryPath;
       if (!Path.IsPathRooted(modPath))
         modPath = Path.Combine(localBasePath, modPath);
 
@@ -169,7 +169,7 @@ public class ModList
 
     var prefMods = new ModSet();
     var disabledMods = new List<ModInfo>();
-    foreach (var mod in this.mods)
+    foreach (var mod in mods)
     {
       if (!mod.Enabled)
         continue;
@@ -216,18 +216,18 @@ public class ModList
   public bool CheckDependencies()
   {
     var valid = true;
-    foreach (var mod in this.mods)
+    foreach (var mod in mods)
     {
       if (!mod.Enabled)
         continue;
       if (mod.Source == ModSourceType.Core)
         continue;
       var missingDeps = false;
-      foreach (var dep in mod.About.DependsOn ?? new())
+      foreach (var dep in mod.About.DependsOn ?? [])
       {
         if (!dep.IsValid)
           continue;
-        if (this.mods.Any(mod2 => mod2 != mod && mod2.Enabled && mod2.Satisfies(dep)))
+        if (mods.Any(mod2 => mod2 != mod && mod2.Enabled && mod2.Satisfies(dep)))
           continue;
         missingDeps = true;
 
@@ -236,7 +236,7 @@ public class ModList
 
         Logger.Global.LogWarning($"{mod.Source} {mod.Name} is missing dependency {dep}");
 
-        var possible = this.mods.Where(mod2 => mod2 != mod && mod2.Satisfies(dep)).ToList();
+        var possible = mods.Where(mod2 => mod2 != mod && mod2.Satisfies(dep)).ToList();
         if (possible.Count == 0)
         {
           Logger.Global.LogWarning("No possible matches installed");
@@ -257,7 +257,7 @@ public class ModList
   // returns true if sort was successful
   public bool SortByDeps()
   {
-    var graph = OrderGraph.Build(this.mods);
+    var graph = OrderGraph.Build(mods);
     if (graph.HasCircular)
       return false;
 
@@ -278,9 +278,9 @@ public class ModList
     var idx = 0;
     var firstSkipped = -1;
 
-    while (idx < this.mods.Count)
+    while (idx < mods.Count)
     {
-      var mod = this.mods[idx];
+      var mod = mods[idx];
       if (added.Contains(mod))
       {
         idx++;
@@ -305,10 +305,10 @@ public class ModList
         idx++;
     }
 
-    if (newOrder.Count != this.mods.Count)
-      throw new InvalidOperationException($"Sort did not add all mods: {newOrder.Count} != {this.mods.Count}");
+    if (newOrder.Count != mods.Count)
+      throw new InvalidOperationException($"Sort did not add all mods: {newOrder.Count} != {mods.Count}");
 
-    this.mods = newOrder;
+    mods = newOrder;
     return true;
   }
 

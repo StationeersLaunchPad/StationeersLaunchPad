@@ -1,7 +1,7 @@
 
+using System;
 using Cysharp.Threading.Tasks;
 using StationeersLaunchPad.Update;
-using System;
 
 namespace StationeersLaunchPad.Commands;
 

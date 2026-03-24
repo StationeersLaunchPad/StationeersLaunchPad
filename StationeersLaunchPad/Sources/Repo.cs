@@ -1,10 +1,10 @@
 
+using System.Collections.Generic;
+using System.IO;
 using Assets.Scripts.Serialization;
 using Cysharp.Threading.Tasks;
 using StationeersLaunchPad.Metadata;
 using StationeersLaunchPad.Repos;
-using System.Collections.Generic;
-using System.IO;
 
 namespace StationeersLaunchPad.Sources;
 
@@ -39,11 +39,10 @@ public class RepoModSource : ModSource
   }
 }
 
-public class RepoModDefinition : ModDefinition
+public class RepoModDefinition(RepoModDef mod, ModAboutEx about) : ModDefinition(about)
 {
-  public readonly RepoModDef Mod;
-  public RepoModDefinition(RepoModDef mod, ModAboutEx about) : base(about) =>
-    Mod = mod;
+  public readonly RepoModDef Mod = mod;
+
   public override ModSourceType Type => ModSourceType.Repo;
   public override ulong WorkshopHandle => About.WorkshopHandle;
   public override string DirectoryPath =>

@@ -1,6 +1,6 @@
 
-using StationeersLaunchPad.Sources;
 using System.Collections.Generic;
+using StationeersLaunchPad.Sources;
 
 namespace StationeersLaunchPad.Metadata;
 
@@ -13,7 +13,7 @@ public class OrderGraph
     {
       if (!mod.Enabled || mod.Source == ModSourceType.Core)
         continue;
-      foreach (var modRef in mod.About.OrderBefore ?? new())
+      foreach (var modRef in mod.About.OrderBefore ?? [])
       {
         foreach (var mod2 in mods)
         {
@@ -21,7 +21,7 @@ public class OrderGraph
             graph.AddOrder(mod, mod2);
         }
       }
-      foreach (var modRef in mod.About.OrderAfter ?? new())
+      foreach (var modRef in mod.About.OrderAfter ?? [])
       {
         foreach (var mod2 in mods)
         {
@@ -33,8 +33,8 @@ public class OrderGraph
     return graph;
   }
 
-  public readonly Dictionary<ModInfo, HashSet<ModInfo>> Befores = new();
-  public readonly Dictionary<ModInfo, HashSet<ModInfo>> Afters = new();
+  public readonly Dictionary<ModInfo, HashSet<ModInfo>> Befores = [];
+  public readonly Dictionary<ModInfo, HashSet<ModInfo>> Afters = [];
 
   public bool HasCircular = false;
 
@@ -42,8 +42,8 @@ public class OrderGraph
   {
     foreach (var mod in mods)
     {
-      this.Befores[mod] = new();
-      this.Afters[mod] = new();
+      Befores[mod] = [];
+      Afters[mod] = [];
     }
   }
 
@@ -52,21 +52,21 @@ public class OrderGraph
     if (HasCircular)
       return;
     // if the second mod is already required before the first, this would add a circular reference
-    if (this.Befores[first].Contains(second))
+    if (Befores[first].Contains(second))
     {
       HasCircular = true;
       return;
     }
 
     // this order is already added
-    if (this.Befores[second].Contains(first))
+    if (Befores[second].Contains(first))
       return;
 
-    this.Afters[first].Add(second);
-    this.Befores[second].Add(first);
-    foreach (var before in this.Befores[first])
-      this.AddOrder(before, second);
-    foreach (var after in this.Afters[second])
-      this.AddOrder(first, after);
+    Afters[first].Add(second);
+    Befores[second].Add(first);
+    foreach (var before in Befores[first])
+      AddOrder(before, second);
+    foreach (var after in Afters[second])
+      AddOrder(first, after);
   }
 }

@@ -50,7 +50,6 @@ public static class Version
   {
     private ReadOnlySpan<char> data;
     private int section;
-    private bool newSection;
 
     public VersionReader(ReadOnlySpan<char> data)
     {
@@ -58,14 +57,14 @@ public static class Version
         data = data[1..];
       this.data = data;
       section = 0;
-      newSection = true;
+      Done = true;
     }
 
-    public bool Done => data.Length == 0 && !newSection;
+    public bool Done { get => data.Length == 0 && !field; private set; }
 
     public Part ReadPart()
     {
-      newSection = false;
+      Done = false;
       var len = 0;
       while (len < data.Length && data[len] is not (SECTION_SEPARATOR or PART_SEPARATOR))
         len++;
@@ -78,7 +77,7 @@ public static class Version
         if (data[0] is SECTION_SEPARATOR)
         {
           section++;
-          newSection = true;
+          Done = true;
         }
         data = data[1..];
       }

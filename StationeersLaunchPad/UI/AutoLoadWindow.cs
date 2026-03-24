@@ -1,6 +1,6 @@
 
-using ImGuiNET;
 using System;
+using ImGuiNET;
 
 namespace StationeersLaunchPad.UI;
 
@@ -44,7 +44,6 @@ public class AutoLoadWindow
         if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
           stopAuto = true;
       }
-      ;
 
       ImGui.End();
     });

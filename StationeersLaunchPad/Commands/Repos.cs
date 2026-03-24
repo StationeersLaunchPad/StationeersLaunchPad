@@ -1,10 +1,10 @@
 
-using Cysharp.Threading.Tasks;
-using StationeersLaunchPad.Repos;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Cysharp.Threading.Tasks;
+using StationeersLaunchPad.Repos;
 
 namespace StationeersLaunchPad.Commands;
 
@@ -34,7 +34,7 @@ public class ReposCommand : SubCommand
         return false;
       }
       var matches = new List<(int, ModRepoDef)>();
-      var repos = ModRepos.Current?.Repos ?? new();
+      var repos = ModRepos.Current?.Repos ?? [];
       for (var i = 0; i < repos.Count; i++)
       {
         var repo = repos[i];

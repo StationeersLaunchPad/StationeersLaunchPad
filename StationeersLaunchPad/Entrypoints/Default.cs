@@ -1,12 +1,12 @@
 
-using BepInEx;
-using BepInEx.Configuration;
-using StationeersLaunchPad.Loading;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Text;
+using BepInEx;
+using BepInEx.Configuration;
+using StationeersLaunchPad.Loading;
 using UnityEngine;
 
 namespace StationeersLaunchPad.Entrypoints;
@@ -31,7 +31,7 @@ public class DefaultEntrypoint : BehaviourEntrypoint<MonoBehaviour>
   public override string DebugName() => $"Default Entry {Type.FullName}";
 
   public override void Instantiate(GameObject parent) =>
-    Instance = (MonoBehaviour) parent.AddComponent(Type);
+    Instance = (MonoBehaviour)parent.AddComponent(Type);
 
   public override void Initialize(LoadedMod mod)
   {
@@ -63,7 +63,7 @@ public class DefaultEntrypoint : BehaviourEntrypoint<MonoBehaviour>
     return new(mod, type, loadMethod, eparams);
   }
 
-  private static ParamPatternMatch<EntrypointParam> Parser =
+  private static readonly ParamPatternMatch<EntrypointParam> Parser =
     new ParamPatternMatch<EntrypointParam>()
       .Register<List<GameObject>, PrefabsParam>()
       .Register<ConfigFile, ConfigParam>()
@@ -80,20 +80,7 @@ public class DefaultEntrypoint : BehaviourEntrypoint<MonoBehaviour>
   }
   public class ConfigParam : EntrypointParam
   {
-    private static HashSet<char> _invalidFileChars;
-    private static HashSet<char> InvalidFileChars
-    {
-      get
-      {
-        if (_invalidFileChars == null)
-        {
-          _invalidFileChars = new();
-          foreach (var c in Path.GetInvalidFileNameChars())
-            _invalidFileChars.Add(c);
-        }
-        return _invalidFileChars;
-      }
-    }
+    private static HashSet<char> InvalidFileChars => field ??= [.. Path.GetInvalidFileNameChars()];
 
     public ConfigFile Config;
     public override object GetParam(DefaultEntrypoint entry)
@@ -120,7 +107,6 @@ public class DefaultEntrypoint : BehaviourEntrypoint<MonoBehaviour>
 
 public partial class EntrypointSearch
 {
-
   private List<ModEntrypoint> FindDefaultEntrypoints()
   {
     var entries = new List<ModEntrypoint>();
@@ -153,8 +139,8 @@ public partial class EntrypointSearch
 
 public class ParamPatternMatch<T>
 {
-  private readonly Dictionary<Type, int> ptypeToIndex = new();
-  private readonly List<Func<T>> ctors = new();
+  private readonly Dictionary<Type, int> ptypeToIndex = [];
+  private readonly List<Func<T>> ctors = [];
 
   public ParamPatternMatch<T> Register<P, T2>() where T2 : T, new()
   {

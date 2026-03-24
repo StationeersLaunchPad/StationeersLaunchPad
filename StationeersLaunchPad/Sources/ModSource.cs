@@ -1,8 +1,8 @@
 
+using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using StationeersLaunchPad.Metadata;
 using StationeersLaunchPad.Repos;
-using System.Collections.Generic;
 
 namespace StationeersLaunchPad.Sources;
 
@@ -43,11 +43,9 @@ public abstract class ModSource
 }
 
 // Contains only the base information about a mod, not any configuration related to it
-public abstract class ModDefinition
+public abstract class ModDefinition(ModAboutEx about)
 {
-  public readonly ModAboutEx About;
-
-  public ModDefinition(ModAboutEx about) => About = about;
+  public readonly ModAboutEx About = about;
 
   public abstract ModSourceType Type { get; }
   public abstract ulong WorkshopHandle { get; }

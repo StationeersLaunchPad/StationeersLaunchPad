@@ -1,11 +1,11 @@
 
-using Assets.Scripts;
-using Cysharp.Threading.Tasks;
-using StationeersLaunchPad.UI;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Assets.Scripts;
+using Cysharp.Threading.Tasks;
+using StationeersLaunchPad.UI;
 using UnityEngine;
 using Util.Commands;
 
@@ -98,7 +98,7 @@ public class SLPCommand : CommandBase
 
   public override string HelpText => RootCommand.Instance.UsageDescription;
 
-  public override string[] Arguments => new string[] { RootCommand.Instance.ChildNames };
+  public override string[] Arguments => [RootCommand.Instance.ChildNames];
 
   public override bool IsLaunchCmd => true;
 
@@ -140,8 +140,8 @@ public abstract class SubCommand
   public SubCommand(string name, params SubCommand[] children)
   {
     Name = name.ToLower();
-    Children = new(children);
-    ChildrenMap = new();
+    Children = [.. children];
+    ChildrenMap = [];
     foreach (var child in children)
       ChildrenMap.Add(child.Name, child);
 
@@ -326,8 +326,8 @@ public ref struct ArgParser
 
 public class RootCommand : SubCommand
 {
-  private static readonly SubCommand[] StartupCommands = new SubCommand[]
-  {
+  private static readonly SubCommand[] StartupCommands =
+  [
     new ConfigCommand(),
     new SelfUpdateCommand(),
     new ReposCommand(),
@@ -336,11 +336,11 @@ public class RootCommand : SubCommand
     new DebugPkgCommand(),
     new LoadToCommand(),
     new ExitCommand(),
-  };
-  private static readonly SubCommand[] InGameCommands = new SubCommand[]
-  {
+  ];
+  private static readonly SubCommand[] InGameCommands =
+  [
     new LogsCommand(),
-  };
+  ];
 
   public static readonly RootCommand StartupInstance = new(StartupCommands);
   public static readonly RootCommand Instance = new(StartupCommands, InGameCommands);
@@ -348,7 +348,7 @@ public class RootCommand : SubCommand
   public readonly string ChildNames;
 
   private RootCommand(SubCommand[] children, params SubCommand[] extraChildren)
-  : base("", children.Concat(extraChildren).ToArray()) =>
+  : base("", [.. children, .. extraChildren]) =>
     ChildNames = string.Join(" | ", Children.Select(c => c.Name));
 
   public override string UsageDescription => "StationeersLaunchPad Commands";
@@ -416,15 +416,11 @@ public class LoadToCommand : SubCommand
   public override string UsageDescription =>
     "-- wait for load step to complete before following commands";
 
-  public class LoadToStageCommand : SubCommand
+  public class LoadToStageCommand(string name, CommandStage stage) : SubCommand(name)
   {
-    private readonly CommandStage stage;
-    private readonly string usage;
-    public LoadToStageCommand(string name, CommandStage stage) : base(name)
-    {
-      this.stage = stage;
-      usage = $"-- wait for {stage}";
-    }
+    private readonly CommandStage stage = stage;
+    private readonly string usage = $"-- wait for {stage}";
+
     public override string UsageDescription => usage;
 
     protected override CommandStage LeafStage => stage;

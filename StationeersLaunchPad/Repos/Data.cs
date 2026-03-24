@@ -8,7 +8,7 @@ namespace StationeersLaunchPad.Repos;
 public class ModRepoData
 {
   [XmlElement("ModVersion", typeof(ModVersionData))]
-  public List<ModVersionData> ModVersions = new();
+  public List<ModVersionData> ModVersions = [];
 }
 
 public class ModVersionData
@@ -21,11 +21,11 @@ public class ModVersionData
   [XmlAttribute("Digest")] public string Digest;
 
   [XmlElement("Branch")]
-  public List<StringData> Branches = new();
+  public List<StringData> Branches = [];
   [XmlElement("Tag")]
-  public List<StringData> Tags = new();
+  public List<StringData> Tags = [];
   [XmlElement("Dep")]
-  public List<ModVersionDepData> Deps = new();
+  public List<ModVersionDepData> Deps = [];
 }
 
 public class StringData
@@ -34,10 +34,8 @@ public class StringData
 
   public override string ToString() => Value;
 
-  public static implicit operator StringData(string value) =>
-    new() { Value = value };
-  public static implicit operator string(StringData data) =>
-    data.Value;
+  public static implicit operator StringData(string value) => new() { Value = value };
+  public static implicit operator string(StringData data) => data.Value;
 }
 
 public class ModVersionDepData

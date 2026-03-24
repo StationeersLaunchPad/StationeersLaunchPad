@@ -1,11 +1,11 @@
 
-using BepInEx.Configuration;
-using StationeersLaunchPad.Loading;
-using StationeersMods.Shared;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using BepInEx.Configuration;
+using StationeersLaunchPad.Loading;
+using StationeersMods.Shared;
 using UnityEngine;
 
 namespace StationeersLaunchPad.Entrypoints;
@@ -18,12 +18,10 @@ public abstract class ModEntrypoint
   public abstract IEnumerable<ConfigFile> Configs();
 }
 
-public abstract class BehaviourEntrypoint<T> : ModEntrypoint where T : MonoBehaviour
+public abstract class BehaviourEntrypoint<T>(Type type) : ModEntrypoint where T : MonoBehaviour
 {
-  public readonly Type Type;
+  public readonly Type Type = type;
   public T Instance;
-
-  public BehaviourEntrypoint(Type type) => Type = type;
 }
 
 public partial class EntrypointSearch
@@ -32,7 +30,7 @@ public partial class EntrypointSearch
   private readonly Logger logger;
   private readonly List<Assembly> assemblies;
   private readonly List<ExportSettings> exports;
-  private List<Type> types = new();
+  private readonly List<Type> types = [];
 
   private EntrypointSearch(
     LoadedMod mod,
@@ -40,7 +38,7 @@ public partial class EntrypointSearch
     List<ExportSettings> exports)
   {
     this.mod = mod;
-    this.logger = mod.Logger;
+    logger = mod.Logger;
     this.assemblies = assemblies;
     this.exports = exports;
   }
@@ -79,7 +77,7 @@ public partial class EntrypointSearch
     catch (Exception ex)
     {
       logger.LogException(ex);
-      return Enumerable.Empty<Type>();
+      return [];
     }
   }
 

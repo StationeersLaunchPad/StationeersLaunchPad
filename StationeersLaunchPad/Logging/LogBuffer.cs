@@ -1,55 +1,28 @@
-﻿using Assets.Scripts;
-using System;
+﻿using System;
 using System.Linq;
+using Assets.Scripts;
 
 namespace StationeersLaunchPad;
 
-public class LogBuffer
+public class LogBuffer(int size = LogBuffer.DEFAULT_BUFFER_SIZE)
 {
   public const int DEFAULT_BUFFER_SIZE = 512;
 
   private readonly object _lock = new();
 
-  public int Size
-  {
-    get; private set;
-  }
+  public readonly int Size = size;
+  public readonly LogLine[] Lines = new LogLine[size];
+  private int start;
+  public int Count { get; private set; }
+  public ulong TotalCount { get; private set; }
 
-  public int Start
-  {
-    get; private set;
-  }
-
-  public int Count
-  {
-    get; private set;
-  }
-
-  public ulong TotalCount
-  {
-    get; private set;
-  }
-
-  public LogLine[] Lines
-  {
-    get; private set;
-  }
-
-  public int Length => this.Lines.Length;
-
-  public LogLine this[int index] => this.At(index);
-
-  public LogBuffer(int size = LogBuffer.DEFAULT_BUFFER_SIZE)
-  {
-    this.Size = size;
-    this.Lines = new LogLine[this.Size];
-  }
+  public LogLine this[int index] => At(index);
 
   public LogLine At(int index)
   {
-    lock (this._lock)
+    lock (_lock)
     {
-      return index >= 0 && index < this.Count ? this.Lines[(this.Start + index) % this.Lines.Length] : null;
+      return index >= 0 && index < Count ? Lines[(start + index) % Lines.Length] : null;
     }
   }
 
@@ -57,45 +30,45 @@ public class LogBuffer
   {
     var line = new LogLine(name, message, severity);
 
-    this.AddLine(line);
+    AddLine(line);
   }
 
   public void Add(string name, Exception exception)
   {
     var line = new LogLine(name, exception);
 
-    this.AddLine(line);
+    AddLine(line);
   }
 
   public void Clear()
   {
-    this.Lines = new LogLine[this.Size];
-    this.Start = 0;
-    this.Count = 0;
-    this.TotalCount = 0;
+    Array.Fill(Lines, null);
+    start = 0;
+    Count = 0;
+    TotalCount = 0;
   }
 
-  public void CopyToClipboard() => GameManager.Clipboard = this.ToString();
+  public void CopyToClipboard() => GameManager.Clipboard = ToString();
 
   private void AddLine(LogLine line)
   {
-    lock (this._lock)
+    lock (_lock)
     {
-      if (this.Count < this.Length)
+      if (Count < Size)
       {
-        var index = (this.Start + this.Count) % this.Length;
-        this.Lines[index] = line;
-        this.Count++;
+        var index = (start + Count) % Size;
+        Lines[index] = line;
+        Count++;
       }
       else
       {
-        this.Lines[this.Start] = line;
-        this.Start = (this.Start + 1) % this.Length;
+        Lines[start] = line;
+        start = (start + 1) % Size;
       }
 
-      this.TotalCount++;
+      TotalCount++;
     }
   }
 
-  public override string ToString() => string.Join("\n", Enumerable.Range(0, this.Count).Select(i => this.At(i)));
+  public override string ToString() => string.Join("\n", Enumerable.Range(0, Count).Select(At));
 }

@@ -1,7 +1,7 @@
-﻿using Cysharp.Threading.Tasks;
-using StationeersLaunchPad.UI;
-using System;
+﻿using System;
 using System.IO;
+using Cysharp.Threading.Tasks;
+using StationeersLaunchPad.UI;
 
 namespace StationeersLaunchPad.Update;
 
@@ -83,29 +83,27 @@ public static class LaunchPadUpdater
       return false;
     }
 
-    using (var archive = await asset.FetchToMemory())
-    {
-      var sequence = UpdateSequence.Make(
-        LaunchPadPaths.InstallDir,
-        archive,
-        filter: e => e.Name.EndsWith(".dll"),
-        mapPath: e => e.Name
-      );
+    using var archive = await asset.FetchToMemory();
+    var sequence = UpdateSequence.Make(
+      LaunchPadPaths.InstallDir,
+      archive,
+      filter: e => e.Name.EndsWith(".dll"),
+      mapPath: e => e.Name
+    );
 
-      var result = sequence.Execute();
-      switch (result)
-      {
-        case UpdateResult.Success:
-          return true;
-        case UpdateResult.Rollback:
-          Logger.Global.LogError("Update failed. Changes were rolled back");
-          return false;
-        case UpdateResult.FailedRollback:
-          Logger.Global.LogError("Update failed. Rolling back update failed. StationeersLaunchPad may be in an invalid state.");
-          return false;
-        default:
-          throw new InvalidOperationException($"Invalid update result {result}");
-      }
+    var result = sequence.Execute();
+    switch (result)
+    {
+      case UpdateResult.Success:
+        return true;
+      case UpdateResult.Rollback:
+        Logger.Global.LogError("Update failed. Changes were rolled back");
+        return false;
+      case UpdateResult.FailedRollback:
+        Logger.Global.LogError("Update failed. Rolling back update failed. StationeersLaunchPad may be in an invalid state.");
+        return false;
+      default:
+        throw new InvalidOperationException($"Invalid update result {result}");
     }
   }
 }

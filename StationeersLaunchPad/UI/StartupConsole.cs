@@ -1,9 +1,9 @@
 
+using System;
+using System.Linq;
 using Assets.Scripts.Util;
 using ImGuiNET;
 using StationeersLaunchPad.Commands;
-using System;
-using System.Linq;
 using Util.Commands;
 
 namespace StationeersLaunchPad.UI;
@@ -12,7 +12,7 @@ public static class StartupConsole
 {
   private static string input = "";
   private static bool refocus = false;
-  private static CircularBuffer<string> commandHistory = new(64);
+  private static readonly CircularBuffer<string> commandHistory = new(64);
   private static int historyIndex = -1;
 
   public unsafe static bool DrawInput(Rect rect)
@@ -90,26 +90,24 @@ public static class StartupConsole
   }
 }
 
-public class CircularBuffer<T>
+public class CircularBuffer<T>(int capacity)
 {
-  private readonly T[] values;
-  private int length = 0;
+  private readonly T[] values = new T[capacity];
   private int start = 0;
 
-  public CircularBuffer(int capacity) => values = new T[capacity];
-  public int Length => length;
+  public int Length { get; private set; } = 0;
   public int Capacity => values.Length;
 
   public T this[int index] => values[(start + index) % Capacity];
 
   public void Add(T val)
   {
-    values[(start + length) % Capacity] = val;
-    if (length == values.Length)
+    values[(start + Length) % Capacity] = val;
+    if (Length == values.Length)
       start = (start + 1) % Capacity;
     else
-      length++;
+      Length++;
   }
 
-  public void Clear() => length = start = 0;
+  public void Clear() => Length = start = 0;
 }

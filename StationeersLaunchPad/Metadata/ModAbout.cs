@@ -28,10 +28,10 @@ public class ModAboutEx
   [XmlIgnore]
   public string InGameDescription;
 
-  [XmlElement("InGameDescription", IsNullable =true)]
+  [XmlElement("InGameDescription", IsNullable = true)]
   public CDataString InGameDescriptionCData
   {
-    get => string.IsNullOrEmpty(InGameDescription) ? null : new() { Value = InGameDescription};
+    get => string.IsNullOrEmpty(InGameDescription) ? null : new() { Value = InGameDescription };
     set => InGameDescription = value?.Value;
   }
 
@@ -91,15 +91,15 @@ public class ModReference
 
   public override string ToString()
   {
-    if (!this.IsValid)
+    if (!IsValid)
       return "Invalid";
     var sb = new StringBuilder();
-    if (!string.IsNullOrEmpty(this.ModID))
-      sb.AppendFormat("ModID: {0}", this.ModID);
+    if (!string.IsNullOrEmpty(ModID))
+      sb.AppendFormat("ModID: {0}", ModID);
     if (WorkshopHandle != 0)
-      sb.AppendFormat("{0}WorkshopHandle: {1}", sb.Length == 0 ? "" : ", ", this.WorkshopHandle);
-    if (!string.IsNullOrEmpty(this.Version))
-      sb.AppendFormat("{0}Version: {1}", sb.Length == 0 ? "" : ", ", this.Version);
+      sb.AppendFormat("{0}WorkshopHandle: {1}", sb.Length == 0 ? "" : ", ", WorkshopHandle);
+    if (!string.IsNullOrEmpty(Version))
+      sb.AppendFormat("{0}Version: {1}", sb.Length == 0 ? "" : ", ", Version);
     return sb.ToString();
   }
 

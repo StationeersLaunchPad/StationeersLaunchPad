@@ -1,7 +1,7 @@
-using StationeersLaunchPad.Sources;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using StationeersLaunchPad.Sources;
 
 namespace StationeersLaunchPad.Metadata;
 
@@ -9,8 +9,8 @@ public class ModInfo
 {
   // Metadata
   public readonly ModDefinition Def;
-  public readonly List<string> Assemblies = new();
-  public readonly List<string> AssetBundles = new();
+  public readonly List<string> Assemblies = [];
+  public readonly List<string> AssetBundles = [];
 
   // Validation state
   public readonly bool DepsInvalid;
@@ -41,11 +41,11 @@ public class ModInfo
     if (def.Type is ModSourceType.Core)
       return;
 
-    foreach (var dep in def.About.DependsOn ?? new())
+    foreach (var dep in def.About.DependsOn ?? [])
       DepsInvalid |= !dep.IsValid;
-    foreach (var before in def.About.OrderBefore ?? new())
+    foreach (var before in def.About.OrderBefore ?? [])
       OrderInvalid |= !before.IsValid;
-    foreach (var after in def.About.OrderAfter ?? new())
+    foreach (var after in def.About.OrderAfter ?? [])
       OrderInvalid |= !after.IsValid;
 
     Assemblies.AddRange(Directory.GetFiles(
@@ -56,9 +56,9 @@ public class ModInfo
 
   public bool SortBefore(ModInfo other)
   {
-    if (other.About?.OrderAfter?.Any(v => Satisfies(v)) ?? false)
+    if (other.About?.OrderAfter?.Any(Satisfies) ?? false)
       return true;
-    return About?.OrderBefore?.Any(v => other.Satisfies(v)) ?? false;
+    return About?.OrderBefore?.Any(other.Satisfies) ?? false;
   }
 
   public bool Satisfies(ModReference modRef)

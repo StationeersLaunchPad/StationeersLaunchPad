@@ -1,11 +1,11 @@
 
+using System.Collections.Generic;
+using System.IO;
 using Assets.Scripts.Networking.Transports;
 using Assets.Scripts.Serialization;
 using Cysharp.Threading.Tasks;
 using StationeersLaunchPad.Metadata;
 using Steamworks.Ugc;
-using System.Collections.Generic;
-using System.IO;
 
 namespace StationeersLaunchPad.Sources;
 
@@ -38,11 +38,9 @@ public class WorkshopModSource : ModSource
   }
 }
 
-public class WorkshopModDefinition : ModDefinition
+public class WorkshopModDefinition(Item item, ModAboutEx about) : ModDefinition(about)
 {
-  public readonly Item Item;
-  public WorkshopModDefinition(Item item, ModAboutEx about) : base(about) =>
-    Item = item;
+  public readonly Item Item = item;
 
   public override ModSourceType Type => ModSourceType.Workshop;
   public override ulong WorkshopHandle => Item.Id;

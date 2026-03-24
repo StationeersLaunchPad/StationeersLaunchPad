@@ -1,6 +1,6 @@
-﻿using ImGuiNET;
-using System;
+﻿using System;
 using System.Runtime.CompilerServices;
+using ImGuiNET;
 using UnityEngine;
 
 namespace StationeersLaunchPad.UI;
@@ -22,7 +22,7 @@ public static class ImGuiHelper
   }
 
   [MethodImpl(MethodImplOptions.AggressiveInlining)]
-  public static void TextColored(string text, Color color) => TextColored(text, (Vector4) color);
+  public static void TextColored(string text, Color color) => TextColored(text, (Vector4)color);
 
   [MethodImpl(MethodImplOptions.AggressiveInlining)]
   public static void TextRight(string text, float padding = 2.0f)
@@ -123,7 +123,7 @@ public static class ImGuiHelper
 
   public static void Draw(Action drawFunc)
   {
-    ImGuiHelper.PushDefaultStyle();
+    PushDefaultStyle();
 
     try
     {
@@ -135,7 +135,7 @@ public static class ImGuiHelper
       Logger.Global.LogException(ex);
     }
 
-    ImGuiHelper.PopDefaultStyle();
+    PopDefaultStyle();
   }
 
   public static void DrawIfHovering(Action func)
@@ -198,32 +198,32 @@ public static class ImGuiHelper
   public static bool DrawIfDragging(ImGuiMouseButton button, Func<bool> func) => ImGui.IsMouseDragging(button) ? func?.Invoke() ?? false : false;
   public static bool DrawIfChild(bool child, Func<bool> func, Func<bool> childFunc) => child ? childFunc?.Invoke() ?? false : func?.Invoke() ?? false;
 
-  public static Color White => new Color(0.0f, 0.0f, 0.0f, 1.0f);
+  public static Color White => new(0.0f, 0.0f, 0.0f, 1.0f);
 
-  public static Color Red = new Color(1.0f, 0.0f, 0.0f, 1.0f);
-  public static Color Green => new Color(0.0f, 1.0f, 0.0f, 1.0f);
-  public static Color Blue => new Color(0.0f, 0.0f, 1.0f, 1.0f);
-  public static Color Black => new Color(1.0f, 1.0f, 1.0f, 1.0f);
+  public static Color Red = new(1.0f, 0.0f, 0.0f, 1.0f);
+  public static Color Green => new(0.0f, 1.0f, 0.0f, 1.0f);
+  public static Color Blue => new(0.0f, 0.0f, 1.0f, 1.0f);
+  public static Color Black => new(1.0f, 1.0f, 1.0f, 1.0f);
 
-  public static Color Opaque => new Color(0.0f, 0.0f, 0.0f, 1.0f);
-  public static Color Translucent => new Color(0.0f, 0.0f, 0.0f, 0.5f);
-  public static Color Transparent => new Color(0.0f, 0.0f, 0.0f, 0.0f);
+  public static Color Opaque => new(0.0f, 0.0f, 0.0f, 1.0f);
+  public static Color Translucent => new(0.0f, 0.0f, 0.0f, 0.5f);
+  public static Color Transparent => new(0.0f, 0.0f, 0.0f, 0.0f);
 
-  public static Color Yellow = new Color(0.7f, 0.7f, 0.0f, 1.0f);
+  public static Color Yellow = new(0.7f, 0.7f, 0.0f, 1.0f);
 
-  public static Color TextColor => _colors[(int) ImGuiCol.Text];
-  public static Color TextDisabledColor => _colors[(int) ImGuiCol.TextDisabled];
-  public static Color SeparatorColor => _colors[(int) ImGuiCol.Separator];
+  public static Color TextColor => _colors[(int)ImGuiCol.Text];
+  public static Color TextDisabledColor => _colors[(int)ImGuiCol.TextDisabled];
+  public static Color SeparatorColor => _colors[(int)ImGuiCol.Separator];
 
   private static Color[] _colors;
   public static void PushDefaultStyle()
   {
     if (_colors == null)
     {
-      _colors = new Color[(int) ImGuiCol.COUNT];
-      for (var i = 0; i < (int) ImGuiCol.COUNT; i++)
+      _colors = new Color[(int)ImGuiCol.COUNT];
+      for (var i = 0; i < (int)ImGuiCol.COUNT; i++)
       {
-        var c = ImGui.ColorConvertU32ToFloat4(ImGui.GetColorU32((ImGuiCol) i));
+        var c = ImGui.ColorConvertU32ToFloat4(ImGui.GetColorU32((ImGuiCol)i));
 
         _colors[i] = new Color(c.x, c.y, c.z, c.w);
         _colors[i] = _colors[i] * _colors[i][3];
@@ -232,9 +232,9 @@ public static class ImGuiHelper
       }
     }
 
-    for (var i = (ImGuiCol) 0; i < ImGuiCol.COUNT; i++)
+    for (var i = (ImGuiCol)0; i < ImGuiCol.COUNT; i++)
     {
-      ImGui.PushStyleColor(i, _colors[(int) i]);
+      ImGui.PushStyleColor(i, _colors[(int)i]);
     }
 
     ImGui.PushStyleVar(ImGuiStyleVar.CellPadding, new Vector2(3, 2));
@@ -246,15 +246,15 @@ public static class ImGuiHelper
   public static void PopDefaultStyle()
   {
     ImGui.PopStyleVar(4);
-    ImGui.PopStyleColor((int) ImGuiCol.COUNT);
+    ImGui.PopStyleColor((int)ImGuiCol.COUNT);
   }
 
   public static Vector4 FlashColor(ImGuiCol from, ImGuiCol to)
   {
     var style = ImGui.GetStyle();
     var flashPos = Mathf.Sin(Time.realtimeSinceStartup * 5f) * 0.5f + 0.5f;
-    var crFrom = style.Colors[(int) from];
-    var crTo = style.Colors[(int) to];
+    var crFrom = style.Colors[(int)from];
+    var crTo = style.Colors[(int)to];
     return Vector4.Lerp(crFrom, crTo, flashPos);
   }
 
@@ -276,7 +276,7 @@ public static class ImGuiHelper
   {
     ImGui.GetWindowDrawList().AddLine(from, to,
       ImGui.ColorConvertFloat4ToU32(
-        ImGui.GetStyle().Colors[(int) ImGuiCol.Separator]));
+        ImGui.GetStyle().Colors[(int)ImGuiCol.Separator]));
   }
 
   public static void Text(Rect rect, string text)
@@ -351,7 +351,7 @@ public readonly struct Rect
   }
 
   public TableRow TableRow(float rowHei, Span<float> widths) =>
-    new(this.Shrink(0, 0, 0, this.Size.y - rowHei), widths);
+    new(Shrink(0, 0, 0, Size.y - rowHei), widths);
 
   public Rect Shrink(float margin) => Shrink(margin, margin, margin, margin);
   public Rect Shrink(float minX, float minY, float maxX, float maxY) =>
@@ -368,7 +368,7 @@ public readonly struct Rect
 public ref struct TableRow
 {
   private Rect rect;
-  private Span<float> columns;
+  private readonly Span<float> columns;
   private int lastColumn;
   private float lastColumnOffset;
 

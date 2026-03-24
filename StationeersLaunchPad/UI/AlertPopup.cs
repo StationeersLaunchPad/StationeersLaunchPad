@@ -1,8 +1,8 @@
-﻿using Cysharp.Threading.Tasks;
-using ImGuiNET;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Cysharp.Threading.Tasks;
+using ImGuiNET;
 using UI.ImGuiUi;
 using UnityEngine;
 
@@ -10,7 +10,7 @@ namespace StationeersLaunchPad.UI;
 
 public static class AlertPopup
 {
-  public static Vector2 DefaultSize => new Vector2(600, 200);
+  public static Vector2 DefaultSize => new(600, 200);
   public static Vector2 DefaultPosition => ImguiHelper.ScreenSize / 2;
 
   private static bool IsActive = false;
@@ -28,7 +28,7 @@ public static class AlertPopup
     if (!IsActive)
       return;
 
-    ImGuiHelper.Draw(() => DrawAlert());
+    ImGuiHelper.Draw(DrawAlert);
   }
 
   public static async UniTask Show(string title, string description, Vector2 size, Vector2 position, params (string, Func<bool>)[] buttons)

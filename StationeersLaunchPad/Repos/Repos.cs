@@ -1,12 +1,12 @@
 
-using Assets.Scripts.Serialization;
-using Cysharp.Threading.Tasks;
-using StationeersLaunchPad.Metadata;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Xml.Serialization;
+using Assets.Scripts.Serialization;
+using Cysharp.Threading.Tasks;
+using StationeersLaunchPad.Metadata;
 using UnityEngine.Networking;
 
 namespace StationeersLaunchPad.Repos;
@@ -79,7 +79,7 @@ public static class ModRepos
   }
 
   private static readonly XmlSerializer DataSerializer =
-    new XmlSerializer(typeof(ModRepoData));
+    new(typeof(ModRepoData));
   private static void LoadRepoCache(ModRepoDef repo)
   {
     repo.Data = null;
@@ -192,7 +192,7 @@ public static class ModRepos
     var index = ModRepoIndex.Build(config);
     var dirs = InitRepoModsAssignment(config);
 
-    await UniTask.WhenAll(updates.Select(u => PerformModUpdate(u)));
+    await UniTask.WhenAll(updates.Select(PerformModUpdate));
 
     CleanRepoModDirs(config);
   }
@@ -395,7 +395,7 @@ public static class ModRepos
 
   private class DirAssignment
   {
-    private readonly HashSet<string> used = new();
+    private readonly HashSet<string> used = [];
 
     public string Assign(string current, string id)
     {

@@ -35,7 +35,7 @@ public class UpdateSequence
     return seq;
   }
 
-  public readonly List<UpdateAction> Actions = new();
+  public readonly List<UpdateAction> Actions = [];
 
   public UpdateResult Execute()
   {
@@ -47,7 +47,7 @@ public class UpdateSequence
     catch (Exception ex)
     {
       Logger.Global.LogException(ex);
-      return this.Rollback();
+      return Rollback();
     }
 
     try
@@ -92,20 +92,15 @@ public abstract class UpdateAction
   public abstract void RevertUpdate();
 }
 
-public class NewFileFromZipAction : UpdateAction
+public class NewFileFromZipAction(string path, ZipArchiveEntry entry) : UpdateAction
 {
-  private string path;
-  private ZipArchiveEntry entry;
-  public NewFileFromZipAction(string path, ZipArchiveEntry entry)
-  {
-    this.path = path;
-    this.entry = entry;
-  }
+  private readonly string path = path;
+  private readonly ZipArchiveEntry entry = entry;
 
   public override void PerformUpdate()
   {
-    Logger.Global.LogDebug($"Extracting new file to {this.path}");
-    entry.ExtractToFile(this.path);
+    Logger.Global.LogDebug($"Extracting new file to {path}");
+    entry.ExtractToFile(path);
   }
 
   public override void FinishUpdate()
@@ -114,48 +109,43 @@ public class NewFileFromZipAction : UpdateAction
 
   public override void RevertUpdate()
   {
-    if (File.Exists(this.path))
+    if (File.Exists(path))
     {
-      Logger.Global.LogDebug($"Removing new file {this.path}");
-      File.Delete(this.path);
+      Logger.Global.LogDebug($"Removing new file {path}");
+      File.Delete(path);
     }
   }
 }
 
-public class ReplaceFileFromZipAction : UpdateAction
+public class ReplaceFileFromZipAction(string path, ZipArchiveEntry entry) : UpdateAction
 {
-  private string path;
-  private ZipArchiveEntry entry;
-  public ReplaceFileFromZipAction(string path, ZipArchiveEntry entry)
-  {
-    this.path = path;
-    this.entry = entry;
-  }
+  private readonly string path = path;
+  private readonly ZipArchiveEntry entry = entry;
 
-  private string backupPath => $"{this.path}.bak";
+  private string BackupPath => $"{path}.bak";
 
   public override void PerformUpdate()
   {
-    Logger.Global.LogDebug($"Replacing file {this.path}");
+    Logger.Global.LogDebug($"Replacing file {path}");
 
-    if (File.Exists(this.backupPath))
+    if (File.Exists(BackupPath))
     {
-      Logger.Global.LogDebug($"Removing old backup {this.backupPath}");
-      File.Delete(this.backupPath);
+      Logger.Global.LogDebug($"Removing old backup {BackupPath}");
+      File.Delete(BackupPath);
     }
 
-    Logger.Global.LogDebug($"Backing up existing file to {this.backupPath}");
-    File.Move(this.path, this.backupPath);
+    Logger.Global.LogDebug($"Backing up existing file to {BackupPath}");
+    File.Move(path, BackupPath);
 
-    Logger.Global.LogDebug($"Extracting new file to {this.path}");
-    entry.ExtractToFile(this.path);
+    Logger.Global.LogDebug($"Extracting new file to {path}");
+    entry.ExtractToFile(path);
   }
 
   public override void FinishUpdate()
   {
     try
     {
-      File.Delete(this.backupPath);
+      File.Delete(BackupPath);
     }
     catch
     {
@@ -165,19 +155,19 @@ public class ReplaceFileFromZipAction : UpdateAction
 
   public override void RevertUpdate()
   {
-    if (!File.Exists(this.backupPath))
+    if (!File.Exists(BackupPath))
     {
       // nothing to do
       return;
     }
 
-    if (File.Exists(this.path))
+    if (File.Exists(path))
     {
-      Logger.Global.LogDebug($"Removing new file {this.path}");
-      File.Delete(this.path);
+      Logger.Global.LogDebug($"Removing new file {path}");
+      File.Delete(path);
     }
 
-    Logger.Global.LogDebug($"Restoring backup file {this.backupPath}");
-    File.Move(this.backupPath, this.path);
+    Logger.Global.LogDebug($"Restoring backup file {BackupPath}");
+    File.Move(BackupPath, path);
   }
 }

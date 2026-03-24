@@ -1,10 +1,7 @@
-﻿using Cysharp.Threading.Tasks;
-using StationeersLaunchPad.Metadata;
-using StationeersLaunchPad.Sources;
-using System;
-using System.Collections.Generic;
+﻿using System;
 using System.Diagnostics;
 using System.Linq;
+using Cysharp.Threading.Tasks;
 
 namespace StationeersLaunchPad.Loading;
 
@@ -39,23 +36,23 @@ public abstract class LoadStrategy
   {
     Logger.Global.LogDebug($"Assemblies loading...");
     var stopwatch = Stopwatch.StartNew();
-    await this.LoadAssemblies();
+    await LoadAssemblies();
     stopwatch.Stop();
     Logger.Global.LogWarning($"Assembly loading took {stopwatch.Elapsed:m\\:ss\\.fff}");
 
     Logger.Global.LogDebug($"Assets loading...");
     stopwatch.Restart();
-    await this.LoadAssets();
+    await LoadAssets();
     stopwatch.Stop();
     Logger.Global.LogWarning($"Asset loading took {stopwatch.Elapsed:m\\:ss\\.fff}");
 
     Logger.Global.LogDebug($"Loading entrypoints...");
     stopwatch.Restart();
-    await this.LoadEntryPoints();
+    await LoadEntryPoints();
     stopwatch.Stop();
     Logger.Global.LogWarning($"Loading entrypoints took {stopwatch.Elapsed:m\\:ss\\.fff}");
 
-    return !this.failed;
+    return !failed;
   }
 
   public void LoadFailed(LoadedMod mod, Exception ex)
@@ -64,7 +61,7 @@ public abstract class LoadStrategy
     mod.LoadFailed = true;
     mod.LoadFinished = false;
 
-    this.failed = true;
+    failed = true;
   }
 
   public abstract UniTask LoadAssemblies();
@@ -88,7 +85,7 @@ public class LoadStrategyLinearSerial : LoadStrategy
       }
       catch (Exception ex)
       {
-        this.LoadFailed(mod, ex);
+        LoadFailed(mod, ex);
       }
     }
   }
@@ -107,7 +104,7 @@ public class LoadStrategyLinearSerial : LoadStrategy
       }
       catch (Exception ex)
       {
-        this.LoadFailed(mod, ex);
+        LoadFailed(mod, ex);
       }
     }
   }
@@ -128,7 +125,7 @@ public class LoadStrategyLinearSerial : LoadStrategy
       }
       catch (Exception ex)
       {
-        this.LoadFailed(mod, ex);
+        LoadFailed(mod, ex);
       }
     }
   }
@@ -153,7 +150,7 @@ public class LoadStrategyLinearParallel : LoadStrategy
       }
       catch (Exception ex)
       {
-        this.LoadFailed(mod, ex);
+        LoadFailed(mod, ex);
       }
     }));
   }
@@ -172,7 +169,7 @@ public class LoadStrategyLinearParallel : LoadStrategy
       }
       catch (Exception ex)
       {
-        this.LoadFailed(mod, ex);
+        LoadFailed(mod, ex);
       }
     }));
   }
@@ -193,7 +190,7 @@ public class LoadStrategyLinearParallel : LoadStrategy
       }
       catch (Exception ex)
       {
-        this.LoadFailed(mod, ex);
+        LoadFailed(mod, ex);
       }
     }));
   }

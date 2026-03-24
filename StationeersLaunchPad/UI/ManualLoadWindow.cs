@@ -1,8 +1,8 @@
-﻿using ImGuiNET;
+﻿using System;
+using ImGuiNET;
 using StationeersLaunchPad.Loading;
 using StationeersLaunchPad.Metadata;
 using StationeersLaunchPad.Sources;
-using System;
 using UnityEngine;
 
 namespace StationeersLaunchPad.UI;
@@ -181,11 +181,11 @@ public static class ManualLoadWindow
         continue;
       var flag = mod.Enabled ? hasEnabled : hasDisabled;
       states[0] |= flag;
-      states[(int) mod.Source] |= flag;
+      states[(int)mod.Source] |= flag;
     }
     Span<byte> tgtStates = stackalloc byte[] { hasBoth, hasBoth, hasBoth, hasBoth };
 
-    bool SelectCheckbox(string label, byte curState, out byte nextState, bool force = false)
+    static bool SelectCheckbox(string label, byte curState, out byte nextState, bool force = false)
     {
       if (curState == 0 && !force)
       {
@@ -209,14 +209,14 @@ public static class ManualLoadWindow
     if (SelectCheckbox("All##enableAll", states[0], out var nextState, force: true))
       tgtStates.Fill(nextState);
     if (SelectCheckbox("Local##enableLocal",
-        states[(int) ModSourceType.Local], out nextState))
-      tgtStates[(int) ModSourceType.Local] = nextState;
+        states[(int)ModSourceType.Local], out nextState))
+      tgtStates[(int)ModSourceType.Local] = nextState;
     if (SelectCheckbox("Workshop##enableWorkshop",
-        states[(int) ModSourceType.Workshop], out nextState))
-      tgtStates[(int) ModSourceType.Workshop] = nextState;
+        states[(int)ModSourceType.Workshop], out nextState))
+      tgtStates[(int)ModSourceType.Workshop] = nextState;
     if (SelectCheckbox("Repo##enableRepo",
-        states[(int) ModSourceType.Repo], out nextState))
-      tgtStates[(int) ModSourceType.Repo] = nextState;
+        states[(int)ModSourceType.Repo], out nextState))
+      tgtStates[(int)ModSourceType.Repo] = nextState;
     ImGui.EndDisabled();
 
     if ((tgtStates[1] & tgtStates[2] & tgtStates[3]) != hasBoth)
@@ -225,7 +225,7 @@ public static class ManualLoadWindow
       {
         if (mod.Source is ModSourceType.Core)
           continue;
-        var tgtFlags = tgtStates[(int) mod.Source];
+        var tgtFlags = tgtStates[(int)mod.Source];
         if (tgtFlags == hasBoth)
           continue;
         var tgt = (tgtFlags & hasEnabled) != 0;

@@ -1,4 +1,10 @@
 
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Reflection;
+using System.Reflection.Emit;
+using System.Threading.Tasks;
 using Assets.Scripts;
 using Assets.Scripts.Networking;
 using Assets.Scripts.Networking.Transports;
@@ -9,12 +15,6 @@ using StationeersLaunchPad.Metadata;
 using StationeersLaunchPad.Sources;
 using StationeersLaunchPad.UI;
 using Steamworks;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Reflection;
-using System.Reflection.Emit;
-using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -170,12 +170,7 @@ static class SteamPatches
   }
 
   private static MetaServerTransport metaServerTransport;
-  public static MetaServerTransport GetMetaServerTransport()
-  {
-    if (metaServerTransport == null)
-      metaServerTransport = new();
-    return metaServerTransport;
-  }
+  public static MetaServerTransport GetMetaServerTransport() => metaServerTransport ??= new();
 
   [HarmonyPatch(typeof(MetaServerTransport), nameof(MetaServerTransport.InitClient)), HarmonyPrefix]
   static bool MetaServerTransport_InitClient(MetaServerTransport __instance)
@@ -304,10 +299,10 @@ static class WorkshopPatches
     public TextMeshProUGUI DescriptionText;
     public void OnPointerClick(PointerEventData eventData)
     {
-      var linkIndex = TMP_TextUtilities.FindIntersectingLink(this.DescriptionText, eventData.position, null);
+      var linkIndex = TMP_TextUtilities.FindIntersectingLink(DescriptionText, eventData.position, null);
       if (linkIndex != -1)
       {
-        var linkInfo = this.DescriptionText.textInfo.linkInfo[linkIndex];
+        var linkInfo = DescriptionText.textInfo.linkInfo[linkIndex];
         Application.OpenURL(linkInfo.GetLinkID());
       }
     }
@@ -360,7 +355,7 @@ static class WorkshopPatches
 
 static class BugfixPatches
 {
-  [HarmonyPatch(typeof(GameString), "op_Implicit", new Type[] { typeof(GameString) }), HarmonyPrefix]
+  [HarmonyPatch(typeof(GameString), "op_Implicit", [typeof(GameString)]), HarmonyPrefix]
   static bool GameString_op_Implicit(ref string __result, GameString gameString)
   {
     __result = gameString?.DisplayString ?? string.Empty;

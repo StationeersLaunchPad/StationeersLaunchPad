@@ -1,10 +1,10 @@
 
-using Cysharp.Threading.Tasks;
-using StationeersLaunchPad.Commands;
-using StationeersLaunchPad.UI;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Cysharp.Threading.Tasks;
+using StationeersLaunchPad.Commands;
+using StationeersLaunchPad.UI;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -26,12 +26,7 @@ public abstract class Platform
   private static HashSet<char> InvalidFileChars;
   public static string MakeValidFileName(string name, char replacement = '_')
   {
-    if (InvalidFileChars == null)
-    {
-      InvalidFileChars = new();
-      foreach (var c in Path.GetInvalidFileNameChars())
-        InvalidFileChars.Add(c);
-    }
+    InvalidFileChars ??= [.. Path.GetInvalidFileNameChars()];
     var res = new char[name.Length];
     for (var i = 0; i < name.Length; i++)
       res[i] = InvalidFileChars.Contains(name[i]) ? replacement : name[i];

@@ -1,11 +1,11 @@
-using Cysharp.Threading.Tasks;
-using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Text.RegularExpressions;
+using Cysharp.Threading.Tasks;
+using Newtonsoft.Json;
 using UnityEngine.Networking;
 
 namespace StationeersLaunchPad;
@@ -25,48 +25,44 @@ public class Github
 
   private static async UniTask<ZipArchive> FetchZipToMemory(Asset asset)
   {
-    using (var downloadRequest = UnityWebRequest.Get(asset.BrowserDownloadUrl))
+    using var downloadRequest = UnityWebRequest.Get(asset.BrowserDownloadUrl);
+    downloadRequest.timeout = Configs.UpdateDownloadTimeout.Value;
+
+    Logger.Global.LogDebug($"Downloading {asset.Name}");
+    var downloadResult = await downloadRequest.SendWebRequest();
+
+    if (downloadResult.result != UnityWebRequest.Result.Success)
     {
-      downloadRequest.timeout = Configs.UpdateDownloadTimeout.Value;
-
-      Logger.Global.LogDebug($"Downloading {asset.Name}");
-      var downloadResult = await downloadRequest.SendWebRequest();
-
-      if (downloadResult.result != UnityWebRequest.Result.Success)
-      {
-        Logger.Global.LogError($"Failed to download {asset.Name}! result: {downloadResult.result}, error: {downloadResult.error}");
-        return null;
-      }
-
-      var data = downloadRequest.downloadHandler.data;
-      Logger.Global.LogDebug($"Downloaded {data.Length} bytes");
-      var stream = new MemoryStream(data.Length);
-      stream.Write(data, 0, data.Length);
-      stream.Position = 0;
-
-      return new ZipArchive(stream);
+      Logger.Global.LogError($"Failed to download {asset.Name}! result: {downloadResult.result}, error: {downloadResult.error}");
+      return null;
     }
+
+    var data = downloadRequest.downloadHandler.data;
+    Logger.Global.LogDebug($"Downloaded {data.Length} bytes");
+    var stream = new MemoryStream(data.Length);
+    stream.Write(data, 0, data.Length);
+    stream.Position = 0;
+
+    return new ZipArchive(stream);
   }
 
   private static async UniTask<T> FetchJSON<T>(string url) where T : class
   {
     try
     {
-      using (var request = UnityWebRequest.Get(url))
+      using var request = UnityWebRequest.Get(url);
+      request.timeout = Configs.UpdateCheckTimeout.Value;
+
+      Logger.Global.LogDebug($"Fetching {url}");
+      var result = await request.SendWebRequest();
+
+      if (result.result != UnityWebRequest.Result.Success)
       {
-        request.timeout = Configs.UpdateCheckTimeout.Value;
-
-        Logger.Global.LogDebug($"Fetching {url}");
-        var result = await request.SendWebRequest();
-
-        if (result.result != UnityWebRequest.Result.Success)
-        {
-          Logger.Global.LogError($"Failed to fetch {url}. result: {result.result}, error: {result.error}");
-          return null;
-        }
-
-        return JsonConvert.DeserializeObject<T>(result.downloadHandler.text);
+        Logger.Global.LogError($"Failed to fetch {url}. result: {result.result}, error: {result.error}");
+        return null;
       }
+
+      return JsonConvert.DeserializeObject<T>(result.downloadHandler.text);
     }
     catch (Exception ex)
     {
@@ -76,40 +72,34 @@ public class Github
     }
   }
 
-  public class Repo
+  public class Repo(string owner, string name)
   {
-    public readonly string Owner;
-    public readonly string Name;
-
-    public Repo(string owner, string name)
-    {
-      this.Owner = owner;
-      this.Name = name;
-    }
+    public readonly string Owner = owner;
+    public readonly string Name = name;
 
     public string WebURL => $"https://github.com/{Owner}/{Name}";
     public string ReleaseListURL => $"https://api.github.com/repos/{Owner}/{Name}/releases";
-    public string LatestReleaseURL => $"{this.ReleaseListURL}/latest";
-    public string TagReleaseURL(string tag) => $"{this.ReleaseListURL}/tags/{tag}";
+    public string LatestReleaseURL => $"{ReleaseListURL}/latest";
+    public string TagReleaseURL(string tag) => $"{ReleaseListURL}/tags/{tag}";
 
     public async UniTask<List<Release>> FetchReleaseList()
     {
-      var releases = await FetchJSON<List<Release>>(this.ReleaseListURL) ?? new();
+      var releases = await FetchJSON<List<Release>>(ReleaseListURL) ?? [];
       foreach (var release in releases)
-        this.InitRelease(release);
+        InitRelease(release);
       return releases;
     }
 
     public async UniTask<Release> FetchLatestRelease()
     {
-      var release = await FetchJSON<Release>(this.LatestReleaseURL);
+      var release = await FetchJSON<Release>(LatestReleaseURL);
       InitRelease(release);
       return release;
     }
 
     public async UniTask<Release> FetchTagRelease(string tag)
     {
-      var release = await FetchJSON<Release>(this.TagReleaseURL(tag));
+      var release = await FetchJSON<Release>(TagReleaseURL(tag));
       InitRelease(release);
       return release;
     }
@@ -156,14 +146,14 @@ public class Github
       for (var i = 0; i < matches.Count; i++)
       {
         var match = matches[i];
-        var relName = this.RelativeName(match.Groups[1].Value, match.Groups[2].Value);
+        var relName = RelativeName(match.Groups[1].Value, match.Groups[2].Value);
         text = text.Replace(match.Value, $"{relName}#");
       }
       matches = ComparePrefixRegex.Matches(text);
       for (var i = 0; i < matches.Count; i++)
       {
         var match = matches[i];
-        var relName = this.RelativeName(match.Groups[1].Value, match.Groups[2].Value);
+        var relName = RelativeName(match.Groups[1].Value, match.Groups[2].Value);
         text = text.Replace(match.Value, relName);
       }
       var lines = text

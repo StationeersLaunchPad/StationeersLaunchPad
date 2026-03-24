@@ -1,10 +1,10 @@
 
-using BepInEx.Configuration;
-using StationeersLaunchPad.Loading;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using BepInEx.Configuration;
+using StationeersLaunchPad.Loading;
 
 namespace StationeersLaunchPad;
 
@@ -119,11 +119,11 @@ public static class Configs
     );
     var oldDedupe = config.Bind(
       new ConfigDefinition("Mod Loading", "DisableDuplicates"), "");
-    var dedupeDefault = oldDedupe.Value switch
+    int[] dedupeDefault = oldDedupe.Value switch
     {
-      "KeepLocal" => new int[] { 1, 2, 1, 3 },
-      "KeepWorkshop" => new int[] { 1, 1, 2, 3 },
-      _ => new int[] { 0, 2, 1, 3 },
+      "KeepLocal" => [1, 2, 1, 3],
+      "KeepWorkshop" => [1, 1, 2, 3],
+      _ => [0, 2, 1, 3],
     };
     config.Remove(oldDedupe.Definition);
     DedupeMods = config.Bind(
@@ -279,8 +279,8 @@ public class SortedConfigFile
 
   public SortedConfigFile(ConfigFile configFile)
   {
-    this.ConfigFile = configFile;
-    this.FileName = Path.GetFileName(configFile.ConfigFilePath);
+    ConfigFile = configFile;
+    FileName = Path.GetFileName(configFile.ConfigFilePath);
     var categories = new List<SortedConfigCategory>();
     foreach (var group in configFile.Select(entry => entry.Value).GroupBy(entry => entry.Definition.Section))
     {
@@ -291,7 +291,7 @@ public class SortedConfigFile
       ));
     }
     categories.Sort((a, b) => a.Category.CompareTo(b.Category));
-    this.Categories = categories;
+    Categories = categories;
   }
 }
 
@@ -303,10 +303,10 @@ public class SortedConfigCategory
 
   public SortedConfigCategory(ConfigFile configFile, string category, IEnumerable<ConfigEntryBase> entries)
   {
-    this.ConfigFile = configFile;
-    this.Category = category;
-    this.Entries = entries.Select(entry => new ConfigEntryWrapper(entry)).ToList();
-    this.Entries.Sort((a, b) =>
+    ConfigFile = configFile;
+    Category = category;
+    Entries = [.. entries.Select(entry => new ConfigEntryWrapper(entry))];
+    Entries.Sort((a, b) =>
     {
       var order = a.Order.CompareTo(b.Order);
       return order != 0 ? order : a.Entry.Definition.Key.CompareTo(b.Entry.Definition.Key);
@@ -317,44 +317,44 @@ public class SortedConfigCategory
 public class ConfigEntryWrapper
 {
   public readonly ConfigEntryBase Entry;
-  public int Order = 0;
-  public bool RequireRestart = false;
-  public bool Disabled = false;
-  public bool Visible = true;
-  public string DisplayName;
-  public string Format;
-  public Func<ConfigEntryBase, bool> CustomDrawer;
-  public ConfigDefinition Definition => this.Entry.Definition;
-  public ConfigDescription Description => this.Entry.Description;
+  public readonly int Order = 0;
+  public readonly bool RequireRestart = false;
+  public readonly bool Disabled = false;
+  public readonly bool Visible = true;
+  public readonly string DisplayName;
+  public readonly string Format;
+  public readonly Func<ConfigEntryBase, bool> CustomDrawer;
+  public ConfigDefinition Definition => Entry.Definition;
+  public ConfigDescription Description => Entry.Description;
 
   public ConfigEntryWrapper(ConfigEntryBase entry)
   {
-    this.DisplayName = entry.Definition.Key;
-    this.Entry = entry;
+    DisplayName = entry.Definition.Key;
+    Entry = entry;
     foreach (var tag in entry.Description.Tags)
     {
       switch (tag)
       {
         case KeyValuePair<string, int> { Key: "Order", Value: var order }:
-          this.Order = order;
+          Order = order;
           break;
         case KeyValuePair<string, bool> { Key: "RequireRestart", Value: var requireRestart }:
-          this.RequireRestart = requireRestart;
+          RequireRestart = requireRestart;
           break;
         case KeyValuePair<string, bool> { Key: "Disabled", Value: var disabled }:
-          this.Disabled = disabled;
+          Disabled = disabled;
           break;
         case KeyValuePair<string, bool> { Key: "Visible", Value: var visible }:
-          this.Visible = visible;
+          Visible = visible;
           break;
         case KeyValuePair<string, string> { Key: "DisplayName", Value: var displayName }:
-          this.DisplayName = displayName;
+          DisplayName = displayName;
           break;
         case KeyValuePair<string, string> { Key: "Format", Value: var format }:
-          this.Format = format;
+          Format = format;
           break;
         case KeyValuePair<string, Func<ConfigEntryBase, bool>> { Key: "CustomDrawer", Value: var customDrawer }:
-          this.CustomDrawer = customDrawer;
+          CustomDrawer = customDrawer;
           break;
       }
     }
