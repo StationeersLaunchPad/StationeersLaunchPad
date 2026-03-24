@@ -1,0 +1,83 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(SolutionDir)Stationeers.user.props" />
+  <!-- Optional extra build file for customized local build -->
+  <Import Project="$(SolutionDir)SLP.extra.props"
+    Condition="Exists('$(SolutionDir)SLP.extra.props')" />
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>14.0</LangVersion>
+    <LanguageTargets>$(MSBuildToolsPath)\Microsoft.CSharp.targets</LanguageTargets>
+    <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
+
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <Targets>AnyCPU</Targets>
+    <OutputPath>$(SolutionDir)bin\$(Configuration)</OutputPath>
+
+    <StationeersManagedDirectory>$(StationeersDirectory)\rocketstation_Data\Managed</StationeersManagedDirectory>
+    <BIECoreDirectory>$(StationeersDirectory)\BepInEx\core</BIECoreDirectory>
+    <SLPPluginPath>$(StationeersDirectory)\BepInEx\plugins\StationeersLaunchPad</SLPPluginPath>
+
+    <NoStandardLibraries>true</NoStandardLibraries>
+    <NoStdLib>true</NoStdLib>
+    <NoConfig>true</NoConfig>
+    <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
+    <NoWarn>$(NoWarn);MSB3277</NoWarn> <!-- unity ships dlls with conflicting references -->
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>embedded</DebugType>
+    <Optimize>false</Optimize>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugSymbols>false</DebugSymbols>
+    <DebugType>none</DebugType>
+    <Optimize>true</Optimize>
+    <DefineConstants>TRACE</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <GameReference Include="mscorlib" />
+    <GameReference Include="netstandard" />
+
+    <GameReference Include="Assembly-CSharp" />
+
+    <GameReference Include="Facepunch.Steamworks.Win64" />
+    <GameReference Include="Newtonsoft.Json" />
+    <GameReference Include="UniTask" />
+    <GameReference Include="UnityEngine" />
+    <GameReference Include="UnityEngine.AssetBundleModule" />
+    <GameReference Include="UnityEngine.CoreModule" />
+    <GameReference Include="UnityEngine.UI" />
+    <GameReference Include="UnityEngine.UnityWebRequestModule" />
+    <GameReference Include="Unity.TextMeshPro" />
+
+    <GameReference Include="BepInEx" />
+    <GameReference Include="0Harmony" />
+
+    <!-- search game and bepinex folder for named references -->
+    <_GameRefCandidate Include="@(GameReference->'$(StationeersManagedDirectory)\%(Identity).dll')" />
+    <_GameRefCandidate Include="@(GameReference->'$(BIECoreDirectory)\%(Identity).dll')" />
+    <_GameRefResolved Include="@(_GameRefCandidate->Exists())" Path="%(FullPath)" />
+
+    <Reference Include="@(_GameRefResolved->'%(FileName)')" HintPath="%(Path)" Private="False" />
+
+    <_MissingRef Include="@(GameReference)" Exclude="@(Reference)" />
+
+    <!-- include all system dlls -->
+    <SystemDll Include="$(StationeersManagedDirectory)\System*.dll" />
+    <SystemRefs Include="@(SystemDll->'%(Filename)')">
+      <HintPath>$(StationeersManagedDirectory)\%(Identity).dll</HintPath>
+    </SystemRefs>
+    <Reference Include="@(SystemRefs)" Private="False" />
+  </ItemGroup>
+  <Target Name="ValidateGameRefs" BeforeTargets="Build" Condition="'@(_MissingRef)' != ''">
+    <Error Text="Failed to resolve GameReference %(_MissingRef.Identity)" />
+  </Target>
+</Project>
