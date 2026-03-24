@@ -3,50 +3,49 @@ using System;
 using System.Diagnostics;
 using UnityEngine;
 
-namespace StationeersLaunchPad
+namespace StationeersLaunchPad;
+
+public static class ProcessUtil
 {
-  public static class ProcessUtil
+  public static void OpenExplorerDir(string dirPath)
   {
-    public static void OpenExplorerDir(string dirPath)
+    try
     {
-      try
-      {
-        Process.Start("explorer.exe", $"\"{dirPath}\"");
-      }
-      catch (Exception ex)
-      {
-        Logger.Global.LogException(ex);
-      }
+      Process.Start("explorer.exe", $"\"{dirPath}\"");
     }
-
-    public static void OpenExplorerSelectFile(string filePath)
+    catch (Exception ex)
     {
-      try
-      {
-        Process.Start("explorer", $"/select,\"{filePath}\"");
-      }
-      catch (Exception ex)
-      {
-        Logger.Global.LogException(ex);
-      }
+      Logger.Global.LogException(ex);
     }
+  }
 
-    public static void RestartGame()
+  public static void OpenExplorerSelectFile(string filePath)
+  {
+    try
     {
-
-      var startInfo = new ProcessStartInfo
-      {
-        FileName = LaunchPadPaths.ExecutablePath,
-        WorkingDirectory = LaunchPadPaths.GameRootPath,
-        UseShellExecute = false
-      };
-
-      // remove environment variables that new process will inherit
-      startInfo.Environment.Remove("DOORSTOP_INITIALIZED");
-      startInfo.Environment.Remove("DOORSTOP_DISABLE");
-
-      Process.Start(startInfo);
-      Application.Quit();
+      Process.Start("explorer", $"/select,\"{filePath}\"");
     }
+    catch (Exception ex)
+    {
+      Logger.Global.LogException(ex);
+    }
+  }
+
+  public static void RestartGame()
+  {
+
+    var startInfo = new ProcessStartInfo
+    {
+      FileName = LaunchPadPaths.ExecutablePath,
+      WorkingDirectory = LaunchPadPaths.GameRootPath,
+      UseShellExecute = false
+    };
+
+    // remove environment variables that new process will inherit
+    startInfo.Environment.Remove("DOORSTOP_INITIALIZED");
+    startInfo.Environment.Remove("DOORSTOP_DISABLE");
+
+    Process.Start(startInfo);
+    Application.Quit();
   }
 }

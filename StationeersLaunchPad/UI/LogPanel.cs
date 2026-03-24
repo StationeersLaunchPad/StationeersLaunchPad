@@ -1,123 +1,122 @@
 ﻿using ImGuiNET;
 using StationeersLaunchPad.Loading;
 
-namespace StationeersLaunchPad.UI
+namespace StationeersLaunchPad.UI;
+
+public static class LogPanel
 {
-  public static class LogPanel
+  private static bool standaloneLogsOpen = false;
+  private static LoadedMod logFilter = null;
+  public static void OpenStandaloneLogs()
   {
-    private static bool standaloneLogsOpen = false;
-    private static LoadedMod logFilter = null;
-    public static void OpenStandaloneLogs()
+    standaloneLogsOpen = true;
+    logFilter = null;
+  }
+  public static void DrawStandaloneLogs()
+  {
+    if (!standaloneLogsOpen)
+      return;
+    ImGuiHelper.Draw(() =>
     {
-      standaloneLogsOpen = true;
-      logFilter = null;
-    }
-    public static void DrawStandaloneLogs()
-    {
-      if (!standaloneLogsOpen)
-        return;
-      ImGuiHelper.Draw(() =>
-      {
-        ImGui.SetNextWindowSize(new(1200, 800), ImGuiCond.Appearing);
-        ImGui.SetNextWindowSizeConstraints(
-          new(400, 300), new(float.PositiveInfinity, float.PositiveInfinity));
-        ImGui.Begin("Mod Logs",
-          ref standaloneLogsOpen, ImGuiWindowFlags.NoSavedSettings);
+      ImGui.SetNextWindowSize(new(1200, 800), ImGuiCond.Appearing);
+      ImGui.SetNextWindowSizeConstraints(
+        new(400, 300), new(float.PositiveInfinity, float.PositiveInfinity));
+      ImGui.Begin("Mod Logs",
+        ref standaloneLogsOpen, ImGuiWindowFlags.NoSavedSettings);
 
-        if (ImGui.BeginCombo("##modfilter", logFilter?.Info.Name ?? "All"))
+      if (ImGui.BeginCombo("##modfilter", logFilter?.Info.Name ?? "All"))
+      {
+        if (ImGui.Selectable("All", logFilter == null))
+          logFilter = null;
+        var idx = 0;
+        foreach (var mod in ModLoader.LoadedMods)
         {
-          if (ImGui.Selectable("All", logFilter == null))
-            logFilter = null;
-          var idx = 0;
-          foreach (var mod in ModLoader.LoadedMods)
-          {
-            ImGui.PushID(idx);
+          ImGui.PushID(idx);
 
-            if (ImGui.Selectable(mod.Info.Name, logFilter == mod))
-              logFilter = mod;
+          if (ImGui.Selectable(mod.Info.Name, logFilter == mod))
+            logFilter = mod;
 
-            ImGui.PopID();
-            idx++;
-          }
-          ImGui.EndCombo();
+          ImGui.PopID();
+          idx++;
         }
-        DrawConsole(logFilter?.Logger ?? Logger.Global);
+        ImGui.EndCombo();
+      }
+      DrawConsole(logFilter?.Logger ?? Logger.Global);
 
-        ImGui.End();
-      });
-    }
+      ImGui.End();
+    });
+  }
 
-    private static ulong lastLineCount = 0;
-    private static Logger lastLogger = null;
-    private static int tooltipDelay = 0;
-    public static void DrawConsole(Logger logger)
+  private static ulong lastLineCount = 0;
+  private static Logger lastLogger = null;
+  private static int tooltipDelay = 0;
+  public static void DrawConsole(Logger logger)
+  {
+    ImGui.SetNextItemWidth(200);
+    ConfigPanel.DrawEnumEntry(Configs.LogSeverities, Configs.LogSeveritiesWrapper, false);
+    ImGui.BeginChild("##logs", ImGuiWindowFlags.HorizontalScrollbar);
+
+    var shouldScroll = false;
+    if (logger != lastLogger || logger.TotalCount != lastLineCount)
     {
-      ImGui.SetNextItemWidth(200);
-      ConfigPanel.DrawEnumEntry(Configs.LogSeverities, Configs.LogSeveritiesWrapper, false);
-      ImGui.BeginChild("##logs", ImGuiWindowFlags.HorizontalScrollbar);
-
-      var shouldScroll = false;
-      if (logger != lastLogger || logger.TotalCount != lastLineCount)
-      {
-        lastLogger = logger;
-        lastLineCount = logger.TotalCount;
-        shouldScroll = Configs.AutoScrollLogs.Value;
-      }
-
-      for (var i = 0; i < logger.Count; i++)
-      {
-        DrawConsoleLine(logger[i]);
-      }
-
-      if (shouldScroll)
-      {
-        shouldScroll = false;
-        ImGui.SetScrollHereY();
-      }
-
-      if (ImGui.IsWindowHovered())
-        tooltipDelay--;
-      else
-        tooltipDelay = 15;
-
-      if (tooltipDelay <= 0)
-      {
-        ImGuiHelper.TextTooltip("Right-click to copy logs.");
-        if (ImGui.IsMouseClicked(ImGuiMouseButton.Right))
-        {
-          logger.CopyToClipboard();
-          logger.Log("Logs copied to clipboard.");
-        }
-      }
-
-      ImGui.EndChild();
+      lastLogger = logger;
+      lastLineCount = logger.TotalCount;
+      shouldScroll = Configs.AutoScrollLogs.Value;
     }
 
-    public static void DrawConsoleLine(LogLine line, bool force = false)
+    for (var i = 0; i < logger.Count; i++)
     {
-      if (line == null)
-        return;
-
-      if (!force && (Configs.LogSeverities.Value & line.Severity) == 0)
-        return;
-
-      var text = Configs.CompactLogs.Value ? line.CompactString : line.FullString;
-      switch (line.Severity)
-      {
-        case LogSeverity.Debug:
-          ImGuiHelper.TextDisabled(text);
-          break;
-        case LogSeverity.Information:
-          ImGuiHelper.Text(text);
-          break;
-        case LogSeverity.Warning:
-          ImGuiHelper.TextWarning(text);
-          break;
-        case LogSeverity.Error or LogSeverity.Exception or LogSeverity.Fatal:
-          ImGuiHelper.TextError(text);
-          break;
-      }
-      ;
+      DrawConsoleLine(logger[i]);
     }
+
+    if (shouldScroll)
+    {
+      shouldScroll = false;
+      ImGui.SetScrollHereY();
+    }
+
+    if (ImGui.IsWindowHovered())
+      tooltipDelay--;
+    else
+      tooltipDelay = 15;
+
+    if (tooltipDelay <= 0)
+    {
+      ImGuiHelper.TextTooltip("Right-click to copy logs.");
+      if (ImGui.IsMouseClicked(ImGuiMouseButton.Right))
+      {
+        logger.CopyToClipboard();
+        logger.Log("Logs copied to clipboard.");
+      }
+    }
+
+    ImGui.EndChild();
+  }
+
+  public static void DrawConsoleLine(LogLine line, bool force = false)
+  {
+    if (line == null)
+      return;
+
+    if (!force && (Configs.LogSeverities.Value & line.Severity) == 0)
+      return;
+
+    var text = Configs.CompactLogs.Value ? line.CompactString : line.FullString;
+    switch (line.Severity)
+    {
+      case LogSeverity.Debug:
+        ImGuiHelper.TextDisabled(text);
+        break;
+      case LogSeverity.Information:
+        ImGuiHelper.Text(text);
+        break;
+      case LogSeverity.Warning:
+        ImGuiHelper.TextWarning(text);
+        break;
+      case LogSeverity.Error or LogSeverity.Exception or LogSeverity.Fatal:
+        ImGuiHelper.TextError(text);
+        break;
+    }
+    ;
   }
 }
