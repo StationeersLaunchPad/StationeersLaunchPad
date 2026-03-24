@@ -1,5 +1,5 @@
-﻿using StationeersLaunchPad;
-using System.Reflection;
+﻿using System.Reflection;
+using StationeersLaunchPad;
 
 [assembly: AssemblyTitle(LaunchPadInfo.NAME)]
 [assembly: AssemblyDescription(LaunchPadInfo.NAME)]

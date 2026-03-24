@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/Compatibility/">
+    <Project Path="Compatibility/RG.ImGui/RG.ImGui.csproj" />
+    <Project Path="Compatibility/StationeersMods.Interface/StationeersMods.Interface.csproj" />
+    <Project Path="Compatibility/StationeersMods.Shared/StationeersMods.Shared.csproj" />
+  </Folder>
+  <Project Path="LaunchPadBooster/LaunchPadBooster/LaunchPadBooster.csproj" />
+  <Project Path="StationeersLaunchPad/StationeersLaunchPad.csproj" />
+</Solution>

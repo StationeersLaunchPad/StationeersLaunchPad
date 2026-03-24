@@ -2,47 +2,44 @@
 using System.Collections.Generic;
 using System.Xml.Serialization;
 
-namespace StationeersLaunchPad.Repos
+namespace StationeersLaunchPad.Repos;
+
+[XmlRoot("ModRepo")]
+public class ModRepoData
 {
-  [XmlRoot("ModRepo")]
-  public class ModRepoData
-  {
-    [XmlElement("ModVersion", typeof(ModVersionData))]
-    public List<ModVersionData> ModVersions = new();
-  }
+  [XmlElement("ModVersion", typeof(ModVersionData))]
+  public List<ModVersionData> ModVersions = [];
+}
 
-  public class ModVersionData
-  {
-    [XmlAttribute("ModID")] public string ModID;
-    [XmlAttribute("Version")] public string Version;
-    [XmlAttribute("Name")] public string Name;
-    [XmlAttribute("Author")] public string Author;
-    [XmlAttribute("Url")] public string Url;
-    [XmlAttribute("Digest")] public string Digest;
+public class ModVersionData
+{
+  [XmlAttribute("ModID")] public string ModID;
+  [XmlAttribute("Version")] public string Version;
+  [XmlAttribute("Name")] public string Name;
+  [XmlAttribute("Author")] public string Author;
+  [XmlAttribute("Url")] public string Url;
+  [XmlAttribute("Digest")] public string Digest;
 
-    [XmlElement("Branch")]
-    public List<StringData> Branches = new();
-    [XmlElement("Tag")]
-    public List<StringData> Tags = new();
-    [XmlElement("Dep")]
-    public List<ModVersionDepData> Deps = new();
-  }
+  [XmlElement("Branch")]
+  public List<StringData> Branches = [];
+  [XmlElement("Tag")]
+  public List<StringData> Tags = [];
+  [XmlElement("Dep")]
+  public List<ModVersionDepData> Deps = [];
+}
 
-  public class StringData
-  {
-    [XmlAttribute("Value")] public string Value;
+public class StringData
+{
+  [XmlAttribute("Value")] public string Value;
 
-    public override string ToString() => Value;
+  public override string ToString() => Value;
 
-    public static implicit operator StringData(string value) =>
-      new() { Value = value };
-    public static implicit operator string(StringData data) =>
-      data.Value;
-  }
+  public static implicit operator StringData(string value) => new() { Value = value };
+  public static implicit operator string(StringData data) => data.Value;
+}
 
-  public class ModVersionDepData
-  {
-    [XmlAttribute("ModID")]
-    public string ModID;
-  }
+public class ModVersionDepData
+{
+  [XmlAttribute("ModID")]
+  public string ModID;
 }
