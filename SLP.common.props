@@ -1,5 +1,5 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(SolutionDir)Stationeers.user.props" />
+  <Import Project="$(SolutionDir)Stationeers.User.props" />
   <!-- Optional extra build file for customized local build -->
   <Import Project="$(SolutionDir)SLP.extra.props"
     Condition="Exists('$(SolutionDir)SLP.extra.props')" />
