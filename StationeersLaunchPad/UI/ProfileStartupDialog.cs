@@ -68,7 +68,7 @@ public class ProfileStartupDialog
         var buttonRowHeight = 35f + spacing.y * 2 + 1f;
         var listHeight = available.y - buttonRowHeight;
 
-        ImGui.BeginChild("##profilestatuplist", new Vector2(available.x, listHeight));
+        ImGui.BeginChild("##profilestartuplist", new Vector2(available.x, listHeight));
         for (var i = 0; i < profiles.Count; i++)
         {
             ImGui.PushID(i);

@@ -13,7 +13,7 @@ public class ActiveProfileConfig
     public string Name;
 }
 
-public class ProfileStorage
+public static class ProfileStorage
 {
     public static string ProfilesDirectory => Path.Join(LaunchPadPaths.SavePath, "profiles");
     public static string ActiveConfigPath => Path.Join(LaunchPadPaths.SavePath, "active.xml");
@@ -114,7 +114,7 @@ public class ProfileStorage
         }
         catch (Exception e)
         {
-            Logger.Global.LogError($"Failed to load active profile config: {e.Message}");
+            Logger.Global.LogWarning($"Failed to load active profile config: {e.Message}");
             return null;
         }
     }

@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace StationeersLaunchPad.UI;
 
-public class ProfileSelectorPanel
+public static class ProfileSelectorPanel
 {
     private static int selectedIndex = -1;
     private static string pendingName = "";

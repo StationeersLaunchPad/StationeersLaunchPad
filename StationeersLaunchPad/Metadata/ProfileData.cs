@@ -9,7 +9,7 @@ public class ProfileData
     [XmlAttribute("Name")]
     public string Name;
     
-    [XmlAttribute("Description")]
+    [XmlElement("Description")]
     public string Description = "";
     
     [XmlElement("Mod")]
