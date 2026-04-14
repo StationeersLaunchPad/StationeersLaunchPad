@@ -56,6 +56,8 @@ public static class LaunchPadConfig
   public static SplashBehaviour SplashBehaviour;
 
   private static ModList modList = ModList.NewEmpty();
+  
+  private static ProfileManager profileManager = new();
 
   private static LoadStage Stage = LoadStage.Initializing;
   public static bool ModsLoaded => Stage > LoadStage.Configuring;
@@ -92,10 +94,11 @@ public static class LaunchPadConfig
     }
     else
     {
-      var changed = ManualLoadWindow.Draw(Stage, modList, AutoSort);
+      var changed = ManualLoadWindow.Draw(Stage, modList, AutoSort, profileManager);
       HandleChange(changed);
     }
-
+    
+    ProfileStartupDialog.Draw();
     AlertPopup.Draw();
   }
 
@@ -121,6 +124,7 @@ public static class LaunchPadConfig
     {
       await StageSearching(firstLoad);
       firstLoad = false;
+      await ApplyStartupProfile();
       await StageConfiguring();
     }
     while (Stage == LoadStage.Searching);
@@ -256,12 +260,41 @@ public static class LaunchPadConfig
 
       if (depNotice && Platform.PauseOnDepNotice)
         StopAutoLoad();
+      
+      if (firstLoad)
+        profileManager.Initialize();
 
       Logger.Global.LogInfo("Mod Config Initialized");
     }
     catch (Exception ex)
     {
       OnStartupError(ex);
+    }
+  }
+
+  private static async UniTask ApplyStartupProfile()
+  {
+    if (Stage == LoadStage.Failed) return;
+
+    var startupProfile = profileManager.GetStartupProfile();
+
+    if (profileManager.AllProfiles.Count == 0) return;
+    if (startupProfile != null)
+    {
+      profileManager.LoadProfile(startupProfile.Name, modList);
+      return;
+    }
+
+    var (result, chosen) = await ProfileStartupDialog.Show(profileManager.AllProfiles);
+    switch (result)
+    {
+      case ProfileStartupResult.Chosen:
+        profileManager.LoadProfile(chosen, modList);
+        break;
+      case ProfileStartupResult.ManageProfiles:
+        StopAutoLoad();
+        ManualLoadWindow.OpenProfilesTab();
+        break;
     }
   }
 
@@ -334,6 +367,8 @@ public static class LaunchPadConfig
       if (AutoSort)
         modList.SortByDeps();
       ModConfigUtil.SaveConfig(modList.ToModConfig());
+      if (modsChanged && profileManager.ActiveProfileName != null)
+        profileManager.MarkDiverged();
     }
     var next = changed.HasFlag(ManualLoadWindow.ChangeFlags.NextStep);
     if (next)

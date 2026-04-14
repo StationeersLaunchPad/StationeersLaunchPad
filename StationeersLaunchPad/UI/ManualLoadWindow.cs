@@ -22,10 +22,13 @@ public static class ManualLoadWindow
   private static ModInfo selectedInfo = null;
   private static LoadedMod selectedMod = null;
   private static bool openInfo = false;
+  private static bool openProfilesTab = false;
   private static ModInfo draggingMod = null;
   private static bool dragged = false;
 
-  public static ChangeFlags Draw(LoadStage stage, ModList modList, bool autoSort)
+  public static void OpenProfilesTab() => openProfilesTab = true;
+  
+  public static ChangeFlags Draw(LoadStage stage, ModList modList, bool autoSort, ProfileManager profileManager = null)
   {
     Platform.SetBackgroundEnabled(false);
     var changed = ChangeFlags.None;
@@ -87,6 +90,9 @@ public static class ManualLoadWindow
         // If we changed launchpad config and haven't loaded mods yet, mark mods changed to apply disable/sort behaviour
         if (DrawLaunchPadConfigTab() && stage <= LoadStage.Configuring)
           changed |= ChangeFlags.Mods;
+
+        if (profileManager != null)
+          changed |= DrawProfilesTab(stage, modList, profileManager); 
 
         ImGui.EndTabBar();
       }
@@ -437,6 +443,25 @@ public static class ManualLoadWindow
       changed = ConfigPanel.DrawConfigFile(Configs.Sorted, category => category != "Internal");
       ImGui.EndTabItem();
     }
+    return changed;
+  }
+
+  private static ChangeFlags DrawProfilesTab(LoadStage stage, ModList modList, ProfileManager profileManager)
+  {
+    var disabled = stage != LoadStage.Configuring;
+    ImGui.BeginDisabled(disabled);
+    var open = ImGui.BeginTabItem("Profiles", openProfilesTab ? ImGuiTabItemFlags.SetSelected : ImGuiTabItemFlags.None);
+    ImGui.EndDisabled();
+    ImGuiHelper.ItemTooltip(
+      disabled ? "Profiles are only available during the Configuring stage" : "Manage mod profiles",
+      hoverFlags: ImGuiHoveredFlags.AllowWhenDisabled
+    );
+    openProfilesTab = false;
+    if (!open)
+      return ChangeFlags.None;
+    
+    var changed = ProfileSelectorPanel.Draw(profileManager, modList, stage);
+    ImGui.EndTabItem();
     return changed;
   }
 }
