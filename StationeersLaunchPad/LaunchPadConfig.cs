@@ -97,7 +97,8 @@ public static class LaunchPadConfig
       var changed = ManualLoadWindow.Draw(Stage, modList, AutoSort, profileManager);
       HandleChange(changed);
     }
-
+    
+    ProfileStartupDialog.Draw();
     AlertPopup.Draw();
   }
 
@@ -281,6 +282,19 @@ public static class LaunchPadConfig
     if (startupProfile != null)
     {
       profileManager.LoadProfile(startupProfile.Name, modList);
+      return;
+    }
+
+    var (result, chosen) = await ProfileStartupDialog.Show(profileManager.AllProfiles);
+    switch (result)
+    {
+      case ProfileStartupResult.Chosen:
+        profileManager.LoadProfile(chosen, modList);
+        break;
+      case ProfileStartupResult.ManageProfiles:
+        StopAutoLoad();
+        ManualLoadWindow.OpenProfilesTab();
+        break;
     }
   }
 

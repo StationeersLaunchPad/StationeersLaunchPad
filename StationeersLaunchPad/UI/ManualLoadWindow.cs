@@ -26,6 +26,8 @@ public static class ManualLoadWindow
   private static ModInfo draggingMod = null;
   private static bool dragged = false;
 
+  public static void OpenProfilesTab() => openProfilesTab = true;
+  
   public static ChangeFlags Draw(LoadStage stage, ModList modList, bool autoSort, ProfileManager profileManager = null)
   {
     Platform.SetBackgroundEnabled(false);
