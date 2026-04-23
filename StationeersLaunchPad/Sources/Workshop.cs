@@ -17,25 +17,43 @@ public class WorkshopModSource : ModSource
   {
     var mods = new List<ModDefinition>();
     if (state.SteamDisabled)
-      return mods;
+      return Configs.RetainWorkshopMods.Value ? ListRetainedMods() : mods;
 
     var items = await Steam.LoadWorkshopItems();
 
     foreach (var item in items)
     {
-      var about = XmlSerialization.Deserialize<ModAboutEx>(
-        Path.Join(item.Directory, "About/About.xml"), "ModMetadata") ?? new()
-        {
-          Name = $"[Invalid About.xml] {item.Title}",
-          Author = "",
-          Version = "",
-          Description = "",
-        };
+      var about = LoadAbout(Path.Join(item.Directory, "About/About.xml"), item.Title);
       mods.Add(new WorkshopModDefinition(item, about));
     }
 
     return mods;
   }
+
+  private static List<ModDefinition> ListRetainedMods()
+  {
+    var config = ModConfigUtil.LoadConfig();
+    var mods = new List<ModDefinition>();
+    foreach (var mod in config.Mods)
+    {
+      if (mod is not WorkshopModData wmod)
+        continue;
+      if (!File.Exists(mod.AboutXmlPath))
+        continue;
+      var about = LoadAbout(mod.AboutXmlPath, mod.DirectoryPath.Value);
+      mods.Add(new FakeWorkshopModDefinition(mod.DirectoryPath, wmod.WorkshopId, about));
+    }
+    return mods;
+  }
+
+  private static ModAboutEx LoadAbout(string path, string fallbackName) =>
+    XmlSerialization.Deserialize<ModAboutEx>(path, "ModMetadata") ?? new()
+    {
+      Name = $"[Invalid About.xml] {fallbackName}",
+      Author = "",
+      Version = "",
+      Description = "",
+    };
 }
 
 public class WorkshopModDefinition(Item item, ModAboutEx about) : ModDefinition(about)
@@ -49,4 +67,18 @@ public class WorkshopModDefinition(Item item, ModAboutEx about) : ModDefinition(
     SteamTransport.ItemWrapper.WrapWorkshopItem(Item, "About/About.xml"),
     enabled
   );
+}
+
+public class FakeWorkshopModDefinition(string dir, ulong handle, ModAboutEx about) : ModDefinition(about)
+{
+  public override ModSourceType Type => ModSourceType.Workshop;
+  public override ulong WorkshopHandle { get; } = handle;
+  public override string DirectoryPath { get; } = dir;
+
+  public override ModData ToModData(bool enabled) => new WorkshopModData()
+  {
+    Enabled = enabled,
+    DirectoryPath = new(DirectoryPath),
+    WorkshopId = new(WorkshopHandle),
+  };
 }
