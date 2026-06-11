@@ -320,6 +320,26 @@ public static class ManualLoadWindow
         "Off: sorting only changes how the list is displayed; the load order is left untouched.");
     }
 
+    ImGui.SameLine();
+    ImGuiHelper.TextDisabled("|", true);
+
+    ImGui.SameLine();
+    if (ImGui.Button("Export List"))
+      LaunchPadConfig.ExportModListJson();
+    ImGuiHelper.ItemTooltip($"Save the current mod list (state + order) as JSON to:\n{LaunchPadPaths.ModListJsonPath}");
+
+    ImGui.SameLine();
+    ImGui.BeginDisabled(!LaunchPadConfig.CanImportModList);
+    if (ImGui.Button("Import List"))
+    {
+      LaunchPadConfig.ImportModListJson();
+      changed |= ChangeFlags.Mods;
+    }
+    ImGui.EndDisabled();
+    ImGuiHelper.ItemTooltip(
+      $"Load a mod list from JSON and apply its enabled state and order:\n{LaunchPadPaths.ModListJsonPath}",
+      hoverFlags: ImGuiHoveredFlags.AllowWhenDisabled);
+
     return changed;
   }
 

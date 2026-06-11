@@ -376,6 +376,96 @@ public class ModList
     return changed;
   }
 
+  public ModListJson ToJsonModel()
+  {
+    var model = new ModListJson
+    {
+      Version = LaunchPadInfo.VERSION,
+      ExportedAt = DateTime.Now,
+    };
+    var order = 0;
+    foreach (var mod in mods)
+    {
+      model.Mods.Add(new ModListJsonEntry
+      {
+        Name = mod.Name,
+        ModID = mod.ModID,
+        WorkshopHandle = mod.WorkshopHandle,
+        Source = mod.Source.ToString(),
+        Enabled = mod.Enabled,
+        Order = order++,
+      });
+    }
+    return model;
+  }
+
+  // Applies an imported mod list: reorders installed mods to match the file, applies their
+  // enabled state, disables mods not present in the file (except Core), and reports any
+  // entries that are not installed locally.
+  public ModListImportResult ApplyJsonModel(ModListJson model)
+  {
+    var result = new ModListImportResult();
+    if (model?.Mods == null)
+      return result;
+
+    var byHandle = new Dictionary<ulong, ModInfo>();
+    var byModID = new Dictionary<string, ModInfo>(StringComparer.OrdinalIgnoreCase);
+    foreach (var mod in mods)
+    {
+      if (mod.WorkshopHandle > 1)
+        byHandle[mod.WorkshopHandle] = mod;
+      if (!string.IsNullOrEmpty(mod.ModID))
+        byModID[mod.ModID] = mod;
+    }
+
+    var used = new HashSet<ModInfo>();
+    var newOrder = new List<ModInfo>();
+
+    foreach (var entry in model.Mods)
+    {
+      ModInfo match = null;
+      if (entry.WorkshopHandle > 1)
+        byHandle.TryGetValue(entry.WorkshopHandle, out match);
+      if (match == null && !string.IsNullOrEmpty(entry.ModID))
+        byModID.TryGetValue(entry.ModID, out match);
+      if (match == null && !string.IsNullOrEmpty(entry.Name))
+        match = mods.FirstOrDefault(m =>
+          !used.Contains(m) &&
+          string.Equals(m.Name, entry.Name, StringComparison.OrdinalIgnoreCase));
+
+      if (match == null)
+      {
+        result.Missing.Add(string.IsNullOrEmpty(entry.Name) ? entry.ModID ?? "(unknown)" : entry.Name);
+        continue;
+      }
+      if (used.Contains(match))
+        continue;
+
+      if (match.Source != ModSourceType.Core)
+        match.Enabled = entry.Enabled;
+      used.Add(match);
+      newOrder.Add(match);
+      result.Matched++;
+    }
+
+    // Append mods that weren't in the imported file, disabling them (except Core) so the
+    // resulting set matches the file as closely as the installed mods allow.
+    foreach (var mod in mods)
+    {
+      if (used.Contains(mod))
+        continue;
+      if (mod.Source != ModSourceType.Core && mod.Enabled)
+      {
+        mod.Enabled = false;
+        result.Disabled++;
+      }
+      newOrder.Add(mod);
+    }
+
+    mods = newOrder;
+    return result;
+  }
+
   private static string NormalizePath(string path) =>
     path?.Replace("\\", "/").Trim().ToLowerInvariant() ?? string.Empty;
 }
