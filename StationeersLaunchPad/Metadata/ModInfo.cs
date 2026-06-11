@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -24,10 +25,16 @@ public class ModInfo
   public ModAboutEx About => Def.About;
   public ModSourceType Source => Def.Type;
   public string Name => About.Name;
+  public string Author => About?.Author ?? "";
   public string DirectoryPath => Def.DirectoryPath;
   public string DirectoryName => new DirectoryInfo(DirectoryPath).Name;
   public ulong WorkshopHandle => Def.WorkshopHandle;
   public string ModID => About.ModID ?? "";
+
+  // Release/update timestamps used for sorting. For Workshop mods these come from
+  // Steam metadata; for Local/Repo mods they fall back to the mod folder timestamps.
+  public DateTime? Released => Def.Created;
+  public DateTime? Updated => Def.Updated;
 
   public string AboutPath => Path.Combine(DirectoryPath, "About");
   public string AboutXmlPath => Path.Combine(AboutPath, "About.xml");
