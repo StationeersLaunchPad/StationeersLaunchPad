@@ -45,6 +45,8 @@ public class WorkshopModDefinition(Item item, ModAboutEx about) : ModDefinition(
   public override ModSourceType Type => ModSourceType.Workshop;
   public override ulong WorkshopHandle => Item.Id;
   public override string DirectoryPath => Item.Directory;
+  public override System.DateTime? Created => Item.Created;
+  public override System.DateTime? Updated => Item.Updated;
   public override ModData ToModData(bool enabled) => new WorkshopModData(
     SteamTransport.ItemWrapper.WrapWorkshopItem(Item, "About/About.xml"),
     enabled

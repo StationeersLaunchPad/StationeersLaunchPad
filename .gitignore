@@ -430,3 +430,6 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+# Local UI design reference (not part of the mod)
+Redesign LaunchPad UI/
+ui_layout.xml

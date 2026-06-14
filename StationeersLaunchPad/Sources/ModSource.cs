@@ -1,5 +1,7 @@
 
+using System;
 using System.Collections.Generic;
+using System.IO;
 using Cysharp.Threading.Tasks;
 using StationeersLaunchPad.Metadata;
 using StationeersLaunchPad.Repos;
@@ -51,4 +53,18 @@ public abstract class ModDefinition(ModAboutEx about)
   public abstract ulong WorkshopHandle { get; }
   public abstract string DirectoryPath { get; }
   public abstract ModData ToModData(bool enabled);
+
+  // Release/update timestamps used by the mod loader UI for sorting.
+  // Workshop mods override these with Steam metadata; otherwise we fall back to
+  // the mod folder's filesystem creation/last-write time. Returns null when unknown.
+  public virtual DateTime? Created => GetDirTime(lastWrite: false);
+  public virtual DateTime? Updated => GetDirTime(lastWrite: true);
+
+  protected DateTime? GetDirTime(bool lastWrite)
+  {
+    var path = DirectoryPath;
+    if (string.IsNullOrEmpty(path) || !Directory.Exists(path))
+      return null;
+    return lastWrite ? Directory.GetLastWriteTime(path) : Directory.GetCreationTime(path);
+  }
 }

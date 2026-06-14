@@ -6,6 +6,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Reflection;
 using System.Xml.Serialization;
+using Newtonsoft.Json;
 using Assets.Scripts;
 using Assets.Scripts.Serialization;
 using Assets.Scripts.Util;
@@ -97,6 +98,7 @@ public static class LaunchPadConfig
     }
 
     AlertPopup.Draw();
+    FilePicker.Draw();
   }
 
   public static async void Run()
@@ -257,6 +259,20 @@ public static class LaunchPadConfig
       if (depNotice && Platform.PauseOnDepNotice)
         StopAutoLoad();
 
+      // Statically scan mod assemblies for game-API mismatches (off the main thread).
+      var modSnapshot = modList.AllMods.ToList();
+      await UniTask.SwitchToThreadPool();
+      ModCompatScanner.ScanAll(modSnapshot);
+      await UniTask.SwitchToMainThread();
+
+      PreLoadCheck.Run(modList);
+
+      if (Platform.PauseOnDepNotice && PreLoadCheck.Current.Issues.Any(i => i.Category == "Incompatible"))
+      {
+        Logger.Global.LogWarning("Incompatible mods detected - pausing auto-load");
+        StopAutoLoad();
+      }
+
       Logger.Global.LogInfo("Mod Config Initialized");
     }
     catch (Exception ex)
@@ -309,6 +325,9 @@ public static class LaunchPadConfig
     if (Stage != LoadStage.Failed)
       Stage = LoadStage.Loaded;
 
+    // Remember which mods failed to load so the next launch can warn about them.
+    PreLoadCheck.SaveLoadResults();
+
     await SLPCommand.MoveToStage(CommandStage.ModsLoaded);
 
     CurWait = new(Configs.AutoLoadWaitTime.Value, AutoLoad);
@@ -334,6 +353,7 @@ public static class LaunchPadConfig
       if (AutoSort)
         modList.SortByDeps();
       ModConfigUtil.SaveConfig(modList.ToModConfig());
+      PreLoadCheck.Run(modList);
     }
     var next = changed.HasFlag(ManualLoadWindow.ChangeFlags.NextStep);
     if (next)
@@ -402,6 +422,89 @@ public static class LaunchPadConfig
       if (!Platform.IsServer)
         ProcessUtil.OpenExplorerSelectFile(pkgpath);
       return $"exported {pkgpath}";
+    }
+    catch (Exception ex)
+    {
+      Logger.Global.LogException(ex);
+      return ex.ToString();
+    }
+  }
+
+  // Whether importing a mod list is currently allowed (only before mods start loading).
+  public static bool CanImportModList => Stage is LoadStage.Searching or LoadStage.Configuring;
+
+  // Writes the current mod list (names, ids, source, enabled state and load order) to a JSON file.
+  public static string ExportModListJson(string path = null)
+  {
+    try
+    {
+      if (string.IsNullOrEmpty(path))
+        path = LaunchPadPaths.ModListJsonPath;
+      else
+      {
+        if (!Path.IsPathRooted(path))
+          path = Path.Combine(LaunchPadPaths.SavePath, path);
+        if (!path.ToLower().EndsWith(".json"))
+          path += ".json";
+      }
+
+      var json = JsonConvert.SerializeObject(modList.ToJsonModel(), Formatting.Indented);
+      File.WriteAllText(path, json);
+
+      Logger.Global.LogInfo($"Exported mod list to {path}");
+      if (!Platform.IsServer)
+        ProcessUtil.OpenExplorerSelectFile(path);
+      return $"exported {path}";
+    }
+    catch (Exception ex)
+    {
+      Logger.Global.LogException(ex);
+      return ex.ToString();
+    }
+  }
+
+  // Reads a JSON mod list and applies its enabled state and load order to the installed mods.
+  public static string ImportModListJson(string path = null)
+  {
+    try
+    {
+      if (!CanImportModList)
+        return "mod list can only be imported before mods are loaded";
+
+      if (string.IsNullOrEmpty(path))
+        path = LaunchPadPaths.ModListJsonPath;
+      else if (!Path.IsPathRooted(path))
+        path = Path.Combine(LaunchPadPaths.SavePath, path);
+
+      if (!File.Exists(path))
+      {
+        Logger.Global.LogError($"mod list file not found: {path}");
+        return $"file not found: {path}";
+      }
+
+      var model = JsonConvert.DeserializeObject<ModListJson>(File.ReadAllText(path));
+      if (model == null)
+      {
+        Logger.Global.LogError($"invalid mod list file: {path}");
+        return "invalid mod list file";
+      }
+
+      var result = modList.ApplyJsonModel(model);
+
+      // Re-run the same validation/persistence the UI does after a manual change.
+      modList.CheckDependencies();
+      modList.DisableDuplicates();
+      if (AutoSort)
+        modList.SortByDeps();
+      ModConfigUtil.SaveConfig(modList.ToModConfig());
+      PreLoadCheck.Run(modList);
+
+      Logger.Global.LogInfo(
+        $"Imported mod list from {path}: {result.Matched} matched, {result.Disabled} disabled, {result.Missing.Count} not installed");
+      foreach (var name in result.Missing)
+        Logger.Global.LogWarning($"- not installed: {name}");
+
+      return $"imported {result.Matched} mods ({result.Missing.Count} not installed)";
     }
     catch (Exception ex)
     {
