@@ -3,7 +3,10 @@ using UnityEngine;
 
 namespace StationeersLaunchPad.UI;
 
-// Color palette + ImGui style matching the redesigned LaunchPad UI (dark panels, orange accent).
+// Color palette and ImGui style for the LaunchPad UI (dark panels with a single accent).
+// The accent is defined once (AccentRgb) and every accent shade is derived from it, so the
+// whole UI can be retinted by changing that one value. No view should reference a raw hex
+// color or a color-specific name; use the semantic fields below instead.
 public static class LaunchPadTheme
 {
   public static Color Hex(uint rgb, float a = 1f) =>
@@ -18,9 +21,14 @@ public static class LaunchPadTheme
   public static readonly Color Border = new(1f, 1f, 1f, 0.07f);
   public static readonly Color RowAlt = new(1f, 1f, 1f, 0.025f);
 
-  public static readonly Color Orange = Hex(0xF47A2A);
-  public static readonly Color OrangeFaint = Hex(0xF47A2A, 0.10f);
-  public static readonly Color OrangeBorder = Hex(0xF47A2A, 0.25f);
+  // Single source of truth for the accent. Swap this one value to retheme the UI.
+  public const uint AccentRgb = 0xF47A2A;
+
+  public static readonly Color Accent = Hex(AccentRgb);
+  public static readonly Color AccentFaint = Hex(AccentRgb, 0.10f);
+  public static readonly Color AccentSoft = Hex(AccentRgb, 0.16f);
+  public static readonly Color AccentStrong = Hex(AccentRgb, 0.22f);
+  public static readonly Color AccentBorder = Hex(AccentRgb, 0.25f);
 
   public static readonly Color Text = Hex(0xF1F3F6);
   public static readonly Color TextSub = Hex(0xB7BDC9);
@@ -54,11 +62,11 @@ public static class LaunchPadTheme
     C(ImGuiCol.FrameBgActive, PanelAlt);
     C(ImGuiCol.Button, new Color(1f, 1f, 1f, 0.04f));
     C(ImGuiCol.ButtonHovered, new Color(1f, 1f, 1f, 0.09f));
-    C(ImGuiCol.ButtonActive, OrangeFaint);
-    C(ImGuiCol.Header, Hex(0xF47A2A, 0.16f));
+    C(ImGuiCol.ButtonActive, AccentFaint);
+    C(ImGuiCol.Header, AccentSoft);
     C(ImGuiCol.HeaderHovered, new Color(1f, 1f, 1f, 0.09f));
-    C(ImGuiCol.HeaderActive, Hex(0xF47A2A, 0.22f));
-    C(ImGuiCol.CheckMark, Orange);
+    C(ImGuiCol.HeaderActive, AccentStrong);
+    C(ImGuiCol.CheckMark, Accent);
     C(ImGuiCol.Separator, Border);
     C(ImGuiCol.ScrollbarBg, new Color(0f, 0f, 0f, 0f));
     C(ImGuiCol.ScrollbarGrab, new Color(1f, 1f, 1f, 0.10f));

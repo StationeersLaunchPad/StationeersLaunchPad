@@ -488,44 +488,8 @@ public static class LaunchPadConfig
     }
   }
 
-  // ── Presets: enabled state + load order only (reuses the ModConfig system) ──────
-  public static List<string> ListPresets() => PresetStore.List();
-
-  public static string SavePreset(string name)
-  {
-    if (string.IsNullOrWhiteSpace(name))
-      return "preset name required";
-    if (!PresetStore.Save(name, modList.ToModConfig()))
-      return "failed to save preset";
-    Logger.Global.LogInfo($"Saved preset '{name}'");
-    return $"saved preset {name}";
-  }
-
-  public static string LoadPreset(string name)
-  {
-    if (!CanImportModList)
-      return "presets can only be loaded before mods are loaded";
-    var config = PresetStore.Load(name);
-    if (config == null)
-      return $"preset '{name}' not found";
-
-    config.CreateCoreMod();
-    modList.ApplyConfig(config);
-    modList.CheckDependencies();
-    modList.DisableDuplicates();
-    if (AutoSort)
-      modList.SortByDeps();
-    ModConfigUtil.SaveConfig(modList.ToModConfig());
-    PreLoadCheck.Run(modList);
-
-    Logger.Global.LogInfo($"Loaded preset '{name}'");
-    return $"loaded preset {name}";
-  }
-
-  public static string DeletePreset(string name)
-  {
-    PresetStore.Delete(name);
-    Logger.Global.LogInfo($"Deleted preset '{name}'");
-    return $"deleted preset {name}";
-  }
+  // Profiles (saving and switching mod configurations) are provided by PR #139.
+  // The redesigned toolbar exposes a seam (ManualLoadWindow.DrawProfileBar) that will
+  // call #139's ProfileManager once it lands. This PR does not ship its own profile or
+  // preset backend, to avoid duplicating #139. See docs/pr-c-profiles-notes.md.
 }

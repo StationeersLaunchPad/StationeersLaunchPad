@@ -32,8 +32,6 @@ public static class ManualLoadWindow
   private static bool sortDescending = false;
   private static bool sortApplyToLoadOrder = false;
   private static string searchText = "";
-  private static int presetIndex = 0;
-  private static string presetNameInput = "";
   private static bool authorSplitDrag = false;
   // Redesigned shell: left-sidebar navigation sections + collapsible console.
   private enum NavSection { Mods, Dependencies, Settings, About }
@@ -122,9 +120,9 @@ public static class ManualLoadWindow
     const float pad = 14f;
 
     var logo = new Rect(new(rect.Min.x + pad, rect.Min.y + 8f), new(rect.Min.x + pad + 20f, rect.Min.y + 28f));
-    LaunchPadTheme.Fill(logo, LaunchPadTheme.OrangeFaint);
-    LaunchPadTheme.Stroke(logo, LaunchPadTheme.OrangeBorder);
-    LaunchPadTheme.TextAt(new(logo.Min.x + 6f, cy), "L", LaunchPadTheme.Orange);
+    LaunchPadTheme.Fill(logo, LaunchPadTheme.AccentFaint);
+    LaunchPadTheme.Stroke(logo, LaunchPadTheme.AccentBorder);
+    LaunchPadTheme.TextAt(new(logo.Min.x + 6f, cy), "L", LaunchPadTheme.Accent);
 
     var x = rect.Min.x + pad + 30f;
     LaunchPadTheme.TextAt(new(x, cy), "STATIONEERS LAUNCHPAD", LaunchPadTheme.Text);
@@ -140,7 +138,7 @@ public static class ManualLoadWindow
     var segs = new List<(string, Color)>
     {
       (StageText(stage), LaunchPadTheme.TextSub),
-      ($"Active {enabled}", LaunchPadTheme.Orange),
+      ($"Active {enabled}", LaunchPadTheme.Accent),
       ($"Disabled {disabled}", LaunchPadTheme.TextSub),
       ($"Warn {warns}", warns > 0 ? LaunchPadTheme.Warn : LaunchPadTheme.TextDim),
       ($"Err {errs}", errs > 0 ? LaunchPadTheme.Err : LaunchPadTheme.TextDim),
@@ -192,7 +190,7 @@ public static class ManualLoadWindow
       ImGui.SetCursorScreenPos(new(x, y));
       var active = nav == id;
       if (active)
-        ImGui.PushStyleColor(ImGuiCol.Text, (Vector4)LaunchPadTheme.Orange);
+        ImGui.PushStyleColor(ImGuiCol.Text, (Vector4)LaunchPadTheme.Accent);
       if (ImGui.Selectable($"  {label}", active, new Vector2(w, 26f)))
         nav = id;
       if (active)
@@ -212,9 +210,9 @@ public static class ManualLoadWindow
     };
 
     ImGui.SetCursorScreenPos(new(x, y));
-    ImGui.PushStyleColor(ImGuiCol.Button, (Vector4)(loadEnabled ? LaunchPadTheme.Orange : new Color(1f, 1f, 1f, 0.04f)));
+    ImGui.PushStyleColor(ImGuiCol.Button, (Vector4)(loadEnabled ? LaunchPadTheme.Accent : new Color(1f, 1f, 1f, 0.04f)));
     ImGui.PushStyleColor(ImGuiCol.ButtonHovered, (Vector4)(loadEnabled ? LaunchPadTheme.Hex(0xE06B1F) : new Color(1f, 1f, 1f, 0.06f)));
-    ImGui.PushStyleColor(ImGuiCol.ButtonActive, (Vector4)LaunchPadTheme.Orange);
+    ImGui.PushStyleColor(ImGuiCol.ButtonActive, (Vector4)LaunchPadTheme.Accent);
     ImGui.PushStyleColor(ImGuiCol.Text, (Vector4)(loadEnabled ? Color.white : LaunchPadTheme.TextMuted));
     ImGui.BeginDisabled(!loadEnabled);
     var clicked = ImGui.Button(loadText, new Vector2(w, 32f));
@@ -308,7 +306,7 @@ public static class ManualLoadWindow
 
   private static void DrawAboutView()
   {
-    ImGuiHelper.TextColored("Stationeers LaunchPad", LaunchPadTheme.Orange);
+    ImGuiHelper.TextColored("Stationeers LaunchPad", LaunchPadTheme.Accent);
     ImGuiHelper.TextDisabled($"Version {LaunchPadInfo.VERSION}");
     ImGui.Separator();
     ImGuiHelper.Text("Community mod loader for Stationeers.");
@@ -326,7 +324,7 @@ public static class ManualLoadWindow
       ImGui.SetMouseCursor(ImGuiMouseCursor.ResizeEW);
     var cx = rect.Min.x + rect.Size.x / 2f;
     LaunchPadTheme.HLine(new(cx, rect.Min.y + 2f), new(cx, rect.Max.y - 2f),
-      active ? LaunchPadTheme.Orange : hovered ? LaunchPadTheme.OrangeBorder : LaunchPadTheme.Border);
+      active ? LaunchPadTheme.Accent : hovered ? LaunchPadTheme.AccentBorder : LaunchPadTheme.Border);
     return SplitterDelta(active, ImGui.GetIO().MouseDelta.x);
   }
 
@@ -340,7 +338,7 @@ public static class ManualLoadWindow
       ImGui.SetMouseCursor(ImGuiMouseCursor.ResizeNS);
     var cy = rect.Min.y + rect.Size.y / 2f;
     LaunchPadTheme.HLine(new(rect.Min.x + 2f, cy), new(rect.Max.x - 2f, cy),
-      active ? LaunchPadTheme.Orange : hovered ? LaunchPadTheme.OrangeBorder : LaunchPadTheme.Border);
+      active ? LaunchPadTheme.Accent : hovered ? LaunchPadTheme.AccentBorder : LaunchPadTheme.Border);
     return SplitterDelta(active, ImGui.GetIO().MouseDelta.y);
   }
 
@@ -697,82 +695,20 @@ public static class ManualLoadWindow
   private static ChangeFlags DrawModListToolbar(ModList modList, bool loaded)
   {
     var changed = DrawModListTools(modList, loaded);
-    changed |= DrawPresetBar(modList, loaded);
+    DrawProfileBar(modList, loaded);
     DrawSearchAndCount(modList, loaded);
     DrawColumnHeader(loaded);
     return changed;
   }
 
-  // Presets: quickly switch between saved enabled/disabled + load-order configurations.
-  // Distinct from Modpack import/export (which packages files for sharing/servers).
-  private static ChangeFlags DrawPresetBar(ModList modList, bool loaded)
+  // Seam for the profile system from PR #139 (saving and switching mod configurations).
+  // This PR intentionally ships no profile/preset backend of its own so it does not
+  // duplicate #139. Once #139 lands, this draws its profile selector (combo plus
+  // Load / Save / Delete) driven by ProfileManager. Kept distinct from Modpack
+  // import/export, which packages files for sharing and dedicated servers.
+  // See docs/pr-c-profiles-notes.md.
+  private static void DrawProfileBar(ModList modList, bool loaded)
   {
-    var changed = ChangeFlags.None;
-    var presets = LaunchPadConfig.ListPresets();
-
-    ImGui.AlignTextToFramePadding();
-    ImGuiHelper.Text("Presets:");
-
-    ImGui.SameLine();
-    ImGui.SetNextItemWidth(170f);
-    if (presets.Count == 0)
-    {
-      ImGui.BeginDisabled(true);
-      var none = 0;
-      ImGui.Combo("##presetsel", ref none, new[] { "(no presets saved)" }, 1);
-      ImGui.EndDisabled();
-    }
-    else
-    {
-      presetIndex = Mathf.Clamp(presetIndex, 0, presets.Count - 1);
-      var arr = presets.ToArray();
-      if (ImGui.Combo("##presetsel", ref presetIndex, arr, arr.Length))
-        presetNameInput = arr[presetIndex];
-    }
-
-    var hasSelection = presets.Count > 0;
-    var selected = hasSelection ? presets[Mathf.Clamp(presetIndex, 0, presets.Count - 1)] : null;
-
-    ImGui.SameLine();
-    ImGui.BeginDisabled(!hasSelection || !LaunchPadConfig.CanImportModList);
-    if (ImGui.Button("Load") && selected != null)
-    {
-      LaunchPadConfig.LoadPreset(selected);
-      changed |= ChangeFlags.Mods;
-    }
-    ImGui.EndDisabled();
-    ImGuiHelper.ItemTooltip(
-      "Instantly restore this preset's enabled state and load order.\nNo files are downloaded or changed.",
-      hoverFlags: ImGuiHoveredFlags.AllowWhenDisabled);
-
-    ImGui.SameLine();
-    ImGui.BeginDisabled(!hasSelection);
-    if (ImGui.Button("Delete") && selected != null)
-    {
-      LaunchPadConfig.DeletePreset(selected);
-      presetIndex = 0;
-    }
-    ImGui.EndDisabled();
-
-    ImGui.SameLine();
-    ImGuiHelper.TextDisabled("|", true);
-    ImGui.SameLine();
-    ImGui.SetNextItemWidth(150f);
-    ImGui.InputTextWithHint("##presetname", "new preset name...", ref presetNameInput, 64);
-
-    ImGui.SameLine();
-    ImGui.BeginDisabled(string.IsNullOrWhiteSpace(presetNameInput));
-    if (ImGui.Button("Save"))
-    {
-      LaunchPadConfig.SavePreset(presetNameInput);
-      var updated = LaunchPadConfig.ListPresets();
-      var idx = updated.FindIndex(p => string.Equals(p, presetNameInput.Trim(), StringComparison.OrdinalIgnoreCase));
-      presetIndex = Mathf.Max(0, idx);
-    }
-    ImGui.EndDisabled();
-    ImGuiHelper.ItemTooltip("Save the current checkbox state + load order as a named preset (overwrites if the name exists).");
-
-    return changed;
   }
 
   // Draws the sort selector and the JSON export/import buttons.
@@ -1048,11 +984,11 @@ public static class ManualLoadWindow
         }
       }
 
-      // Orange accent bar on the selected row (on top of the Selectable's highlight).
+      // Accent bar on the selected row (on top of the Selectable's highlight).
       if (draggingMod == null && mod == selectedInfo)
         ImGui.GetWindowDrawList().AddRectFilled(row.Rect.TL,
           new Vector2(row.Rect.Min.x + 3f, row.Rect.Max.y),
-          ImGui.ColorConvertFloat4ToU32((Vector4)LaunchPadTheme.Orange));
+          ImGui.ColorConvertFloat4ToU32((Vector4)LaunchPadTheme.Accent));
 
       DrawStatusDot(row.Column(1), StatusOf(mod, sev));
 
@@ -1096,8 +1032,8 @@ public static class ManualLoadWindow
     ImGui.EndDisabled();
 
     // Divider line between the Name and Author columns (drag handled above).
-    var dividerColor = authorSplitDrag ? LaunchPadTheme.Orange
-      : splitHover ? LaunchPadTheme.OrangeBorder : LaunchPadTheme.Border;
+    var dividerColor = authorSplitDrag ? LaunchPadTheme.Accent
+      : splitHover ? LaunchPadTheme.AccentBorder : LaunchPadTheme.Border;
     LaunchPadTheme.HLine(new(boundaryX, available.Min.y + 2f), new(boundaryX, available.Max.y - 2f), dividerColor);
 
     if (canReorder && draggingIndex != -1 && hoveringIndex != -1 && draggingIndex != hoveringIndex)
