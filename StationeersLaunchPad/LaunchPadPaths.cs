@@ -17,7 +17,6 @@ public static class LaunchPadPaths
       ? StationSaveUtils.DefaultPath
       : Settings.CurrentData.SavePath;
   public static string ConfigPath => WorkshopMenu.ConfigPath;
-  public static string ModListJsonPath => Path.Join(SavePath, "modlist.json");
 
   public static string ModReposConfigPath => Path.Join(StationSaveUtils.DefaultPath, "modrepos.xml");
   public static string ModReposPath => Path.Join(StationSaveUtils.DefaultPath, "modrepos");

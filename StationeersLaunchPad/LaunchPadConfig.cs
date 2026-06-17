@@ -1,13 +1,14 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Reflection;
 using System.Xml.Serialization;
-using Newtonsoft.Json;
 using Assets.Scripts;
+using Assets.Scripts.Networking.Transports;
 using Assets.Scripts.Serialization;
 using Assets.Scripts.Util;
 using Cysharp.Threading.Tasks;
@@ -430,31 +431,55 @@ public static class LaunchPadConfig
     }
   }
 
-  // Whether importing a mod list is currently allowed (only before mods start loading).
+  // Whether the mod list can still be changed (only before mods start loading).
   public static bool CanImportModList => Stage is LoadStage.Searching or LoadStage.Configuring;
 
-  // Writes the current mod list (names, ids, source, enabled state and load order) to a JSON file.
-  public static string ExportModListJson(string path = null)
+  // Imports an existing StationeersLaunchPad mod package (.zip produced by ExportModPackage /
+  // `slp modpkg`): extracts the bundled mods into the local mod folder and applies the
+  // package's modconfig.xml, then reloads. Fully compatible with existing .zip packages.
+  public static string ImportModPackage(string zippath)
   {
     try
     {
-      if (string.IsNullOrEmpty(path))
-        path = LaunchPadPaths.ModListJsonPath;
-      else
+      if (!CanImportModList)
+        return "packages can only be imported before mods are loaded";
+      if (string.IsNullOrEmpty(zippath) || !File.Exists(zippath))
+        return $"file not found: {zippath}";
+
+      var localBase = SteamTransport.WorkshopType.Mod.GetLocalDirInfo().FullName;
+      ModConfig config = null;
+
+      using (var archive = ZipFile.OpenRead(zippath))
       {
-        if (!Path.IsPathRooted(path))
-          path = Path.Combine(LaunchPadPaths.SavePath, path);
-        if (!path.ToLower().EndsWith(".json"))
-          path += ".json";
+        foreach (var entry in archive.Entries)
+        {
+          if (entry.FullName.EndsWith("/"))
+            continue;
+          if (!entry.FullName.StartsWith("mods/", StringComparison.OrdinalIgnoreCase))
+            continue;
+          var rel = entry.FullName["mods/".Length..].Replace('/', Path.DirectorySeparatorChar);
+          var dest = Path.Combine(localBase, rel);
+          Directory.CreateDirectory(Path.GetDirectoryName(dest));
+          entry.ExtractToFile(dest, overwrite: true);
+        }
+
+        var cfgEntry = archive.GetEntry("modconfig.xml");
+        if (cfgEntry != null)
+        {
+          using var stream = cfgEntry.Open();
+          config = (ModConfig)new XmlSerializer(typeof(ModConfig)).Deserialize(stream);
+        }
       }
 
-      var json = JsonConvert.SerializeObject(modList.ToJsonModel(), Formatting.Indented);
-      File.WriteAllText(path, json);
+      if (config != null)
+      {
+        config.CreateCoreMod();
+        ModConfigUtil.SaveConfig(config);
+      }
 
-      Logger.Global.LogInfo($"Exported mod list to {path}");
-      if (!Platform.IsServer)
-        ProcessUtil.OpenExplorerSelectFile(path);
-      return $"exported {path}";
+      Logger.Global.LogInfo($"Imported mod package {zippath}");
+      ReloadMods();
+      return $"imported {zippath}";
     }
     catch (Exception ex)
     {
@@ -463,53 +488,44 @@ public static class LaunchPadConfig
     }
   }
 
-  // Reads a JSON mod list and applies its enabled state and load order to the installed mods.
-  public static string ImportModListJson(string path = null)
+  // ── Presets: enabled state + load order only (reuses the ModConfig system) ──────
+  public static List<string> ListPresets() => PresetStore.List();
+
+  public static string SavePreset(string name)
   {
-    try
-    {
-      if (!CanImportModList)
-        return "mod list can only be imported before mods are loaded";
+    if (string.IsNullOrWhiteSpace(name))
+      return "preset name required";
+    if (!PresetStore.Save(name, modList.ToModConfig()))
+      return "failed to save preset";
+    Logger.Global.LogInfo($"Saved preset '{name}'");
+    return $"saved preset {name}";
+  }
 
-      if (string.IsNullOrEmpty(path))
-        path = LaunchPadPaths.ModListJsonPath;
-      else if (!Path.IsPathRooted(path))
-        path = Path.Combine(LaunchPadPaths.SavePath, path);
+  public static string LoadPreset(string name)
+  {
+    if (!CanImportModList)
+      return "presets can only be loaded before mods are loaded";
+    var config = PresetStore.Load(name);
+    if (config == null)
+      return $"preset '{name}' not found";
 
-      if (!File.Exists(path))
-      {
-        Logger.Global.LogError($"mod list file not found: {path}");
-        return $"file not found: {path}";
-      }
+    config.CreateCoreMod();
+    modList.ApplyConfig(config);
+    modList.CheckDependencies();
+    modList.DisableDuplicates();
+    if (AutoSort)
+      modList.SortByDeps();
+    ModConfigUtil.SaveConfig(modList.ToModConfig());
+    PreLoadCheck.Run(modList);
 
-      var model = JsonConvert.DeserializeObject<ModListJson>(File.ReadAllText(path));
-      if (model == null)
-      {
-        Logger.Global.LogError($"invalid mod list file: {path}");
-        return "invalid mod list file";
-      }
+    Logger.Global.LogInfo($"Loaded preset '{name}'");
+    return $"loaded preset {name}";
+  }
 
-      var result = modList.ApplyJsonModel(model);
-
-      // Re-run the same validation/persistence the UI does after a manual change.
-      modList.CheckDependencies();
-      modList.DisableDuplicates();
-      if (AutoSort)
-        modList.SortByDeps();
-      ModConfigUtil.SaveConfig(modList.ToModConfig());
-      PreLoadCheck.Run(modList);
-
-      Logger.Global.LogInfo(
-        $"Imported mod list from {path}: {result.Matched} matched, {result.Disabled} disabled, {result.Missing.Count} not installed");
-      foreach (var name in result.Missing)
-        Logger.Global.LogWarning($"- not installed: {name}");
-
-      return $"imported {result.Matched} mods ({result.Missing.Count} not installed)";
-    }
-    catch (Exception ex)
-    {
-      Logger.Global.LogException(ex);
-      return ex.ToString();
-    }
+  public static string DeletePreset(string name)
+  {
+    PresetStore.Delete(name);
+    Logger.Global.LogInfo($"Deleted preset '{name}'");
+    return $"deleted preset {name}";
   }
 }

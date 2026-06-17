@@ -10,10 +10,13 @@ namespace StationeersLaunchPad.UI;
 public class LayoutPrefs
 {
   [XmlElement("ListWidth")]
-  public float ListWidth = 360f;
+  public float ListWidth = 390f;
 
   [XmlElement("ConsoleFraction")]
   public float ConsoleFraction = 0.20f;
+
+  [XmlElement("AuthorWidth")]
+  public float AuthorWidth = 150f;
 
   private static LayoutPrefs current;
   private static string Path => System.IO.Path.Join(LaunchPadPaths.SavePath, "ui_layout.xml");

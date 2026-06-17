@@ -32,6 +32,9 @@ public static class ManualLoadWindow
   private static bool sortDescending = false;
   private static bool sortApplyToLoadOrder = false;
   private static string searchText = "";
+  private static int presetIndex = 0;
+  private static string presetNameInput = "";
+  private static bool authorSplitDrag = false;
   // Redesigned shell: left-sidebar navigation sections + collapsible console.
   private enum NavSection { Mods, Dependencies, Settings, About }
   private static NavSection nav = NavSection.Mods;
@@ -694,8 +697,81 @@ public static class ManualLoadWindow
   private static ChangeFlags DrawModListToolbar(ModList modList, bool loaded)
   {
     var changed = DrawModListTools(modList, loaded);
+    changed |= DrawPresetBar(modList, loaded);
     DrawSearchAndCount(modList, loaded);
     DrawColumnHeader(loaded);
+    return changed;
+  }
+
+  // Presets: quickly switch between saved enabled/disabled + load-order configurations.
+  // Distinct from Modpack import/export (which packages files for sharing/servers).
+  private static ChangeFlags DrawPresetBar(ModList modList, bool loaded)
+  {
+    var changed = ChangeFlags.None;
+    var presets = LaunchPadConfig.ListPresets();
+
+    ImGui.AlignTextToFramePadding();
+    ImGuiHelper.Text("Presets:");
+
+    ImGui.SameLine();
+    ImGui.SetNextItemWidth(170f);
+    if (presets.Count == 0)
+    {
+      ImGui.BeginDisabled(true);
+      var none = 0;
+      ImGui.Combo("##presetsel", ref none, new[] { "(no presets saved)" }, 1);
+      ImGui.EndDisabled();
+    }
+    else
+    {
+      presetIndex = Mathf.Clamp(presetIndex, 0, presets.Count - 1);
+      var arr = presets.ToArray();
+      if (ImGui.Combo("##presetsel", ref presetIndex, arr, arr.Length))
+        presetNameInput = arr[presetIndex];
+    }
+
+    var hasSelection = presets.Count > 0;
+    var selected = hasSelection ? presets[Mathf.Clamp(presetIndex, 0, presets.Count - 1)] : null;
+
+    ImGui.SameLine();
+    ImGui.BeginDisabled(!hasSelection || !LaunchPadConfig.CanImportModList);
+    if (ImGui.Button("Load") && selected != null)
+    {
+      LaunchPadConfig.LoadPreset(selected);
+      changed |= ChangeFlags.Mods;
+    }
+    ImGui.EndDisabled();
+    ImGuiHelper.ItemTooltip(
+      "Instantly restore this preset's enabled state and load order.\nNo files are downloaded or changed.",
+      hoverFlags: ImGuiHoveredFlags.AllowWhenDisabled);
+
+    ImGui.SameLine();
+    ImGui.BeginDisabled(!hasSelection);
+    if (ImGui.Button("Delete") && selected != null)
+    {
+      LaunchPadConfig.DeletePreset(selected);
+      presetIndex = 0;
+    }
+    ImGui.EndDisabled();
+
+    ImGui.SameLine();
+    ImGuiHelper.TextDisabled("|", true);
+    ImGui.SameLine();
+    ImGui.SetNextItemWidth(150f);
+    ImGui.InputTextWithHint("##presetname", "new preset name...", ref presetNameInput, 64);
+
+    ImGui.SameLine();
+    ImGui.BeginDisabled(string.IsNullOrWhiteSpace(presetNameInput));
+    if (ImGui.Button("Save"))
+    {
+      LaunchPadConfig.SavePreset(presetNameInput);
+      var updated = LaunchPadConfig.ListPresets();
+      var idx = updated.FindIndex(p => string.Equals(p, presetNameInput.Trim(), StringComparison.OrdinalIgnoreCase));
+      presetIndex = Mathf.Max(0, idx);
+    }
+    ImGui.EndDisabled();
+    ImGuiHelper.ItemTooltip("Save the current checkbox state + load order as a named preset (overwrites if the name exists).");
+
     return changed;
   }
 
@@ -750,18 +826,19 @@ public static class ManualLoadWindow
     ImGui.SameLine();
     ImGui.BeginDisabled(!LaunchPadConfig.CanImportModList);
     if (ImGui.Button("Import"))
-      FilePicker.OpenLoad("Import Mod List", LaunchPadPaths.SavePath, ".json",
-        path => LaunchPadConfig.ImportModListJson(path));
+      FilePicker.OpenLoad("Import Mod Package", LaunchPadPaths.SavePath, ".zip",
+        path => LaunchPadConfig.ImportModPackage(path));
     ImGui.EndDisabled();
     ImGuiHelper.ItemTooltip(
-      "Load a mod list (.json) and apply its enabled state and order.",
+      "Import a complete mod package (.zip): installs the bundled mods and applies its config.\n" +
+      "For sharing full setups and dedicated servers. Use Presets to switch your own configs.",
       hoverFlags: ImGuiHoveredFlags.AllowWhenDisabled);
 
     ImGui.SameLine();
     if (ImGui.Button("Export"))
-      FilePicker.OpenSave("Export Mod List", LaunchPadPaths.SavePath, "modlist.json", ".json",
-        path => LaunchPadConfig.ExportModListJson(path));
-    ImGuiHelper.ItemTooltip("Save the current mod list (state + order) as JSON.");
+      FilePicker.OpenSave("Export Mod Package", LaunchPadPaths.SavePath, "modpack.zip", ".zip",
+        path => LaunchPadConfig.ExportModPackage(path));
+    ImGuiHelper.ItemTooltip("Package the enabled mods (files + config) into a .zip for sharing or dedicated servers.");
 
     return changed;
   }
@@ -914,6 +991,32 @@ public static class ManualLoadWindow
     );
 
     var sev = BuildSeverity();
+
+    // Independently resizable author column (persisted). Handled manually before the rows so
+    // the divider takes click priority over the row selectables (which start a reorder drag).
+    var maxAuthor = Mathf.Max(140f, available.Size.x - 160f);
+    var authorWidth = Mathf.Clamp(LayoutPrefs.Current.AuthorWidth, 80f, maxAuthor);
+    var boundaryX = available.Max.x - authorWidth;
+    var splitRect = new Rect(new(boundaryX - 4f, available.Min.y), new(boundaryX + 4f, available.Max.y));
+    var splitHover = ImGui.IsMouseHoveringRect(splitRect.Min, splitRect.Max);
+
+    if (splitHover && ImGui.IsMouseClicked(ImGuiMouseButton.Left))
+      authorSplitDrag = true;
+    if (authorSplitDrag)
+    {
+      ImGui.SetMouseCursor(ImGuiMouseCursor.ResizeEW);
+      authorWidth = Mathf.Clamp(authorWidth - ImGui.GetIO().MouseDelta.x, 80f, maxAuthor);
+      LayoutPrefs.Current.AuthorWidth = authorWidth;
+      boundaryX = available.Max.x - authorWidth;
+      if (!ImGui.IsMouseDown(ImGuiMouseButton.Left))
+      {
+        authorSplitDrag = false;
+        LayoutPrefs.Save();
+      }
+    }
+    else if (splitHover)
+      ImGui.SetMouseCursor(ImGuiMouseCursor.ResizeEW);
+
     ImGui.BeginDisabled(!edit);
 
     var idx = 0;
@@ -937,7 +1040,8 @@ public static class ManualLoadWindow
       if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenBlockedByActiveItem))
       {
         hoveringIndex = idx;
-        if (ImGui.IsMouseClicked(ImGuiMouseButton.Left) && draggingMod == null)
+        if (ImGui.IsMouseClicked(ImGuiMouseButton.Left) && draggingMod == null
+            && !splitHover && !authorSplitDrag)
         {
           draggingIndex = idx;
           draggingMod = mod;
@@ -954,7 +1058,6 @@ public static class ManualLoadWindow
 
       // Name and author each get their own clipped column (no overlap).
       var nameCol = row.Column(2);
-      const float authorWidth = 118f;
       var nameRight = Mathf.Max(nameCol.Min.x + 20f, nameCol.Max.x - authorWidth - 8f);
       var nameRect = new Rect(nameCol.Min, new Vector2(nameRight, nameCol.Max.y));
       var authorRect = new Rect(new Vector2(nameRight + 8f, nameCol.Min.y), nameCol.Max);
@@ -991,6 +1094,11 @@ public static class ManualLoadWindow
     }
 
     ImGui.EndDisabled();
+
+    // Divider line between the Name and Author columns (drag handled above).
+    var dividerColor = authorSplitDrag ? LaunchPadTheme.Orange
+      : splitHover ? LaunchPadTheme.OrangeBorder : LaunchPadTheme.Border;
+    LaunchPadTheme.HLine(new(boundaryX, available.Min.y + 2f), new(boundaryX, available.Max.y - 2f), dividerColor);
 
     if (canReorder && draggingIndex != -1 && hoveringIndex != -1 && draggingIndex != hoveringIndex)
     {

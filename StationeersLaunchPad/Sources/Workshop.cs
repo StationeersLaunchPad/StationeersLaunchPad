@@ -1,4 +1,5 @@
 
+using System;
 using System.Collections.Generic;
 using System.IO;
 using Assets.Scripts.Networking.Transports;
@@ -19,7 +20,20 @@ public class WorkshopModSource : ModSource
     if (state.SteamDisabled)
       return mods;
 
-    var items = await Steam.LoadWorkshopItems();
+    List<Item> items;
+    try
+    {
+      items = await Steam.LoadWorkshopItems();
+    }
+    catch (Exception ex)
+    {
+      // Never let a Steam Workshop failure abort the whole mod listing: local and repo
+      // mods (and the game) can still load without the Workshop ones.
+      Logger.Global.LogError("Failed to list Steam Workshop mods; they will be skipped.");
+      Logger.Global.LogError("This is usually a Steam issue - try restarting Steam and the game.");
+      Logger.Global.LogException(ex);
+      return mods;
+    }
 
     foreach (var item in items)
     {
