@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
@@ -7,6 +8,7 @@ using System.Linq;
 using System.Reflection;
 using System.Xml.Serialization;
 using Assets.Scripts;
+using Assets.Scripts.Networking.Transports;
 using Assets.Scripts.Serialization;
 using Assets.Scripts.Util;
 using Cysharp.Threading.Tasks;
@@ -97,6 +99,7 @@ public static class LaunchPadConfig
     }
 
     AlertPopup.Draw();
+    FilePicker.Draw();
   }
 
   public static async void Run()
@@ -257,6 +260,20 @@ public static class LaunchPadConfig
       if (depNotice && Platform.PauseOnDepNotice)
         StopAutoLoad();
 
+      // Statically scan mod assemblies for game-API mismatches (off the main thread).
+      var modSnapshot = modList.AllMods.ToList();
+      await UniTask.SwitchToThreadPool();
+      ModCompatScanner.ScanAll(modSnapshot);
+      await UniTask.SwitchToMainThread();
+
+      PreLoadCheck.Run(modList);
+
+      if (Platform.PauseOnDepNotice && PreLoadCheck.Current.Issues.Any(i => i.Category == "Incompatible"))
+      {
+        Logger.Global.LogWarning("Incompatible mods detected - pausing auto-load");
+        StopAutoLoad();
+      }
+
       Logger.Global.LogInfo("Mod Config Initialized");
     }
     catch (Exception ex)
@@ -309,6 +326,9 @@ public static class LaunchPadConfig
     if (Stage != LoadStage.Failed)
       Stage = LoadStage.Loaded;
 
+    // Remember which mods failed to load so the next launch can warn about them.
+    PreLoadCheck.SaveLoadResults();
+
     await SLPCommand.MoveToStage(CommandStage.ModsLoaded);
 
     CurWait = new(Configs.AutoLoadWaitTime.Value, AutoLoad);
@@ -334,6 +354,7 @@ public static class LaunchPadConfig
       if (AutoSort)
         modList.SortByDeps();
       ModConfigUtil.SaveConfig(modList.ToModConfig());
+      PreLoadCheck.Run(modList);
     }
     var next = changed.HasFlag(ManualLoadWindow.ChangeFlags.NextStep);
     if (next)
@@ -409,4 +430,66 @@ public static class LaunchPadConfig
       return ex.ToString();
     }
   }
+
+  // Whether the mod list can still be changed (only before mods start loading).
+  public static bool CanImportModList => Stage is LoadStage.Searching or LoadStage.Configuring;
+
+  // Imports an existing StationeersLaunchPad mod package (.zip produced by ExportModPackage /
+  // `slp modpkg`): extracts the bundled mods into the local mod folder and applies the
+  // package's modconfig.xml, then reloads. Fully compatible with existing .zip packages.
+  public static string ImportModPackage(string zippath)
+  {
+    try
+    {
+      if (!CanImportModList)
+        return "packages can only be imported before mods are loaded";
+      if (string.IsNullOrEmpty(zippath) || !File.Exists(zippath))
+        return $"file not found: {zippath}";
+
+      var localBase = SteamTransport.WorkshopType.Mod.GetLocalDirInfo().FullName;
+      ModConfig config = null;
+
+      using (var archive = ZipFile.OpenRead(zippath))
+      {
+        foreach (var entry in archive.Entries)
+        {
+          if (entry.FullName.EndsWith("/"))
+            continue;
+          if (!entry.FullName.StartsWith("mods/", StringComparison.OrdinalIgnoreCase))
+            continue;
+          var rel = entry.FullName["mods/".Length..].Replace('/', Path.DirectorySeparatorChar);
+          var dest = Path.Combine(localBase, rel);
+          Directory.CreateDirectory(Path.GetDirectoryName(dest));
+          entry.ExtractToFile(dest, overwrite: true);
+        }
+
+        var cfgEntry = archive.GetEntry("modconfig.xml");
+        if (cfgEntry != null)
+        {
+          using var stream = cfgEntry.Open();
+          config = (ModConfig)new XmlSerializer(typeof(ModConfig)).Deserialize(stream);
+        }
+      }
+
+      if (config != null)
+      {
+        config.CreateCoreMod();
+        ModConfigUtil.SaveConfig(config);
+      }
+
+      Logger.Global.LogInfo($"Imported mod package {zippath}");
+      ReloadMods();
+      return $"imported {zippath}";
+    }
+    catch (Exception ex)
+    {
+      Logger.Global.LogException(ex);
+      return ex.ToString();
+    }
+  }
+
+  // Profiles (saving and switching mod configurations) are provided by PR #139.
+  // The redesigned toolbar exposes a seam (ManualLoadWindow.DrawProfileBar) that will
+  // call #139's ProfileManager once it lands. This PR does not ship its own profile or
+  // preset backend, to avoid duplicating #139. See docs/pr-c-profiles-notes.md.
 }

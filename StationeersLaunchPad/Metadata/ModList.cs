@@ -212,6 +212,37 @@ public class ModList
     return disabledMods.Count > 0;
   }
 
+  // Enables any installed-but-disabled mods that an enabled mod depends on, following
+  // dependency chains transitively. Returns the number of mods that were enabled.
+  public int EnableDisabledDependencies()
+  {
+    var count = 0;
+    var changed = true;
+    while (changed)
+    {
+      changed = false;
+      foreach (var mod in mods)
+      {
+        if (!mod.Enabled || mod.Source == ModSourceType.Core)
+          continue;
+        foreach (var dep in mod.About?.DependsOn ?? [])
+        {
+          if (!dep.IsValid)
+            continue;
+          if (mods.Any(m => m != mod && m.Enabled && m.Satisfies(dep)))
+            continue;
+          var provider = mods.FirstOrDefault(m => m != mod && !m.Enabled && m.Satisfies(dep));
+          if (provider == null)
+            continue;
+          provider.Enabled = true;
+          count++;
+          changed = true;
+        }
+      }
+    }
+    return count;
+  }
+
   // returns true if all dependencies of enabled mods are satisfied
   public bool CheckDependencies()
   {
@@ -310,6 +341,70 @@ public class ModList
 
     mods = newOrder;
     return true;
+  }
+
+  // Fields by which the mod list can be sorted in the loader UI.
+  public enum ModSortField { LoadOrder, Name, Author, Released, Updated }
+
+  public static IComparer<ModInfo> GetComparer(ModSortField field, bool descending)
+  {
+    Comparison<ModInfo> cmp = field switch
+    {
+      ModSortField.Name => (a, b) =>
+        string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase),
+      ModSortField.Author => (a, b) =>
+      {
+        var r = string.Compare(a.Author, b.Author, StringComparison.OrdinalIgnoreCase);
+        return r != 0 ? r : string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
+      },
+      ModSortField.Released => (a, b) =>
+      {
+        var r = Nullable.Compare(a.Released, b.Released);
+        return r != 0 ? r : string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
+      },
+      ModSortField.Updated => (a, b) =>
+      {
+        var r = Nullable.Compare(a.Updated, b.Updated);
+        return r != 0 ? r : string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
+      },
+      _ => (a, b) => 0,
+    };
+    return Comparer<ModInfo>.Create(descending ? (a, b) => cmp(b, a) : cmp);
+  }
+
+  // Returns the mods sorted for display, without touching the underlying load order.
+  public List<ModInfo> Sorted(ModSortField field, bool descending)
+  {
+    var list = new List<ModInfo>(mods);
+    if (field != ModSortField.LoadOrder)
+      list.Sort(GetComparer(field, descending));
+    return list;
+  }
+
+  // Rewrites the actual load order to match the given sort. Returns true if anything moved.
+  public bool ApplySort(ModSortField field, bool descending)
+  {
+    if (field == ModSortField.LoadOrder)
+      return false;
+    return SetOrder(Sorted(field, descending));
+  }
+
+  // Replaces the load order with the given permutation of the current mods.
+  // Returns true only when the order actually changed.
+  public bool SetOrder(List<ModInfo> ordered)
+  {
+    if (ordered == null || ordered.Count != mods.Count)
+      return false;
+    var changed = false;
+    for (var i = 0; i < mods.Count; i++)
+      if (!ReferenceEquals(mods[i], ordered[i]))
+      {
+        changed = true;
+        break;
+      }
+    if (changed)
+      mods = ordered;
+    return changed;
   }
 
   private static string NormalizePath(string path) =>

@@ -69,12 +69,22 @@ public static class Steam
   // Helper to fetch a single workshop page
   private static async UniTask<Item[]> FetchWorkshopPage(int page)
   {
-    var query = Query.Items.WithTag("Mod");
-    using var result = await query.AllowCachedResponse(0).WhereUserSubscribed().GetPageAsync(page);
+    try
+    {
+      var query = Query.Items.WithTag("Mod");
+      using var result = await query.AllowCachedResponse(0).WhereUserSubscribed().GetPageAsync(page);
 
-    return !result.HasValue || result.Value.ResultCount == 0
-      ? []
-      : [.. result.Value.Entries.Where(item => item.Result != Result.FileNotFound)];
+      return !result.HasValue || result.Value.ResultCount == 0
+        ? []
+        : [.. result.Value.Entries.Where(item => item.Result != Result.FileNotFound)];
+    }
+    catch (Exception ex)
+    {
+      // A Steamworks hiccup while enumerating a page (e.g. an internal NullReference in
+      // Helpers.TakeMemory when Steam isn't fully ready) must not abort all mod loading.
+      Logger.Global.LogWarning($"failed to fetch workshop page {page}: {ex.Message}");
+      return [];
+    }
   }
 
   public static (bool, string) ValidateForWorkshop(ModInfo mod)
