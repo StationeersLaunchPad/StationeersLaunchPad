@@ -74,4 +74,7 @@ public class NewsAction
 
   [XmlAttribute("modid")]
   public string ModId;
+
+  [XmlAttribute("workshop_id")]
+  public string WorkshopId;
 }

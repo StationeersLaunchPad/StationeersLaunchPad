@@ -21,10 +21,13 @@ public static class NewsMatcher
 
     var dismissedSet = dismissed ?? new HashSet<string>(StringComparer.Ordinal);
     var installedRepoModIDs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    var installedWorkshopIds = new HashSet<ulong>();
     foreach (var mod in modList.EnabledMods)
     {
       if (mod.Source == ModSourceType.Repo && !string.IsNullOrEmpty(mod.ModID))
         installedRepoModIDs.Add(mod.ModID);
+      if (mod.WorkshopHandle > 1)
+        installedWorkshopIds.Add(mod.WorkshopHandle);
     }
 
     var targetCache = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
@@ -47,23 +50,33 @@ public static class NewsMatcher
         continue;
       }
 
-      if (NeedsAlreadyMigratedCheck(entry.Type) && entry.Actions?.Primary?.Action == "repo_mod_install")
+      if (NeedsAlreadyMigratedCheck(entry.Type) && entry.Actions?.Primary != null)
       {
         var primary = entry.Actions.Primary;
-        bool hasReplacement;
-        if (!string.IsNullOrEmpty(primary.ModId))
+        bool hasReplacement = false;
+        if (primary.Action == "repo_mod_install")
         {
-          hasReplacement = installedRepoModIDs.Contains(primary.ModId);
-        }
-        else
-        {
-          var url = primary.Url ?? "";
-          if (!targetCache.TryGetValue(url, out var targets))
+          if (!string.IsNullOrEmpty(primary.ModId))
           {
-            targets = await ResolveTargetModIDs(url);
-            targetCache[url] = targets;
+            hasReplacement = installedRepoModIDs.Contains(primary.ModId);
           }
-          hasReplacement = targets.Any(id => installedRepoModIDs.Contains(id));
+          else
+          {
+            var url = primary.Url ?? "";
+            if (!targetCache.TryGetValue(url, out var targets))
+            {
+              targets = await ResolveTargetModIDs(url);
+              targetCache[url] = targets;
+            }
+            hasReplacement = targets.Any(id => installedRepoModIDs.Contains(id));
+          }
+        }
+        else if (primary.Action == "workshop_mod_install")
+        {
+          if (ulong.TryParse(primary.WorkshopId, out var targetWid) && targetWid > 1)
+          {
+            hasReplacement = installedWorkshopIds.Contains(targetWid);
+          }
         }
         if (hasReplacement)
         {

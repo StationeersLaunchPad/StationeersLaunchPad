@@ -281,6 +281,14 @@ public static class NewsPopup
       return;
     }
 
+    if (action.Action == "workshop_mod_install")
+    {
+      isActionBusy = true;
+      actionStatus = null;
+      _ = DoWorkshopModInstall(entry, action, handledIndexIfDone);
+      return;
+    }
+
     if (action.Action == "acknowledge" || action.Action == "dismiss" || string.IsNullOrEmpty(action.Action))
     {
       // just close the notice and do nothing else. Default for info type notices.
@@ -308,6 +316,35 @@ public static class NewsPopup
       else
       {
         actionStatus = "Migration install failed. Check log.";
+        isActionBusy = false;
+      }
+    }
+    catch (Exception ex)
+    {
+      Logger.Global.LogException(ex);
+      actionStatus = "Install failed. See log.";
+      isActionBusy = false;
+    }
+  }
+
+  private static async UniTask DoWorkshopModInstall(NewsEntry entry, NewsAction action, int index)
+  {
+    actionStatus = null;
+    try
+    {
+      ulong? oldWid = null;
+      if (ulong.TryParse(entry?.Trigger?.WorkshopId, out var t) && t > 1)
+        oldWid = t;
+
+      bool ok = await NewsRunner.ExecuteWorkshopModInstall(action?.WorkshopId, oldWid);
+      if (ok)
+      {
+        if (index >= 0)
+          HandleHandled(index, persist: false);
+      }
+      else
+      {
+        actionStatus = "Workshop migration failed. Check log.";
         isActionBusy = false;
       }
     }
