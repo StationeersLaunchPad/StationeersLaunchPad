@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Cysharp.Threading.Tasks;
+using StationeersLaunchPad;
+using StationeersLaunchPad.Metadata;
 using StationeersLaunchPad.Repos;
 using UnityEngine;
 
@@ -8,6 +11,30 @@ namespace StationeersLaunchPad.News;
 
 public static class NewsRunner
 {
+  /// <summary>
+  /// Fetches the remote news feed (if configured) and returns the notices that match
+  /// the currently enabled mods (after dismissals and "already migrated" checks).
+  /// This is the main entrypoint for the news system to obtain relevant notices.
+  /// </summary>
+  public static async UniTask<List<NewsEntry>> GetActiveNotices(ModList currentModList)
+  {
+    var url = Configs.EffectiveNewsFeedUrl;
+    if (string.IsNullOrWhiteSpace(url)) return [];
+
+    var feed = await NewsFetcher.Fetch(url);
+    if (feed == null)
+    {
+      Logger.Global.LogDebug("News: no feed or fetch failed");
+      return [];
+    }
+
+    Logger.Global.LogDebug($"News: feed has {feed.Entries?.Count ?? 0} entries");
+
+    var dismissed = NewsDismissal.LoadDismissed();
+    var matches = await NewsMatcher.Match(feed, currentModList, dismissed);
+    return matches;
+  }
+
   public static async UniTask ExecutePrimaryAction(NewsEntry entry)
   {
     var act = entry?.Actions?.Primary;
@@ -111,8 +138,6 @@ public static class NewsRunner
         config.Mods.Add(def);
 
       ModRepos.SaveConfig(config);
-
-      LaunchPadConfig.InvalidateCachedSearchData();
 
       Logger.Global.LogInfo($"news: repo mod migration installed {modID} from {targetRepo.ID}");
       return true;
