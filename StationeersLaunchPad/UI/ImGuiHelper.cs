@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace StationeersLaunchPad.UI;
 
-public static class ImGuiHelper
+public static partial class ImGuiHelper
 {
   [MethodImpl(MethodImplOptions.AggressiveInlining)]
   public static void Text(string text)
@@ -71,6 +71,7 @@ public static class ImGuiHelper
   {
     ImGui.TextWrapped(text);
   }
+
 
   [MethodImpl(MethodImplOptions.AggressiveInlining)]
   public static void TextDisabled(string text, bool disabled = true)
