@@ -16,6 +16,7 @@ using StationeersLaunchPad.Metadata;
 using StationeersLaunchPad.Repos;
 using StationeersLaunchPad.Sources;
 using StationeersLaunchPad.UI;
+using StationeersLaunchPad.News;
 using StationeersLaunchPad.Update;
 using Steamworks;
 
@@ -25,6 +26,7 @@ public enum LoadStage
 {
   Updating,
   Initializing,
+  News,
   Searching,
   Configuring,
   Loading,
@@ -56,6 +58,15 @@ public static class LaunchPadConfig
   public static SplashBehaviour SplashBehaviour;
 
   private static ModList modList = ModList.NewEmpty();
+
+  private static ModList cachedNewsModList;
+  private static ModReposConfig cachedNewsModRepos;
+
+  public static void InvalidateCachedSearchData()
+  {
+    cachedNewsModList = null;
+    cachedNewsModRepos = null;
+  }
 
   private static LoadStage Stage = LoadStage.Initializing;
   public static bool ModsLoaded => Stage > LoadStage.Configuring;
@@ -97,6 +108,7 @@ public static class LaunchPadConfig
     }
 
     AlertPopup.Draw();
+    NewsPopup.Draw();
   }
 
   public static async void Run()
@@ -115,6 +127,7 @@ public static class LaunchPadConfig
 
     await StageInitializing();
     await StageUpdating();
+    await StageNews();
 
     var firstLoad = true;
     do
@@ -216,6 +229,65 @@ public static class LaunchPadConfig
       StopAutoLoad();
   }
 
+  private static async UniTask StageNews()
+  {
+    if (Stage == LoadStage.Failed) return;
+    if (Platform.IsServer || !Configs.NewsCheckOnStart.Value) return;
+
+    var url = Configs.EffectiveNewsFeedUrl;
+    if (string.IsNullOrWhiteSpace(url)) return;
+
+    Stage = LoadStage.News;
+    try
+    {
+      Logger.Global.LogInfo("Loading Mod Repos (news)");
+      var modRepos = ModRepos.Current = await ModRepos.LoadConfig();
+
+      Logger.Global.LogInfo("Listing Mods (news)");
+      var defs = await ModSource.ListAll(new()
+      {
+        Repos = modRepos,
+        SteamDisabled = SteamDisabled,
+      });
+      var ml = ModList.FromDefs(defs);
+
+      Logger.Global.LogInfo("Loading Mod Config (news)");
+      var modConfig = ModConfigUtil.LoadConfig();
+      ModRepos.UpdateModPaths(modRepos, modConfig);
+      ml.ApplyConfig(modConfig);
+
+      cachedNewsModRepos = modRepos;
+      cachedNewsModList = ml;
+      modList = ml;
+
+      var feed = await NewsFetcher.Fetch(url);
+      if (feed == null)
+      {
+        Logger.Global.LogDebug("News: no feed or fetch failed");
+        return;
+      }
+
+      Logger.Global.LogDebug($"News: feed has {feed.Entries?.Count ?? 0} entries");
+
+      var dismissed = NewsDismissal.LoadDismissed();
+      var matches = await NewsMatcher.Match(feed, ml, dismissed);
+      if (matches.Count > 0)
+      {
+        Logger.Global.LogInfo($"Displaying {matches.Count} notice(s)");
+        await NewsPopup.Run(matches);
+      }
+      else
+      {
+        Logger.Global.LogDebug("News: no notices matched current enabled mods / dismissed / already-migrated");
+      }
+    }
+    catch (Exception ex)
+    {
+      Logger.Global.LogError("Error in news notices stage (startup will continue)");
+      Logger.Global.LogException(ex);
+    }
+  }
+
   private static async UniTask StageSearching(bool firstLoad)
   {
     if (Stage == LoadStage.Failed) return;
@@ -223,25 +295,37 @@ public static class LaunchPadConfig
     try
     {
       Logger.Global.LogInfo("Loading Mod Repos");
-      var modRepos = ModRepos.Current = await ModRepos.LoadConfig();
-      if (firstLoad && Configs.RepoCheckUpdates.Value)
-        await ModRepos.UpdateRepos(modRepos);
-      ModRepos.SaveConfig(modRepos);
-      if (firstLoad && Configs.RepoModCheckUpdates.Value)
+      ModReposConfig modRepos;
+      if (cachedNewsModRepos != null && cachedNewsModList != null)
       {
-        var updates = ModRepos.GetModUpdateTargets(modRepos);
-        // TODO: prompt user when auto-update not enabled
-        if (updates.Count > 0)
-          await ModRepos.UpdateMods(modRepos, updates);
-        ModRepos.SaveConfig(modRepos);
+        modRepos = ModRepos.Current = cachedNewsModRepos;
+        modList = cachedNewsModList;
+        cachedNewsModRepos = null;
+        cachedNewsModList = null;
+        Logger.Global.LogDebug("Using cached mod list from news stage");
       }
-
-      Logger.Global.LogInfo("Listing Mods");
-      modList = ModList.FromDefs(await ModSource.ListAll(new()
+      else
       {
-        Repos = modRepos,
-        SteamDisabled = SteamDisabled,
-      }));
+        modRepos = ModRepos.Current = await ModRepos.LoadConfig();
+        if (firstLoad && Configs.RepoCheckUpdates.Value)
+          await ModRepos.UpdateRepos(modRepos);
+        ModRepos.SaveConfig(modRepos);
+        if (firstLoad && Configs.RepoModCheckUpdates.Value)
+        {
+          var updates = ModRepos.GetModUpdateTargets(modRepos);
+          // TODO: prompt user when auto-update not enabled
+          if (updates.Count > 0)
+            await ModRepos.UpdateMods(modRepos, updates);
+          ModRepos.SaveConfig(modRepos);
+        }
+
+        Logger.Global.LogInfo("Listing Mods");
+        modList = ModList.FromDefs(await ModSource.ListAll(new()
+        {
+          Repos = modRepos,
+          SteamDisabled = SteamDisabled,
+        }));
+      }
 
       Logger.Global.LogInfo("Loading Mod Config");
       var modConfig = ModConfigUtil.LoadConfig();

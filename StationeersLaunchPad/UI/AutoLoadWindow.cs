@@ -22,6 +22,7 @@ public class AutoLoadWindow
       {
         LoadStage.Updating => "Checking for Update",
         LoadStage.Initializing => "Initializing",
+        LoadStage.News => "Checking notices",
         LoadStage.Searching => "Finding Mods",
         LoadStage.Configuring => $"Loading Mods in {wait.SecondsRemaining:0.0}s",
         LoadStage.Loading => "Loading Mods",
@@ -38,7 +39,7 @@ public class AutoLoadWindow
       else
         ImGuiHelper.Text("");
 
-      if (ImGui.IsWindowHovered())
+      if (ImGui.IsWindowHovered() && stage != LoadStage.News)
       {
         ImGuiHelper.TextTooltip("Click to pause loading.");
         if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
