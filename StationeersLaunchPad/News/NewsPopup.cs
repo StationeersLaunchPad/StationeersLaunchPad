@@ -65,6 +65,14 @@ public static class NewsPopup
       return;
     }
 
+    // For pure-info notices (1 or many), start the auto-ack timer immediately
+    // so they don't block (forever). Show detail view (with countdown) instead of list.
+    if (detailIndex < 0 && !showConfirm && activeEntries.All(e => e.Type == "info"))
+    {
+      detailIndex = 0;
+      StartInfoTimerIfInfo(activeEntries[0]);
+    }
+
     bool useList = activeEntries.Count > 1 && detailIndex < 0 && !showConfirm;
 
     var screen = ImGuiHelper.ScreenRect();
@@ -236,7 +244,7 @@ public static class NewsPopup
         showConfirm = true;
       }
 
-      if (activeEntries.Count > 1)
+      if (activeEntries.Count > 1 && !activeEntries.All(e => e.Type == "info"))
       {
         ImGui.SameLine();
         if (ImGui.Button("Back to list", new Vector2(140, btnH)))
