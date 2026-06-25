@@ -21,6 +21,9 @@ public static partial class ImGuiHelper
     var current       = RenderState.Default();
     bool needSameLine = false;
 
+    // Tighter line spacing for news/richtext than default ItemSpacing.y (adjust the 2f here if needed)
+    ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(ImGui.GetStyle().ItemSpacing.x, 2f));
+
     foreach (var token in tokens)
     {
       switch (token.Kind)
@@ -43,20 +46,24 @@ public static partial class ImGuiHelper
           break;
 
         case TokenKind.Newline:
-          ImGui.NewLine();
-          needSameLine = false;
+          if (needSameLine)
+            needSameLine = false;
+          else
+            ImGui.NewLine();
           break;
 
         case TokenKind.BulletItem:
-          if (needSameLine) { ImGui.NewLine(); needSameLine = false; }
+          if (needSameLine)
+            needSameLine = false;
           ImGui.Bullet();
           ImGui.SameLine(0, 4);
           RenderChunk(token.Value, current, ref needSameLine);
-          ImGui.NewLine();
           needSameLine = false;
           break;
       }
     }
+
+    ImGui.PopStyleVar();
   }
 
   private enum TokenKind { Text, Newline, OpenTag, CloseTag, BulletItem }

@@ -19,6 +19,10 @@ public static class NewsPopup
   private static string actionStatus;
   private static bool isActionBusy;
 
+  private static bool actionCompleted;
+  private static bool actionSucceeded;
+  private static string actionResultMessage;
+
   public static bool IsVisible => visible;
 
   public static async UniTask Run(List<NewsEntry> entries)
@@ -35,6 +39,9 @@ public static class NewsPopup
     infoTimerStart = null;
     actionStatus = null;
     isActionBusy = false;
+    actionCompleted = false;
+    actionSucceeded = false;
+    actionResultMessage = null;
 
     visible = true;
     while (visible)
@@ -62,7 +69,7 @@ public static class NewsPopup
 
     var screen = ImGuiHelper.ScreenRect();
     var w = screen.Size.x * 0.58f;
-    var maxH = screen.Size.y * 0.8f;
+    var maxH = screen.Size.y * 0.9f;
 
     var size = new Vector2(w, 0);  // height 0 = size to content 
     ImGui.SetNextWindowSize(size);
@@ -70,7 +77,7 @@ public static class NewsPopup
     ImGui.SetNextWindowFocus();
 
     ImGui.SetNextWindowSizeConstraints(
-        new Vector2(500, 350),
+        new Vector2(500, 500),
         new Vector2(w, maxH));
 
     var flags = ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoSavedSettings;
@@ -107,7 +114,7 @@ public static class NewsPopup
 
   private static void DrawListView()
   {
-    ImGuiHelper.Text("Multiple notices require attention. Select one to view details.");
+    ImGuiHelper.Text("Something requires your attention. Click a notice to view details.");
     ImGui.Separator();
 
     ImGui.Dummy(new Vector2(0, 15)); // top breathing
@@ -124,6 +131,11 @@ public static class NewsPopup
       {
         detailIndex = i;
         StartInfoTimerIfInfo(e);
+        actionCompleted = false;
+        actionSucceeded = false;
+        actionResultMessage = null;
+        actionStatus = null;
+        isActionBusy = false;
       }
       ImGui.PopStyleColor();
       if (ImGui.IsItemHovered())
@@ -132,7 +144,7 @@ public static class NewsPopup
 
     ImGui.EndChild();
     ImGui.Separator();
-    ImGuiHelper.TextDisabled("You must view and handle all notices before the game can continue loading.");
+    ImGuiHelper.TextDisabled("You must view and handle all notices before the game can continue loading. Click one to get started.");
   }
 
   private static void DrawDetailView()
@@ -145,64 +157,111 @@ public static class NewsPopup
     var color = GetSeverityColor(entry.Severity);
     ImGuiHelper.TextColored($"{SeverityBadge(entry.Severity)}  {entry.Heading}", color);
     ImGui.Separator();
+
+    float lineH = ImGui.GetFrameHeightWithSpacing();
+    float bodyH = lineH * 20f;
+    float hintReserve = lineH * 1.8f;
+
+    ImGui.BeginChild("##newsbody", new Vector2(0, bodyH), false, ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse);
+
+    bool needsScroll = false;
+    ImGui.BeginChild("##newsdesc", new Vector2(0, bodyH - hintReserve));
+    ImGui.PushTextWrapPos(0);
     ImGuiHelper.TextPretty(entry.LongDescription ?? entry.ShortDescription ?? "");
-    ImGui.Dummy(new Vector2(0, 20)); // extra breathing room after text
+    needsScroll = ImGui.GetScrollMaxY() > 0.1f;
+    ImGui.PopTextWrapPos();
+    ImGui.EndChild();
+
+    if (needsScroll)
+    {
+      ImGui.Dummy(new Vector2(0, 2));
+      ImGuiHelper.TextColored("...scroll to continue reading...", ImGuiHelper.Green);
+    }
+
+    ImGui.EndChild();
 
     ImGui.Separator();
 
-    bool canAct = !isActionBusy;
-
-    var avail = ImGui.GetContentRegionAvail().x;
-    var btnH = 36f;
-    var spacing = ImGui.GetStyle().ItemSpacing.x;
-
-    if (entry.Actions?.Primary != null)
+    if (actionCompleted)
     {
-      var pw = Mathf.Min(260f, avail * 0.38f);
-      if (ImGui.Button(entry.Actions.Primary.Label ?? "Continue", new Vector2(pw, btnH)) && canAct)
-        OnAction(entry, entry.Actions.Primary, detailIndex);
-      ImGui.SameLine();
-      avail -= pw + spacing;
-    }
+      // Post-action result view: big colored indicator + only a Close button
+      var resultColor = actionSucceeded ? ImGuiHelper.Green : ImGuiHelper.Red;
+      string icon = actionSucceeded ? "OK: " : "FAIL: ";
+      string msg = string.IsNullOrEmpty(actionResultMessage)
+        ? (actionSucceeded ? "Migration succeeded!" : "Migration failed. Check log.")
+        : actionResultMessage;
 
-    if (entry.Actions?.Secondary != null)
-    {
-      var sw = Mathf.Min(180f, avail * 0.32f);
-      if (ImGui.Button(entry.Actions.Secondary.Label ?? "Details", new Vector2(sw, btnH)) && canAct)
+      ImGui.Dummy(new Vector2(0, 2));
+      ImGuiHelper.TextColored(icon + msg, resultColor);
+      ImGui.Dummy(new Vector2(0, 6));
+
+      if (ImGui.Button("Close", new Vector2(140, 36)))
       {
-        _ = NewsRunner.ExecuteSecondaryAction(entry);
-      }
-      ImGui.SameLine();
-      avail -= sw + spacing;
-    }
-
-    var iw = Mathf.Min(120f, avail * 0.25f);
-    if (ImGui.Button("Ignore", new Vector2(iw, btnH)) && canAct)
-    {
-      confirmIndex = detailIndex;
-      showConfirm = true;
-    }
-
-    if (activeEntries.Count > 1)
-    {
-      ImGui.SameLine();
-      if (ImGui.Button("Back to list", new Vector2(140, btnH)))
-      {
-        detailIndex = -1;
-        infoTimerStart = null;
+        if (detailIndex >= 0 && detailIndex < activeEntries.Count)
+          HandleHandled(detailIndex, persist: false);
       }
     }
-
-    if (isActionBusy)
+    else
     {
-      ImGui.SameLine();
-      ImGuiHelper.TextDisabled("Working...");
-    }
+      bool canAct = !isActionBusy;
 
-    if (!string.IsNullOrEmpty(actionStatus))
-    {
-      ImGui.Spacing();
-      ImGuiHelper.TextError(actionStatus);
+      var avail = ImGui.GetContentRegionAvail().x;
+      var btnH = 36f;
+      var spacing = ImGui.GetStyle().ItemSpacing.x;
+
+      if (entry.Actions?.Primary != null)
+      {
+        var pw = Mathf.Min(260f, avail * 0.38f);
+        if (ImGui.Button(entry.Actions.Primary.Label ?? "Continue", new Vector2(pw, btnH)) && canAct)
+          OnAction(entry, entry.Actions.Primary, detailIndex);
+        ImGui.SameLine();
+        avail -= pw + spacing;
+      }
+
+      if (entry.Actions?.Secondary != null)
+      {
+        var sw = Mathf.Min(180f, avail * 0.32f);
+        if (ImGui.Button(entry.Actions.Secondary.Label ?? "Details", new Vector2(sw, btnH)) && canAct)
+        {
+          _ = NewsRunner.ExecuteSecondaryAction(entry);
+        }
+        ImGui.SameLine();
+        avail -= sw + spacing;
+      }
+
+      var iw = Mathf.Min(120f, avail * 0.25f);
+      if (ImGui.Button("Ignore", new Vector2(iw, btnH)) && canAct)
+      {
+        confirmIndex = detailIndex;
+        showConfirm = true;
+      }
+
+      if (activeEntries.Count > 1)
+      {
+        ImGui.SameLine();
+        if (ImGui.Button("Back to list", new Vector2(140, btnH)))
+        {
+          detailIndex = -1;
+          infoTimerStart = null;
+          actionCompleted = false;
+          actionSucceeded = false;
+          actionResultMessage = null;
+          actionStatus = null;
+          isActionBusy = false;
+        }
+      }
+
+      if (isActionBusy)
+      {
+        ImGui.SameLine();
+        ImGuiHelper.TextDisabled("Working...");
+      }
+
+      if (!string.IsNullOrEmpty(actionStatus))
+      {
+        ImGui.Spacing();
+        ImGuiHelper.TextError(actionStatus);
+      }
     }
 
     if (entry.Type == "info" && infoTimerStart.HasValue)
@@ -277,6 +336,9 @@ public static class NewsPopup
     {
       isActionBusy = true;
       actionStatus = null;
+      actionCompleted = false;
+      actionSucceeded = false;
+      actionResultMessage = null;
       _ = DoRepoModInstall(entry, action, handledIndexIfDone);
       return;
     }
@@ -285,6 +347,9 @@ public static class NewsPopup
     {
       isActionBusy = true;
       actionStatus = null;
+      actionCompleted = false;
+      actionSucceeded = false;
+      actionResultMessage = null;
       _ = DoWorkshopModInstall(entry, action, handledIndexIfDone);
       return;
     }
@@ -308,22 +373,18 @@ public static class NewsPopup
     try
     {
       bool ok = await NewsRunner.ExecuteRepoModInstall(action?.Url, action?.ModId);
-      if (ok)
-      {
-        if (index >= 0)
-          HandleHandled(index, persist: false);
-      }
-      else
-      {
-        actionStatus = "Migration install failed. Check log.";
-        isActionBusy = false;
-      }
+      isActionBusy = false;
+      actionCompleted = true;
+      actionSucceeded = ok;
+      actionResultMessage = ok ? "Migration succeeded!" : "Migration failed. Check log.";
     }
     catch (Exception ex)
     {
       Logger.Global.LogException(ex);
-      actionStatus = "Install failed. See log.";
       isActionBusy = false;
+      actionCompleted = true;
+      actionSucceeded = false;
+      actionResultMessage = "Migration failed. See log.";
     }
   }
 
@@ -337,22 +398,18 @@ public static class NewsPopup
         oldWid = t;
 
       bool ok = await NewsRunner.ExecuteWorkshopModInstall(action?.WorkshopId, oldWid);
-      if (ok)
-      {
-        if (index >= 0)
-          HandleHandled(index, persist: false);
-      }
-      else
-      {
-        actionStatus = "Workshop migration failed. Check log.";
-        isActionBusy = false;
-      }
+      isActionBusy = false;
+      actionCompleted = true;
+      actionSucceeded = ok;
+      actionResultMessage = ok ? "Migration succeeded!" : "Migration failed. Check log.";
     }
     catch (Exception ex)
     {
       Logger.Global.LogException(ex);
-      actionStatus = "Install failed. See log.";
       isActionBusy = false;
+      actionCompleted = true;
+      actionSucceeded = false;
+      actionResultMessage = "Migration failed. See log.";
     }
   }
 
@@ -368,6 +425,9 @@ public static class NewsPopup
     activeEntries.RemoveAt(index);
     isActionBusy = false;
     actionStatus = null;
+    actionCompleted = false;
+    actionSucceeded = false;
+    actionResultMessage = null;
     infoTimerStart = null;
     showConfirm = false;
     confirmIndex = -1;
