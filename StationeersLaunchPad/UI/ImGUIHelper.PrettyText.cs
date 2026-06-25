@@ -84,7 +84,7 @@ public static partial class ImGuiHelper
 
   private static readonly HashSet<string> KnownTags =
     new(StringComparer.Ordinal)
-    { "b", "i", "u", "strike", "h1", "h2", "h3", "url", "code", "list" };
+    { "b", "i", "u", "strike", "h1", "h2", "h3", "url", "code", "list", "red", "green", "blue", "yellow", "cyan" };
 
   private static List<Token> Lex(string text)
   {
@@ -166,6 +166,11 @@ public static partial class ImGuiHelper
   private static readonly Vector4 ColorLink    = new Vector4(0.40f, 0.70f, 1.00f, 1.0f);
   private static readonly Vector4 ColorHeading = new Vector4(0.35f, 0.66f, 0.84f, 1.0f);
   private static readonly Vector4 ColorCode    = new Vector4(0.60f, 0.60f, 0.60f, 1.0f);
+  private static readonly Vector4 ColorRed     = new Vector4(1.00f, 0.25f, 0.25f, 1.0f);
+  private static readonly Vector4 ColorGreen   = new Vector4(0.20f, 0.90f, 0.40f, 1.0f);
+  private static readonly Vector4 ColorBlue    = new Vector4(0.30f, 0.60f, 1.00f, 1.0f);
+  private static readonly Vector4 ColorYellow  = new Vector4(1.00f, 0.90f, 0.20f, 1.0f);
+  private static readonly Vector4 ColorCyan    = new Vector4(0.20f, 0.95f, 0.95f, 1.0f);
 
   private static readonly Dictionary<string, Func<RenderState, string, RenderState>> TagOpeners =
     new Dictionary<string, Func<RenderState, string, RenderState>>(StringComparer.Ordinal)
@@ -184,6 +189,11 @@ public static partial class ImGuiHelper
         Color     = ColorLink,
         Underline = true,
       },
+      ["red"]    = (s, _) => s with { Color = ColorRed },
+      ["green"]  = (s, _) => s with { Color = ColorGreen },
+      ["blue"]   = (s, _) => s with { Color = ColorBlue },
+      ["yellow"] = (s, _) => s with { Color = ColorYellow },
+      ["cyan"]   = (s, _) => s with { Color = ColorCyan },
     };
   
   private static void RenderChunk(string chunk, RenderState state, ref bool needSameLine)
