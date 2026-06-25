@@ -102,9 +102,9 @@ public static class NewsPopup
     else
       DrawDetailView();
 
-    ImGui.End();
-
     CheckInfoAutoAdvance();
+
+    ImGui.End();
   }
 
   private static void CheckInfoAutoAdvance()
@@ -285,7 +285,7 @@ public static class NewsPopup
     ImGui.Dummy(new Vector2(0, 10));
     ImGuiHelper.TextWarning("Are you sure?");
     ImGui.Spacing();
-    ImGuiHelper.Text("This notice was shown for a reason. Ignoring it may result in a broken or non-functional mod. Do you still want to ignore this?");
+    ImGuiHelper.Text("You will not be able to undo this action. Ignoring a notice may result in a broken mod.");
     ImGui.Spacing();
     ImGui.Separator();
 
@@ -296,7 +296,7 @@ public static class NewsPopup
         HandleHandled(confirmIndex, persist: true);
     }
     ImGui.SameLine();
-    if (ImGui.Button("Cancel", new Vector2(cAvail * 0.35f, 36)))
+    if (ImGui.Button("Go back", new Vector2(cAvail * 0.35f, 36)))
     {
       showConfirm = false;
       confirmIndex = -1;
@@ -347,7 +347,7 @@ public static class NewsPopup
       actionCompleted = false;
       actionSucceeded = false;
       actionResultMessage = null;
-      _ = DoRepoModInstall(entry, action, handledIndexIfDone);
+      _ = DoRepoModInstall(action);
       return;
     }
 
@@ -358,7 +358,7 @@ public static class NewsPopup
       actionCompleted = false;
       actionSucceeded = false;
       actionResultMessage = null;
-      _ = DoWorkshopModInstall(entry, action, handledIndexIfDone);
+      _ = DoWorkshopModInstall(entry, action);
       return;
     }
 
@@ -375,7 +375,7 @@ public static class NewsPopup
       HandleHandled(handledIndexIfDone, persist: false);
   }
 
-  private static async UniTask DoRepoModInstall(NewsEntry entry, NewsAction action, int index)
+  private static async UniTask DoRepoModInstall(NewsAction action)
   {
     actionStatus = null;
     try
@@ -396,7 +396,7 @@ public static class NewsPopup
     }
   }
 
-  private static async UniTask DoWorkshopModInstall(NewsEntry entry, NewsAction action, int index)
+  private static async UniTask DoWorkshopModInstall(NewsEntry entry, NewsAction action)
   {
     actionStatus = null;
     try
