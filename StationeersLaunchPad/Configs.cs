@@ -54,7 +54,7 @@ public static class Configs
   public static ConfigEntry<bool> NewsCheckOnStart;
   public static ConfigEntry<string> NewsFeedUrl;
 
-  public const string DefaultNewsFeedUrl = "https://raw.githubusercontent.com/JacksonTheMaster/SLPNews/main/news.xml";
+  public const string DefaultNewsFeedUrl = "https://raw.githubusercontent.com/StationeersLaunchPad/news/main/news.xml";
   public static ConfigEntry<int> NewsFetchTimeout;
   public static ConfigEntry<string> NewsDismissedIds;
 
