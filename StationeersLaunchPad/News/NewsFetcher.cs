@@ -21,23 +21,34 @@ public static class NewsFetcher
       request.timeout = Configs.NewsFetchTimeout.Value;
 
       Logger.Global.LogDebug($"Fetching news {url}");
-      var result = await request.SendWebRequest();
-
-      if (result.result != UnityWebRequest.Result.Success)
+      
+      try
       {
-        Logger.Global.LogError($"Failed to fetch news {url}. result: {result.result}, error: {result.error}");
+        var result = await request.SendWebRequest();
+      }
+      catch (Exception ex) when (ex.Message.Contains("resolve") || ex.Message.Contains("host"))
+      {
+        // No internet connection or DNS resolution failed
+        Logger.Global.LogInfo($"No internet connection or DNS resolution failed for {url}");
         return null;
       }
 
-      using var reader = new StringReader(result.downloadHandler.text);
+      // Check result after successful request
+      if (request.result != UnityWebRequest.Result.Success)
+      {
+        Logger.Global.LogInfo($"Failed to fetch news {url}. result: {request.result}");
+        return null;
+      }
+
+      using var reader = new StringReader(request.downloadHandler.text);
       var feed = (NewsFeed)Serializer.Deserialize(reader) ?? new();
       Logger.Global.LogDebug($"News: fetched {feed.Entries?.Count ?? 0} entries from {url}");
       return feed;
     }
     catch (Exception ex)
     {
-      Logger.Global.LogException(ex);
-      Logger.Global.LogError($"Failed to fetch news {url}. Skipping");
+      // Catch any other unexpected exceptions
+      Logger.Global.LogDebug($"Failed to fetch news {url}: {ex.Message}");
       return null;
     }
   }
