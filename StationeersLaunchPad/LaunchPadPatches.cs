@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Threading.Tasks;
@@ -102,14 +103,142 @@ static class LaunchPadPatches
   private static void RunSteamPatches() =>
     harmony.CreateClassProcessor(typeof(SteamPatches), true).Patch();
 
-  private static void RunBugfixPatches() =>
+  private static void RunBugfixPatches()
+  {
     harmony.CreateClassProcessor(typeof(BugfixPatches), true).Patch();
+    ApplyInventoryManagerCompatIfNeeded();
+  }
 
   private static void RunCustomSavePathPatches() =>
     harmony.CreateClassProcessor(typeof(CustomSavePathPatches), true).Patch();
 
   public static void RunLinuxPathPatch() =>
     harmony.CreateClassProcessor(typeof(LinuxPathPatch), true).Patch();
+
+  private static void ApplyInventoryManagerCompatIfNeeded()
+  {
+    try
+    {
+      var assemblyCSharp = AppDomain.CurrentDomain.GetAssemblies()
+        .FirstOrDefault(a => a.GetName().Name == "Assembly-CSharp");
+      if (assemblyCSharp == null)
+      {
+        Logger.Global.LogDebug("[SLP InvMgrCompat] Assembly-CSharp not found, skipping HandleStructurePrefab patch.");
+        return;
+      }
+
+      var thingType = assemblyCSharp.GetType("Assets.Scripts.Objects.Thing");
+      if (thingType == null) return;
+
+      // Check the new field exists. if not, this build doesn't have the bug
+      var orientVecField = thingType.GetField("BlueprintOrientVector", BindingFlags.Public | BindingFlags.Instance);
+      if (orientVecField == null)
+      {
+        Logger.Global.LogDebug("[SLP InvMgrCompat] BlueprintOrientVector not found on Thing, patch not needed.");
+        return;
+      }
+
+      var inventoryManagerType = assemblyCSharp.GetType("Assets.Scripts.Inventory.InventoryManager");
+      if (inventoryManagerType == null) return;
+
+      var handleMethod = inventoryManagerType.GetMethod(
+        "HandleStructurePrefab",
+        BindingFlags.NonPublic | BindingFlags.Instance);
+      if (handleMethod == null)
+      {
+        Logger.Global.LogDebug("[SLP InvMgrCompat] HandleStructurePrefab not found, skipping patch.");
+        return;
+      }
+
+      var patchMethod = typeof(LaunchPadPatches).GetMethod(nameof(HandleStructurePrefab_Prefix), BindingFlags.NonPublic | BindingFlags.Static);
+      if (patchMethod == null) return;
+
+      // Don't patch twice
+      var existing = Harmony.GetPatchInfo(handleMethod);
+      if (existing != null && existing.Prefixes.Any(p => p.PatchMethod == patchMethod))
+      {
+        Logger.Global.LogDebug("[SLP InvMgrCompat] HandleStructurePrefab already patched, skipping.");
+        return;
+      }
+
+      harmony?.Patch(handleMethod, prefix: new HarmonyMethod(patchMethod));
+      Logger.Global.LogInfo("[SLP InvMgrCompat] Applied HandleStructurePrefab compat patch (cross-assembly Wireframe subclass workaround).");
+    }
+    catch (Exception e)
+    {
+      Logger.Global.LogDebug($"[SLP InvMgrCompat] Failed to apply HandleStructurePrefab patch: {e}");
+    }
+  }
+
+  private static void HandleStructurePrefab_Prefix(object prefab)
+  {
+    try
+    {
+      if (prefab == null) return;
+
+      var blueprintProp = prefab.GetType().GetField("Blueprint", BindingFlags.Public | BindingFlags.Instance);
+      if (blueprintProp == null) return;
+
+      var blueprint = blueprintProp.GetValue(prefab) as UnityEngine.GameObject;
+      if (blueprint == null) return;
+
+      // Resolve Wireframe type from Assembly-CSharp
+      var assemblyCSharp = AppDomain.CurrentDomain.GetAssemblies()
+        .FirstOrDefault(a => a.GetName().Name == "Assembly-CSharp");
+      if (assemblyCSharp == null) return;
+
+      var wireframeType = assemblyCSharp.GetType("Assets.Scripts.UI.Wireframe");
+      if (wireframeType == null) return;
+
+      // Modded prefabs have a Wireframe subclass component on their Blueprint (from a separate
+      // mod assembly), but GetComponent<Assets.Scripts.UI.Wireframe>() in the basegame fails to resolve it
+      // across assemblys, returning null and deadlocking on OrientationArrowOffset.
+      // We add the base Wireframe component directly so GetComponent finds it.
+      // BlueprintOrientVector is Vector3.zero on modded prefabs so no arrow will be drawn.
+      var existing = blueprint.GetComponent(wireframeType);
+      if (existing == null)
+      {
+        var allComponents = blueprint.GetComponents<UnityEngine.Component>();
+        var viaGetComponents = blueprint.GetComponents(wireframeType);
+        bool sawSubclass = false;
+
+        Logger.Global.LogDebug($"[SLP InvMgrCompat] Diagnostic for Blueprint '{(prefab as UnityEngine.Object)?.name}': GetComponent(Wireframe)=null, GetComponents(Wireframe).Length={viaGetComponents?.Length ?? 0}");
+
+        if ((viaGetComponents?.Length ?? 0) > 0 && existing == null)
+        {
+          Logger.Global.LogInfo($"[SLP InvMgrCompat] Non-generic GetComponents(Wireframe) returned {viaGetComponents.Length} but single GetComponent did not (interesting difference).");
+        }
+
+        foreach (var c in allComponents)
+        {
+          if (c != null)
+          {
+            var ct = c.GetType();
+            if (wireframeType.IsAssignableFrom(ct) && ct != wireframeType)
+            {
+              sawSubclass = true;
+              Logger.Global.LogInfo($"[SLP InvMgrCompat] Found Wireframe SUBCLASS on Blueprint: {ct.FullName} (assembly: {ct.Assembly.GetName().Name})");
+            }
+          }
+        }
+
+        blueprint.AddComponent(wireframeType);
+
+        if (sawSubclass)
+        {
+          Logger.Global.LogInfo($"[SLP InvMgrCompat] Added base Wireframe (workaround for cross-assembly GetComponent) on '{(prefab as UnityEngine.Object)?.name}'.");
+        }
+        else
+        {
+          Logger.Global.LogInfo($"[SLP InvMgrCompat] Added Wireframe to Blueprint on '{(prefab as UnityEngine.Object)?.name}'.");
+        }
+      }
+    }
+    catch (Exception e)
+    {
+      Logger.Global.LogDebug($"[SLP InvMgrCompat] HandleStructurePrefab prefix error: {e}");
+    }
+  }
 }
 
 static class EssentialPatches
