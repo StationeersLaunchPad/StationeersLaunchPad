@@ -51,6 +51,18 @@ public static class Configs
   public static ConfigEntry<bool> RepoModValidateDigest;
   public static ConfigEntry<bool> RepoModValidateVersion;
 
+  public static ConfigEntry<bool> NewsCheckOnStart;
+  public static ConfigEntry<string> NewsFeedUrl;
+
+  public const string DefaultNewsFeedUrl = "https://raw.githubusercontent.com/StationeersLaunchPad/news/main/news.xml";
+  public static ConfigEntry<int> NewsFetchTimeout;
+  public static ConfigEntry<string> NewsDismissedIds;
+
+    // Note: we use EffectiveNewsFeedUrl so the default value is never written to the config file.
+    // This makes it possible to change this default in future versions.
+  public static string EffectiveNewsFeedUrl =>
+      string.IsNullOrWhiteSpace(NewsFeedUrl.Value) ? DefaultNewsFeedUrl : NewsFeedUrl.Value;
+
   public static bool RunPostUpdateCleanup => CheckForUpdate.Value && PostUpdateCleanup.Value;
   public static bool RunOneTimeBoosterInstall => CheckForUpdate.Value && OneTimeBoosterInstall.Value;
   public static (LoadStrategyType, LoadStrategyMode) LoadStrategy => (LoadStrategyType.Value, LoadStrategyMode.Value);
@@ -224,6 +236,37 @@ public static class Configs
         "Reject new mod versions when they don't match the target ModID and Version."
       )
     );
+
+    NewsCheckOnStart = config.Bind(
+      new ConfigDefinition("News", "NewsCheckOnStart"),
+      true,
+      new ConfigDescription(
+        "Check for news notices on startup."
+      )
+    );
+    NewsFeedUrl = config.Bind(
+      new ConfigDefinition("News", "NewsFeedUrl"),
+      "",
+      new ConfigDescription(
+        "URL to fetch the news feed from. Leave empty to use the built-in default. Set a value to override."
+      )
+    );
+    NewsFetchTimeout = config.Bind(
+      new ConfigDefinition("News", "NewsFetchTimeout"),
+      10,
+      new ConfigDescription(
+        "Timeout in seconds for fetching news notices.",
+        new AcceptableValueRange<int>(5, 60)
+      )
+    );
+    NewsDismissedIds = config.Bind(
+      new ConfigDefinition("News", "NewsDismissedIds"),
+      "",
+      new ConfigDescription(
+        "Comma-separated list of dismissed news notice IDs. Automatically managed."
+      )
+    );
+
     AutoScrollLogs = config.Bind(
       new ConfigDefinition("Logging", "AutoScrollLogs"),
       true,

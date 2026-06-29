@@ -16,6 +16,7 @@ using StationeersLaunchPad.Metadata;
 using StationeersLaunchPad.Repos;
 using StationeersLaunchPad.Sources;
 using StationeersLaunchPad.UI;
+using StationeersLaunchPad.News;
 using StationeersLaunchPad.Update;
 using Steamworks;
 
@@ -25,6 +26,7 @@ public enum LoadStage
 {
   Updating,
   Initializing,
+  News,
   Searching,
   Configuring,
   Loading,
@@ -97,6 +99,7 @@ public static class LaunchPadConfig
     }
 
     AlertPopup.Draw();
+    NewsPopup.Draw();
   }
 
   public static async void Run()
@@ -224,9 +227,11 @@ public static class LaunchPadConfig
     {
       Logger.Global.LogInfo("Loading Mod Repos");
       var modRepos = ModRepos.Current = await ModRepos.LoadConfig();
+
       if (firstLoad && Configs.RepoCheckUpdates.Value)
         await ModRepos.UpdateRepos(modRepos);
       ModRepos.SaveConfig(modRepos);
+
       if (firstLoad && Configs.RepoModCheckUpdates.Value)
       {
         var updates = ModRepos.GetModUpdateTargets(modRepos);
@@ -237,16 +242,23 @@ public static class LaunchPadConfig
       }
 
       Logger.Global.LogInfo("Listing Mods");
-      modList = ModList.FromDefs(await ModSource.ListAll(new()
+      var defs = await ModSource.ListAll(new()
       {
         Repos = modRepos,
         SteamDisabled = SteamDisabled,
-      }));
+      });
+      modList = ModList.FromDefs(defs);
 
       Logger.Global.LogInfo("Loading Mod Config");
       var modConfig = ModConfigUtil.LoadConfig();
       ModRepos.UpdateModPaths(modRepos, modConfig);
       modList.ApplyConfig(modConfig);
+
+      // News check now consumes the single mod list built above.
+      // This removes the duplicate "repomod load" that used to live in StageNews.
+      if (firstLoad)
+        await CheckNewsNotices();
+
       ModConfigUtil.SaveConfig(modList.ToModConfig());
 
       var depNotice = !modList.CheckDependencies();
@@ -262,6 +274,54 @@ public static class LaunchPadConfig
     catch (Exception ex)
     {
       OnStartupError(ex);
+    }
+  }
+
+  private static async UniTask CheckNewsNotices()
+  {
+    if (Platform.IsServer || !Configs.NewsCheckOnStart.Value) return;
+
+    var prevStage = Stage;
+    try
+    {
+      Stage = LoadStage.News;
+
+      var matches = await NewsRunner.GetActiveNotices(modList);
+      if (matches.Count > 0)
+      {
+        Logger.Global.LogInfo($"Displaying {matches.Count} notice(s)");
+        await NewsPopup.Run(matches);
+
+        // A repo_mod_install migration may have added a new tracked repo mod.
+        // Rebuild the snapshot so the new mod appears enabled before the countdown.
+        var repos = ModRepos.Current ?? await ModRepos.LoadConfig();
+        ModRepos.Current = repos;
+
+        var defs = await ModSource.ListAll(new()
+        {
+          Repos = repos,
+          SteamDisabled = SteamDisabled,
+        });
+        modList = ModList.FromDefs(defs);
+
+        var modConfig = ModConfigUtil.LoadConfig();
+        ModRepos.UpdateModPaths(repos, modConfig);
+        modList.ApplyConfig(modConfig);
+      }
+      else
+      {
+        Logger.Global.LogDebug("News: no notices matched current enabled mods / dismissed / already-migrated");
+      }
+    }
+    catch (Exception ex)
+    {
+      Logger.Global.LogError("Error in news notices stage (startup will continue)");
+      Logger.Global.LogException(ex);
+    }
+    finally
+    {
+      if (Stage == LoadStage.News)
+        Stage = prevStage;
     }
   }
 
