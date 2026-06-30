@@ -81,6 +81,17 @@ public static class BetaProgramsPanel
           Steam.OpenWorkshopPage(stable.WorkshopHandle);
       }
 
+      if (beta?.Enabled == true && stable.Enabled)
+        ImGuiHelper.TextWarning("Stable and beta are both enabled.");
+      else if (beta?.Enabled == true)
+        ImGuiHelper.TextWarning("Beta is active.");
+      else if (stable.Enabled)
+        ImGuiHelper.TextDisabled("Stable is active.");
+      else if (beta != null)
+        ImGuiHelper.TextDisabled("Both versions are disabled.");
+      else
+        ImGuiHelper.TextDisabled("Stable is disabled.");
+
       if (statuses.TryGetValue(stable.BetaWorkshopHandle, out var status))
         ImGuiHelper.TextDisabled(status);
       ImGui.Separator();
@@ -129,7 +140,9 @@ public static class BetaProgramsPanel
     stable.Enabled = !enabled;
     beta.Enabled = enabled;
     Logger.Global.LogInfo($"Switched {stable.Name} to {(enabled ? "beta" : "stable")}");
-    if (!enabled)
+    if (enabled)
+      statuses.Remove(beta.WorkshopHandle);
+    else
       UnsubscribeFromBeta(stable, beta, modList).Forget();
     return true;
   }
@@ -151,7 +164,7 @@ public static class BetaProgramsPanel
 
       stable.Enabled = false;
       ModConfigUtil.SaveConfig(modList.ToModConfig());
-      statuses[workshopId] = "Beta downloaded and enabled.";
+      statuses.Remove(workshopId);
       LaunchPadConfig.ReloadMods();
     }
     finally
@@ -178,7 +191,7 @@ public static class BetaProgramsPanel
         return;
       }
 
-      statuses[workshopId] = "Beta unsubscribed.";
+      statuses.Remove(workshopId);
       LaunchPadConfig.ReloadMods();
     }
     finally
