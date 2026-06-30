@@ -84,6 +84,9 @@ public static class ManualLoadWindow
         DrawModInfoTab(stage);
         DrawModConfigTab(stage);
 
+        if (BetaProgramsPanel.Draw(stage, modList))
+          changed |= ChangeFlags.Mods;
+
         // If we changed launchpad config and haven't loaded mods yet, mark mods changed to apply disable/sort behaviour
         if (DrawLaunchPadConfigTab() && stage <= LoadStage.Configuring)
           changed |= ChangeFlags.Mods;
@@ -135,6 +138,7 @@ public static class ManualLoadWindow
     ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, Vector2.zero);
     var (nextEnabled, nextText) = stage switch
     {
+      LoadStage.Configuring when BetaProgramsPanel.Busy => (false, "Downloading Beta..."),
       LoadStage.Configuring => (true, "Load Mods"),
       LoadStage.Loaded or LoadStage.Failed => (true, "Start Game"),
       _ => (false, "..."),
@@ -306,7 +310,7 @@ public static class ManualLoadWindow
 
       ImGuiHelper.TextCentered(row.Column(1), $"{mod.Source}");
 
-      ImGuiHelper.Text(row.Column(2), $"{mod.Name}");
+      ImGuiHelper.Text(row.Column(2), mod.IsBetaProgramMod ? $"{mod.Name} (Beta)" : mod.Name);
 
       if (draggingMod != null)
         if (mod.SortBefore(draggingMod))
