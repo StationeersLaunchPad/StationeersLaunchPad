@@ -291,8 +291,9 @@ public static class ManualLoadWindow
 
       ImGui.SetCursorScreenPos(row.Column(0).TL);
       ImGui.BeginDisabled(mod.Source is ModSourceType.Core);
-      if (ImGui.Checkbox("##enable", ref mod.Enabled))
-        changed = true;
+      var enabled = mod.Enabled;
+      if (ImGui.Checkbox("##enable", ref enabled))
+        changed |= BetaProgramsPanel.SetModEnabled(modList, mod, enabled);
       ImGui.EndDisabled();
 
       var c12 = row.ColumnsFrom(1);
