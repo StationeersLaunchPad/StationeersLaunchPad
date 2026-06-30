@@ -15,6 +15,8 @@ public class ModList
   public IEnumerable<ModInfo> AllMods => mods;
   public IEnumerable<ModInfo> EnabledMods => mods.Where(mod => mod.Enabled);
   public int IndexOf(ModInfo mod) => mods.IndexOf(mod);
+  public bool IsBetaMod(ModInfo mod) =>
+    mod.IsBetaProgramMod || mods.Any(stable => stable != mod && stable.IsBetaProgramFor(mod));
 
   public static ModList NewEmpty() => new();
   public static ModList FromDefs(List<ModDefinition> defs)
