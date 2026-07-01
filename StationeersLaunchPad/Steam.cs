@@ -7,6 +7,7 @@ using Cysharp.Threading.Tasks;
 using StationeersLaunchPad.Metadata;
 using StationeersLaunchPad.Sources;
 using Steamworks;
+using Steamworks.Data;
 using Steamworks.Ugc;
 using UnityEngine;
 
@@ -75,6 +76,64 @@ public static class Steam
     return !result.HasValue || result.Value.ResultCount == 0
       ? []
       : [.. result.Value.Entries.Where(item => item.Result != Result.FileNotFound)];
+  }
+
+  public static async UniTask<bool> SubscribeAndDownload(ulong workshopId, ulong? unsubscribeWorkshopId = null)
+  {
+    if (workshopId < 2)
+      return false;
+
+    try
+    {
+      var item = new Item(new PublishedFileId { Value = workshopId });
+
+      Logger.Global.LogInfo($"Subscribing to workshop item {workshopId}");
+      if (!await item.Subscribe())
+      {
+        Logger.Global.LogError($"Subscribe() returned false for workshop {workshopId}");
+        return false;
+      }
+
+      Logger.Global.LogInfo($"Downloading workshop item {workshopId}");
+      if (!await item.DownloadAsync())
+      {
+        Logger.Global.LogError($"DownloadAsync() failed or was not successful for workshop {workshopId}");
+        return false;
+      }
+
+      Logger.Global.LogInfo($"Workshop item {workshopId} subscribed and downloaded successfully");
+
+      if (unsubscribeWorkshopId is > 1 && unsubscribeWorkshopId != workshopId)
+        await Unsubscribe(unsubscribeWorkshopId.Value);
+
+      return true;
+    }
+    catch (Exception ex)
+    {
+      Logger.Global.LogException(ex);
+      Logger.Global.LogError($"Workshop install failed for {workshopId}");
+      return false;
+    }
+  }
+
+  public static async UniTask<bool> Unsubscribe(ulong workshopId)
+  {
+    if (workshopId < 2)
+      return false;
+
+    try
+    {
+      var item = new Item(new PublishedFileId { Value = workshopId });
+      var unsubscribed = await item.Unsubscribe();
+      Logger.Global.LogInfo($"Unsubscribed workshop item {workshopId} (success={unsubscribed})");
+      return unsubscribed;
+    }
+    catch (Exception ex)
+    {
+      Logger.Global.LogException(ex);
+      Logger.Global.LogError($"Workshop unsubscribe failed for {workshopId}");
+      return false;
+    }
   }
 
   public static (bool, string) ValidateForWorkshop(ModInfo mod)

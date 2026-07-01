@@ -93,6 +93,9 @@ public static class ManualLoadWindow
         if (DrawProfilesTab(stage, profileManager, modList))
           changed |= ChangeFlags.Mods;
 
+        if (BetaProgramsPanel.Draw(stage, modList))
+          changed |= ChangeFlags.Mods;
+
         // If we changed launchpad config and haven't loaded mods yet, mark mods changed to apply disable/sort behaviour
         if (DrawLaunchPadConfigTab() && stage <= LoadStage.Configuring)
           changed |= ChangeFlags.Mods;
@@ -144,6 +147,7 @@ public static class ManualLoadWindow
     ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, Vector2.zero);
     var (nextEnabled, nextText) = stage switch
     {
+      LoadStage.Configuring when BetaProgramsPanel.Busy => (false, "Updating Betas..."),
       LoadStage.Configuring => (true, "Load Mods"),
       LoadStage.Loaded or LoadStage.Failed => (true, "Start Game"),
       _ => (false, "..."),
@@ -292,11 +296,13 @@ public static class ManualLoadWindow
     foreach (var mod in modList.AllMods)
     {
       ImGui.PushID(idx);
+      var isBeta = modList.IsBetaMod(mod);
 
       ImGui.SetCursorScreenPos(row.Column(0).TL);
       ImGui.BeginDisabled(mod.Source is ModSourceType.Core);
-      if (ImGui.Checkbox("##enable", ref mod.Enabled))
-        changed = true;
+      var enabled = mod.Enabled;
+      if (ImGui.Checkbox("##enable", ref enabled))
+        changed |= BetaProgramsPanel.SetModEnabled(modList, mod, enabled);
       ImGui.EndDisabled();
 
       var c12 = row.ColumnsFrom(1);
@@ -315,7 +321,13 @@ public static class ManualLoadWindow
 
       ImGuiHelper.TextCentered(row.Column(1), $"{mod.Source}");
 
-      ImGuiHelper.Text(row.Column(2), $"{mod.Name}");
+      ImGui.SetCursorScreenPos(row.Column(2).TL);
+      if (isBeta)
+        ImGuiHelper.TextColored($"{mod.Name} [BETA]", ImGuiHelper.Yellow);
+      else
+        ImGuiHelper.Text(mod.Name);
+      if (isBeta)
+        ImGuiHelper.ItemTooltip("This item is a beta version of an installed mod.");
 
       if (draggingMod != null)
         if (mod.SortBefore(draggingMod))
@@ -372,7 +384,11 @@ public static class ManualLoadWindow
 
       ImGuiHelper.TextCentered(row.Column(1), $"{info.Source}");
 
-      ImGuiHelper.Text(row.Column(2), info.Name);
+      ImGui.SetCursorScreenPos(row.Column(2).TL);
+      if (modList.IsBetaMod(info))
+        ImGuiHelper.TextColored($"{info.Name} [BETA]", ImGuiHelper.Yellow);
+      else
+        ImGuiHelper.Text(info.Name);
 
       ImGui.PopID();
       idx++;

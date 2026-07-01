@@ -41,6 +41,12 @@ public class ModAboutEx
   [XmlElement("WorkshopHandle")]
   public ulong WorkshopHandle;
 
+  [XmlElement("BetaProgram")]
+  public ModReference BetaProgram;
+
+  [XmlElement("IsBetaProgramMod")]
+  public bool IsBetaProgramMod;
+
   [XmlArray("Tags"), XmlArrayItem("Tag")]
   public List<string> Tags;
 
