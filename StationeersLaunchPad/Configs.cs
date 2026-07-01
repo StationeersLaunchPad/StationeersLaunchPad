@@ -8,6 +8,13 @@ using StationeersLaunchPad.Loading;
 
 namespace StationeersLaunchPad;
 
+public enum ProfilePromptMode
+{
+  Never,
+  Auto,
+  Always,
+}
+
 // config values that have different defaults depending on platform
 public struct ConfigDefaults
 {
@@ -50,6 +57,9 @@ public static class Configs
   public static ConfigEntry<int> RepoModFetchTimeout;
   public static ConfigEntry<bool> RepoModValidateDigest;
   public static ConfigEntry<bool> RepoModValidateVersion;
+  public static ConfigEntry<ProfilePromptMode> ProfilePrompt;
+  public static ConfigEntry<string> ModProfile;
+  public static ConfigEntry<string> AppliedModProfile;
 
   public static ConfigEntry<bool> NewsCheckOnStart;
   public static ConfigEntry<string> NewsFeedUrl;
@@ -236,6 +246,13 @@ public static class Configs
         "Reject new mod versions when they don't match the target ModID and Version."
       )
     );
+    ProfilePrompt = config.Bind(
+      new ConfigDefinition("Mod Profiles", "PromptMode"),
+      ProfilePromptMode.Auto,
+      new ConfigDescription(
+        "Choose when to stop at the profile selector. Auto only stops when input is needed."
+      )
+    );
 
     NewsCheckOnStart = config.Bind(
       new ConfigDefinition("News", "NewsCheckOnStart"),
@@ -294,6 +311,20 @@ public static class Configs
       true,
       new ConfigDescription(
         "This setting is automatically managed and should probably not be manually changed. Remove update backup files on start."
+      )
+    );
+    ModProfile = config.Bind(
+      new ConfigDefinition("Internal", "ModProfile"),
+      "",
+      new ConfigDescription(
+        "The active mod profile. Leave empty to use the normal mod configuration."
+      )
+    );
+    AppliedModProfile = config.Bind(
+      new ConfigDefinition("Internal", "AppliedModProfile"),
+      "",
+      new ConfigDescription(
+        "The mod profile last applied to the normal mod configuration. Automatically managed."
       )
     );
     LinuxPathPatch = config.Bind(

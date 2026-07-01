@@ -119,39 +119,14 @@ public class ModList
 
   public void ApplyProfile(ProfileData profile)
   {
-    var modsByPath = new Dictionary<string, ModInfo>(StringComparer.OrdinalIgnoreCase);
-    var modsByHandle = new Dictionary<ulong, ModInfo>();
-
-    foreach (var mod in mods)
-    {
-      if (mod.Source == ModSourceType.Core && string.IsNullOrEmpty(mod.DirectoryPath))
-        modsByPath["Core"] = mod;
-      else if (!string.IsNullOrEmpty(mod.DirectoryPath))
-        modsByPath[NormalizePath(mod.DirectoryPath)] = mod;
-
-      if (mod.WorkshopHandle != 0)
-        modsByHandle[mod.WorkshopHandle] = mod;
-    }
-
     foreach (var mod in mods)
       mod.Enabled = false;
 
     var ordered = new List<ModInfo>();
     var matched = new HashSet<ModInfo>();
-
     foreach (var entry in profile.Mods)
     {
-      ModInfo mod = null;
-
-      // Core sentinel: empty path and zero handle
-      if (string.IsNullOrEmpty(entry.DirectoryPath) && entry.WorkshopHandle == 0)
-        modsByPath.TryGetValue("Core", out mod);
-      else if (!string.IsNullOrEmpty(entry.DirectoryPath))
-        modsByPath.TryGetValue(NormalizePath(entry.DirectoryPath), out mod);
-
-      if (mod == null && entry.WorkshopHandle != 0)
-        modsByHandle.TryGetValue(entry.WorkshopHandle, out mod);
-
+      var mod = ProfileManager.FindMod(entry, mods);
       if (mod == null)
       {
         Logger.Global.LogWarning($"Profile mod not found: path='{entry.DirectoryPath}' handle={entry.WorkshopHandle}");
@@ -159,13 +134,10 @@ public class ModList
       }
 
       mod.Enabled = entry.Enabled;
-      if (!matched.Contains(mod))
-      {
+      if (matched.Add(mod))
         ordered.Add(mod);
-        matched.Add(mod);
-      }
     }
-    
+
     foreach (var mod in mods)
       if (!matched.Contains(mod))
         ordered.Add(mod);

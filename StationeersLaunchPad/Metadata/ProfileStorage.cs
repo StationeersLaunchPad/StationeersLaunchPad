@@ -1,151 +1,85 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Xml.Serialization;
+using System.Linq;
 using Assets.Scripts.Serialization;
 
 namespace StationeersLaunchPad.Metadata;
 
-[XmlRoot("ActiveProfile")]
-public class ActiveProfileConfig
+public static class ProfileStorage
 {
-    [XmlAttribute("Name")]
-    public string Name;
-}
+  public static string ProfilesDirectory => Path.Join(LaunchPadPaths.SavePath, "profiles");
 
-public class ProfileStorage
-{
-    public static string ProfilesDirectory => Path.Join(LaunchPadPaths.SavePath, "profiles");
-    public static string ActiveConfigPath => Path.Join(LaunchPadPaths.SavePath, "active.xml");
+  public static List<ProfileData> LoadAll()
+  {
+    if (!Directory.Exists(ProfilesDirectory))
+      return [];
 
-    public static List<ProfileData> LoadAll()
+    var profiles = new List<ProfileData>();
+    foreach (var file in Directory.GetFiles(ProfilesDirectory, "*.xml").OrderBy(path => path))
     {
-        var dir = ProfilesDirectory;
-        if (!Directory.Exists(dir))
-        {
-            Directory.CreateDirectory(dir);
-            return [];
-        }
-
-        var profiles = new List<ProfileData>();
-
-        foreach (var file in Directory.GetFiles(dir, "*.xml"))
-        {
-            try
-            {
-                var profile = XmlSerialization.Deserialize<ProfileData>(file);
-                if (profile != null)
-                    profiles.Add(profile);
-                else
-                    Logger.Global.LogWarning($"Skipping corrupt profile file: {file}");
-            }
-            catch (Exception e)
-            {
-                Logger.Global.LogWarning($"Skipping corrupt profile file: {file} ({e.Message})");
-            }
-        }
-
-        return profiles;
+      try
+      {
+        var profile = XmlSerialization.Deserialize<ProfileData>(file);
+        if (profile != null && IsValidName(profile.Name))
+          profiles.Add(profile);
+        else
+          Logger.Global.LogWarning($"Skipping invalid profile file: {file}");
+      }
+      catch (Exception ex)
+      {
+        Logger.Global.LogWarning($"Skipping invalid profile file: {file} ({ex.Message})");
+      }
     }
+    return profiles;
+  }
 
-    public static ProfileData Load(string profileName)
+  public static bool Save(ProfileData profile)
+  {
+    if (!IsValidName(profile?.Name))
+      return false;
+
+    if (!Directory.Exists(ProfilesDirectory))
+      Directory.CreateDirectory(ProfilesDirectory);
+
+    var path = GetProfilePath(profile.Name);
+    if (profile.SaveXml(path))
+      return true;
+
+    Logger.Global.LogError($"Failed to save profile to {path}");
+    return false;
+  }
+
+  public static bool Delete(string profileName)
+  {
+    if (!IsValidName(profileName))
+      return false;
+
+    try
     {
-        var path = GetProfilePath(profileName);
-        if (!File.Exists(path))
-            return null;
-
-        try
-        {
-            return XmlSerialization.Deserialize<ProfileData>(path);
-        }
-        catch (Exception e)
-        {
-            Logger.Global.LogWarning($"Failed to load profile '{profileName}': {e.Message}");
-            return null;
-        }
+      var path = GetProfilePath(profileName);
+      if (File.Exists(path))
+        File.Delete(path);
+      return true;
     }
-
-    public static void Save(ProfileData profile)
+    catch (Exception ex)
     {
-        var dir = ProfilesDirectory;
-        if (!Directory.Exists(dir))
-            Directory.CreateDirectory(dir);
-
-        var path = GetProfilePath(profile.Name);
-        if (!profile.SaveXml(path))
-            Logger.Global.LogError($"Failed to save profile to {path}");
+      Logger.Global.LogError($"Failed to delete profile '{profileName}': {ex.Message}");
+      return false;
     }
+  }
 
-    public static void Delete(string profileName)
-    {
-        var path = GetProfilePath(profileName);
-        try
-        {
-            if (File.Exists(path))
-                File.Delete(path);
-        }
-        catch (Exception e)
-        {
-            Logger.Global.LogError($"Failed to delete profile '{profileName}': {e.Message}");
-        }
-    }
+  public static bool IsValidName(string profileName)
+  {
+    if (string.IsNullOrWhiteSpace(profileName))
+      return false;
 
-    public static ProfileData Rename(string oldProfileName, string newProfileName)
-    {
-        var profile = Load(oldProfileName);
-        if (profile == null)
-            return null;
-        
-        profile.Name = newProfileName;
-        Save(profile);
-        Delete(oldProfileName);
-        return profile;
-    }
+    var name = profileName.Trim();
+    return name == profileName
+      && name is not "." and not ".."
+      && Platform.MakeValidFileName(name) == name;
+  }
 
-    public static string LoadActiveName()
-    {
-        if (!File.Exists(ActiveConfigPath))
-            return null;
-
-        try
-        {
-            var config = XmlSerialization.Deserialize<ActiveProfileConfig>(ActiveConfigPath);
-            return config?.Name;
-        }
-        catch (Exception e)
-        {
-            Logger.Global.LogError($"Failed to load active profile config: {e.Message}");
-            return null;
-        }
-    }
-
-    public static void SaveActiveName(string profileName)
-    {
-        var dir = ProfilesDirectory;
-        if (!Directory.Exists(dir))
-            Directory.CreateDirectory(dir);
-
-        var config = new ActiveProfileConfig { Name = profileName };
-        if (!config.SaveXml(ActiveConfigPath))
-            Logger.Global.LogError($"Failed to save active profile config to {ActiveConfigPath}");
-    }
-
-    public static void ClearActiveName()
-    {
-        try
-        {
-            if (File.Exists(ActiveConfigPath))
-                File.Delete(ActiveConfigPath);
-        }
-        catch (Exception e)
-        {
-            Logger.Global.LogError($"Failed to clear active profile config: {e.Message}");
-        }
-    }
-
-    private static string GetProfilePath(string profileName)
-    {
-        var sanitized = Platform.MakeValidFileName(profileName).ToLowerInvariant();
-        return Path.Join(ProfilesDirectory, $"{sanitized}.xml");
-    }
+  private static string GetProfilePath(string profileName) =>
+    Path.Join(ProfilesDirectory, $"{profileName.ToLowerInvariant()}.xml");
 }
