@@ -67,6 +67,7 @@ public static class LaunchPadConfig
   private static bool AutoSort;
   private static bool AutoLoad = true;
   private static bool SteamDisabled;
+  private static string pendingProfileName = "";
 
   private static StageWait CurWait = new(0, false);
 
@@ -91,7 +92,11 @@ public static class LaunchPadConfig
     if (AutoLoad)
     {
       if (AutoLoadWindow.Draw(Stage, CurWait))
+      {
         StopAutoLoad();
+        if (!string.IsNullOrEmpty(Configs.ModProfile.Value))
+          ManualLoadWindow.OpenProfilesTab();
+      }
     }
     else
     {
@@ -260,6 +265,7 @@ public static class LaunchPadConfig
       if (firstLoad)
         await CheckNewsNotices();
 
+      PrepareProfileStartup();
       ModConfigUtil.SaveConfig(modList.ToModConfig());
 
       var depNotice = !modList.CheckDependencies();
@@ -335,6 +341,29 @@ public static class LaunchPadConfig
 
     await SLPCommand.MoveToStage(CommandStage.ConfigLoaded);
     await Platform.Wait(CurWait, CommandStage.ConfigLoaded);
+
+    if (!AutoLoad || string.IsNullOrEmpty(pendingProfileName))
+      return;
+    if (!pendingProfileName.Equals(profileManager.ActiveProfileName, StringComparison.OrdinalIgnoreCase))
+      return;
+    if (!profileManager.ApplyProfile(pendingProfileName, modList))
+      return;
+
+    pendingProfileName = "";
+    var depNotice = !modList.CheckDependencies();
+    depNotice = modList.DisableDuplicates() || depNotice;
+    if (AutoSort)
+      depNotice = !modList.SortByDeps() || depNotice;
+    ModConfigUtil.SaveConfig(modList.ToModConfig());
+    profileManager.SyncActiveProfile(modList);
+
+    if (depNotice && Platform.PauseOnDepNotice)
+    {
+      StopAutoLoad();
+      ManualLoadWindow.OpenProfilesTab();
+      CurWait = new(0, false);
+      await Platform.Wait(CurWait, CommandStage.ConfigLoaded);
+    }
   }
 
   private static async UniTask StageLoading()
@@ -395,10 +424,54 @@ public static class LaunchPadConfig
       if (AutoSort)
         modList.SortByDeps();
       ModConfigUtil.SaveConfig(modList.ToModConfig());
+      profileManager.SyncActiveProfile(modList);
     }
     var next = changed.HasFlag(ManualLoadWindow.ChangeFlags.NextStep);
     if (next)
       CurWait.Skip();
+  }
+
+  private static void PrepareProfileStartup()
+  {
+    pendingProfileName = "";
+    if (string.IsNullOrEmpty(Configs.ModProfile.Value))
+      return;
+
+    profileManager.Initialize();
+    var profile = profileManager.ActiveProfile;
+    if (profile == null)
+      return;
+
+    profileManager.SyncActiveProfile(modList);
+    if (Platform.IsServer)
+    {
+      pendingProfileName = profile.Name;
+      return;
+    }
+
+    if (!AutoLoad)
+    {
+      ManualLoadWindow.OpenProfilesTab();
+      return;
+    }
+
+    var newMods = profileManager.GetNewMods(profile.Name, modList);
+    if (Configs.ProfilePrompt.Value == ProfilePromptMode.Auto && newMods.Count > 0)
+    {
+      Logger.Global.LogInfo($"Found {newMods.Count} mod(s) not in profile '{profile.Name}'");
+      StopAutoLoad();
+      ManualLoadWindow.OpenProfilesTab();
+      return;
+    }
+
+    if (Configs.ProfilePrompt.Value == ProfilePromptMode.Always)
+    {
+      StopAutoLoad();
+      ManualLoadWindow.OpenProfilesTab();
+      return;
+    }
+
+    pendingProfileName = profile.Name;
   }
 
   private static void StartGame()

@@ -453,14 +453,15 @@ public static class ManualLoadWindow
   {
     var disabled = stage is not LoadStage.Searching and not LoadStage.Configuring;
     ImGui.BeginDisabled(disabled);
-    var flags = openProfiles ? ImGuiTabItemFlags.SetSelected : ImGuiTabItemFlags.None;
+    var flags = openProfiles && !disabled ? ImGuiTabItemFlags.SetSelected : ImGuiTabItemFlags.None;
     var open = ImGui.BeginTabItem("Mod Profiles", flags);
     ImGui.EndDisabled();
     ImGuiHelper.ItemTooltip(
       disabled ? "Profiles can only be changed before mods load" : "Save and switch local mod configurations",
       hoverFlags: ImGuiHoveredFlags.AllowWhenDisabled
     );
-    openProfiles = false;
+    if (!disabled)
+      openProfiles = false;
     if (!open)
       return false;
 
