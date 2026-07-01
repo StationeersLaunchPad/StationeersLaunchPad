@@ -42,6 +42,7 @@ public static class Configs
   public static ConfigEntry<LoadStrategyMode> LoadStrategyMode;
   public static ConfigEntry<bool> DisableSteamOnStart;
   public static ConfigEntry<string> SavePathOnStart;
+  public static ConfigEntry<bool> RetainWorkshopMods;
   public static ConfigEntry<bool> PostUpdateCleanup;
   public static ConfigEntry<bool> OneTimeBoosterInstall;
   public static ConfigEntry<bool> AutoScrollLogs;
@@ -195,6 +196,13 @@ public static class Configs
       "",
       new ConfigDescription(
         "This setting allows you to override the default path that config and save files are stored. Notice, due to how this path is implemented in the base game, this setting can only be applied on server start.  Changing it while in game will not have an effect until after a restart."
+      )
+    );
+    RetainWorkshopMods = config.Bind(
+      new ConfigDefinition("Mod Loading", "RetainWorkshopMods"),
+      true,
+      new ConfigDescription(
+        "When running with steam disabled, use the workshop mods already in the mod config as the list of available workshop mods."
       )
     );
     RepoCheckUpdates = config.Bind(
