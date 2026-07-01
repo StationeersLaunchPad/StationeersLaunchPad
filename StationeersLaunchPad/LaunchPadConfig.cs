@@ -265,7 +265,6 @@ public static class LaunchPadConfig
       if (firstLoad)
         await CheckNewsNotices();
 
-      PrepareProfileStartup();
       ModConfigUtil.SaveConfig(modList.ToModConfig());
 
       var depNotice = !modList.CheckDependencies();
@@ -340,6 +339,7 @@ public static class LaunchPadConfig
     CurWait = new(Configs.AutoLoadWaitTime.Value, AutoLoad);
 
     await SLPCommand.MoveToStage(CommandStage.ConfigLoaded);
+    PrepareProfileStartup();
     await Platform.Wait(CurWait, CommandStage.ConfigLoaded);
 
     if (!AutoLoad || string.IsNullOrEmpty(pendingProfileName))
@@ -437,10 +437,17 @@ public static class LaunchPadConfig
     if (string.IsNullOrEmpty(Configs.ModProfile.Value))
       return;
 
+    var profileName = Configs.ModProfile.Value;
+    var wasInitialized = profileManager.IsInitialized;
     profileManager.Initialize();
-    var profile = profileManager.ActiveProfile;
+    var profile = profileManager.FindProfile(profileName);
     if (profile == null)
+    {
+      if (wasInitialized)
+        Logger.Global.LogWarning($"Configured mod profile '{profileName}' was not found");
+      profileManager.DisableProfiles();
       return;
+    }
 
     profileManager.SyncActiveProfile(modList);
     if (Platform.IsServer)

@@ -186,7 +186,9 @@ public class ProfileManager
     GetIdentity(entry).Equals(GetIdentity(mod), StringComparison.OrdinalIgnoreCase);
 
   private static string GetIdentity(ProfileModEntry entry) =>
-    entry.Source == ModSourceType.Core ? "Core" : NormalizePath(entry.DirectoryPath);
+    string.IsNullOrEmpty(entry.DirectoryPath) && entry.WorkshopHandle <= 1
+      ? "Core"
+      : NormalizePath(entry.DirectoryPath);
 
   private static string GetIdentity(ModInfo mod) =>
     mod.Source == ModSourceType.Core ? "Core" : NormalizePath(mod.DirectoryPath);
