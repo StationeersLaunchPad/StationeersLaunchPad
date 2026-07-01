@@ -10,6 +10,7 @@ public class ProfileManager
   private List<ProfileData> profiles = [];
 
   public IReadOnlyList<ProfileData> AllProfiles => profiles;
+  public bool IsInitialized { get; private set; }
   public string ActiveProfileName => Configs.ModProfile.Value;
   public ProfileData ActiveProfile => FindProfile(ActiveProfileName);
   public bool WasActiveProfileApplied =>
@@ -18,8 +19,12 @@ public class ProfileManager
 
   public void Initialize()
   {
+    if (IsInitialized)
+      return;
+
     profiles = ProfileStorage.LoadAll();
     profiles.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
+    IsInitialized = true;
 
     if (string.IsNullOrEmpty(ActiveProfileName) || ActiveProfile != null)
       return;

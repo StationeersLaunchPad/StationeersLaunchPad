@@ -58,6 +58,7 @@ public static class LaunchPadConfig
   public static SplashBehaviour SplashBehaviour;
 
   private static ModList modList = ModList.NewEmpty();
+  private static readonly ProfileManager profileManager = new();
 
   private static LoadStage Stage = LoadStage.Initializing;
   public static bool ModsLoaded => Stage > LoadStage.Configuring;
@@ -94,7 +95,7 @@ public static class LaunchPadConfig
     }
     else
     {
-      var changed = ManualLoadWindow.Draw(Stage, modList, AutoSort);
+      var changed = ManualLoadWindow.Draw(Stage, modList, AutoSort, profileManager);
       HandleChange(changed);
     }
 

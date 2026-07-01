@@ -24,8 +24,15 @@ public static class ManualLoadWindow
   private static bool openInfo = false;
   private static ModInfo draggingMod = null;
   private static bool dragged = false;
+  private static bool openProfiles = false;
 
-  public static ChangeFlags Draw(LoadStage stage, ModList modList, bool autoSort)
+  public static void OpenProfilesTab()
+  {
+    openProfiles = true;
+    ProfilePanel.SelectActive();
+  }
+
+  public static ChangeFlags Draw(LoadStage stage, ModList modList, bool autoSort, ProfileManager profileManager)
   {
     Platform.SetBackgroundEnabled(false);
     var changed = ChangeFlags.None;
@@ -83,6 +90,8 @@ public static class ManualLoadWindow
       {
         DrawModInfoTab(stage);
         DrawModConfigTab(stage);
+        if (DrawProfilesTab(stage, profileManager, modList))
+          changed |= ChangeFlags.Mods;
 
         // If we changed launchpad config and haven't loaded mods yet, mark mods changed to apply disable/sort behaviour
         if (DrawLaunchPadConfigTab() && stage <= LoadStage.Configuring)
@@ -437,6 +446,28 @@ public static class ManualLoadWindow
       changed = ConfigPanel.DrawConfigFile(Configs.Sorted, category => category != "Internal");
       ImGui.EndTabItem();
     }
+    return changed;
+  }
+
+  private static bool DrawProfilesTab(LoadStage stage, ProfileManager profileManager, ModList modList)
+  {
+    var disabled = stage is not LoadStage.Searching and not LoadStage.Configuring;
+    ImGui.BeginDisabled(disabled);
+    var flags = openProfiles ? ImGuiTabItemFlags.SetSelected : ImGuiTabItemFlags.None;
+    var open = ImGui.BeginTabItem("Mod Profiles", flags);
+    ImGui.EndDisabled();
+    ImGuiHelper.ItemTooltip(
+      disabled ? "Profiles can only be changed before mods load" : "Save and switch local mod configurations",
+      hoverFlags: ImGuiHoveredFlags.AllowWhenDisabled
+    );
+    openProfiles = false;
+    if (!open)
+      return false;
+
+    ImGui.BeginChild("##profiles");
+    var changed = ProfilePanel.Draw(profileManager, modList);
+    ImGui.EndChild();
+    ImGui.EndTabItem();
     return changed;
   }
 }
