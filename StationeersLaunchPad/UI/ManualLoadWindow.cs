@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using ImGuiNET;
 using StationeersLaunchPad.Loading;
 using StationeersLaunchPad.Metadata;
@@ -24,6 +26,19 @@ public static class ManualLoadWindow
   private static bool openInfo = false;
   private static ModInfo draggingMod = null;
   private static bool dragged = false;
+
+  // Mod list sorting/filtering state (see DrawModListTools / DrawSearchAndCount)
+  private static ModList.ModSortField sortField = ModList.ModSortField.LoadOrder;
+  private static bool sortDescending = false;
+  private static bool sortApplyToLoadOrder = false;
+  private static string searchText = "";
+
+  private static readonly string[] SortFieldLabels =
+    { "Load order", "Name", "Author", "Released", "Updated" };
+
+  // Subtle background tint for alternating list rows (zebra striping).
+  private static uint RowAltColor =>
+    ImGui.ColorConvertFloat4ToU32(new Color(1f, 1f, 1f, 0.045f));
 
   public static ChangeFlags Draw(LoadStage stage, ModList modList, bool autoSort)
   {
@@ -70,7 +85,13 @@ public static class ManualLoadWindow
       }
       else if (stage is LoadStage.Loading or LoadStage.Loaded)
       {
+        DrawModListToolbar(modList, loaded: true);
+        ImGui.SetCursorPosY(ImGui.GetCursorPosY() - ImGui.GetStyle().ItemSpacing.y);
+        ImGui.Separator();
+        leftRect = leftRect.From(ImGui.GetCursorScreenPos());
+        ImGui.BeginChild("##loadtable", leftRect.Size);
         DrawLoadTable(modList);
+        ImGui.EndChild();
       }
       ImGui.EndChild();
 
@@ -237,10 +258,173 @@ public static class ManualLoadWindow
       }
     }
 
+    changed |= DrawModListToolbar(modList, loaded: false);
+
     ImGui.SetCursorPosY(ImGui.GetCursorPosY() - ImGui.GetStyle().ItemSpacing.y);
     ImGui.Separator();
 
     return changed;
+  }
+
+  // Full toolbar above the mod list: sort controls, search box, counters and column headers.
+  private static ChangeFlags DrawModListToolbar(ModList modList, bool loaded)
+  {
+    var changed = DrawModListTools(modList, loaded);
+    DrawSearchAndCount(modList, loaded);
+    DrawColumnHeader(loaded);
+    return changed;
+  }
+
+  // Sort selector: field combo, direction toggle and an optional "apply to load order" switch.
+  // When loaded is true the mods are already loaded, so the load-order switch is hidden and
+  // sorting only changes how the list is displayed.
+  private static ChangeFlags DrawModListTools(ModList modList, bool loaded)
+  {
+    var changed = ChangeFlags.None;
+
+    ImGui.AlignTextToFramePadding();
+    ImGuiHelper.Text("Sort:");
+
+    ImGui.SameLine();
+    ImGui.SetNextItemWidth(140f);
+    var cur = (int)sortField;
+    if (ImGui.Combo("##sortfield", ref cur, SortFieldLabels, SortFieldLabels.Length))
+    {
+      sortField = (ModList.ModSortField)cur;
+      if (!loaded && sortApplyToLoadOrder && modList.ApplySort(sortField, sortDescending))
+        changed |= ChangeFlags.Mods;
+    }
+    ImGuiHelper.ItemTooltip(
+      "Order the mod list by load order, name, author, release date or last update.\n" +
+      "Release/update dates come from Steam for Workshop mods; for local mods the mod " +
+      "folder timestamps are used as a fallback.");
+
+    ImGui.SameLine();
+    if (ImGui.Button(sortDescending ? "Desc" : "Asc"))
+    {
+      sortDescending = !sortDescending;
+      if (!loaded && sortApplyToLoadOrder && modList.ApplySort(sortField, sortDescending))
+        changed |= ChangeFlags.Mods;
+    }
+    ImGuiHelper.ItemTooltip("Toggle ascending/descending order.");
+
+    if (!loaded)
+    {
+      ImGui.SameLine();
+      if (ImGui.Checkbox("Apply to load order", ref sortApplyToLoadOrder)
+          && sortApplyToLoadOrder
+          && modList.ApplySort(sortField, sortDescending))
+        changed |= ChangeFlags.Mods;
+      ImGuiHelper.ItemTooltip(
+        "On: sorting also rewrites the real mod load order (drag & drop is disabled while a sort is active).\n" +
+        "Off: sorting only changes how the list is displayed; the load order is left untouched.");
+    }
+
+    ImGui.SameLine();
+    ImGuiHelper.TextDisabled("|", true);
+
+    ImGui.SameLine();
+    if (ImGui.Button("Export List"))
+      LaunchPadConfig.ExportModListJson();
+    ImGuiHelper.ItemTooltip($"Save the current mod list (state + order) as JSON to:\n{LaunchPadPaths.ModListJsonPath}");
+
+    ImGui.SameLine();
+    ImGui.BeginDisabled(!LaunchPadConfig.CanImportModList);
+    if (ImGui.Button("Import List"))
+    {
+      LaunchPadConfig.ImportModListJson();
+      changed |= ChangeFlags.Mods;
+    }
+    ImGui.EndDisabled();
+    ImGuiHelper.ItemTooltip(
+      $"Load a mod list from JSON and apply its enabled state and order:\n{LaunchPadPaths.ModListJsonPath}",
+      hoverFlags: ImGuiHoveredFlags.AllowWhenDisabled);
+
+    return changed;
+  }
+
+  private static string SortValueText(ModInfo mod) => sortField switch
+  {
+    ModList.ModSortField.Author => string.IsNullOrEmpty(mod.Author) ? "-" : mod.Author,
+    ModList.ModSortField.Released => mod.Released?.ToString("yyyy-MM-dd") ?? "-",
+    ModList.ModSortField.Updated => mod.Updated?.ToString("yyyy-MM-dd") ?? "-",
+    _ => null,
+  };
+
+  // True when the mod matches the current search text (by name or author).
+  private static bool MatchesSearch(ModInfo mod)
+  {
+    if (string.IsNullOrWhiteSpace(searchText))
+      return true;
+    var q = searchText.Trim();
+    return (mod.Name?.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0)
+        || (mod.Author?.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0);
+  }
+
+  // Search box + counters row.
+  private static void DrawSearchAndCount(ModList modList, bool loaded)
+  {
+    ImGui.AlignTextToFramePadding();
+    ImGuiHelper.Text("Search:");
+
+    ImGui.SameLine();
+    ImGui.SetNextItemWidth(200f);
+    ImGui.InputTextWithHint("##modsearch", "name or author...", ref searchText, 256);
+
+    if (!string.IsNullOrEmpty(searchText))
+    {
+      ImGui.SameLine();
+      if (ImGui.Button("Clear##search"))
+        searchText = "";
+    }
+
+    int total = 0, enabled = 0, shown = 0;
+    if (loaded)
+    {
+      total = enabled = ModLoader.LoadedMods.Count;
+      shown = ModLoader.LoadedMods.Count(m => MatchesSearch(m.Info));
+    }
+    else
+    {
+      foreach (var mod in modList.AllMods)
+      {
+        if (mod.Source == ModSourceType.Core)
+          continue;
+        total++;
+        if (mod.Enabled)
+          enabled++;
+        if (MatchesSearch(mod))
+          shown++;
+      }
+    }
+
+    ImGui.SameLine();
+    ImGuiHelper.TextDisabled("|", true);
+    ImGui.SameLine();
+    var countText = loaded ? $"Loaded: {total}" : $"Enabled: {enabled} / {total}";
+    if (!string.IsNullOrWhiteSpace(searchText))
+      countText += $"   (showing {shown})";
+    ImGuiHelper.TextDisabled(countText);
+  }
+
+  // Fixed (non-scrolling) column headers aligned with the table columns below.
+  private static void DrawColumnHeader(bool loaded)
+  {
+    var spacing = ImGui.GetStyle().ItemSpacing.x * 2;
+    var c0 = loaded
+      ? ImGui.CalcTextSize("XXX").x + spacing
+      : ImGui.GetTextLineHeightWithSpacing() + spacing;
+    var c1 = ImGui.CalcTextSize($"{ModSourceType.Workshop}").x + spacing;
+
+    var available = ImGuiHelper.AvailableRect();
+    var row = available.TableRow(ImGui.GetTextLineHeightWithSpacing(), stackalloc[] { c0, c1 });
+
+    ImGuiHelper.TextCentered(row.Column(1), "Source");
+
+    var nameHeader = "Name";
+    if (sortField != ModList.ModSortField.LoadOrder)
+      nameHeader = $"Name   (by {SortFieldLabels[(int)sortField]} {(sortDescending ? "v" : "^")})";
+    ImGuiHelper.Text(row.Column(2), nameHeader);
   }
 
   private static bool DrawModSelectTable(ModList modList, bool edit = false, bool autoSort = false)
@@ -259,10 +443,19 @@ public static class ManualLoadWindow
       dragged = false;
     }
 
+    // Display order may differ from the real load order when a sort/search is active.
+    // Drag & drop reordering is only allowed when showing the full, unsorted load order.
+    var displayMods = modList.Sorted(sortField, sortDescending);
+    if (!string.IsNullOrWhiteSpace(searchText))
+      displayMods = displayMods.Where(MatchesSearch).ToList();
+    var canReorder = edit
+      && sortField == ModList.ModSortField.LoadOrder
+      && string.IsNullOrWhiteSpace(searchText);
+
     var hoveringIndex = -1;
     var draggingIndex = -1;
     if (draggingMod != null)
-      draggingIndex = modList.IndexOf(draggingMod);
+      draggingIndex = displayMods.IndexOf(draggingMod);
 
     var rowHeight = ImGui.GetTextLineHeightWithSpacing();
     var spacing = ImGui.GetStyle().ItemSpacing.x * 2;
@@ -280,9 +473,12 @@ public static class ManualLoadWindow
     ImGui.BeginDisabled(!edit);
 
     var idx = 0;
-    foreach (var mod in modList.AllMods)
+    foreach (var mod in displayMods)
     {
       ImGui.PushID(idx);
+
+      if ((idx & 1) == 1)
+        ImGui.GetWindowDrawList().AddRectFilled(row.Rect.TL, row.Rect.BR, RowAltColor);
 
       ImGui.SetCursorScreenPos(row.Column(0).TL);
       ImGui.BeginDisabled(mod.Source is ModSourceType.Core);
@@ -308,11 +504,19 @@ public static class ManualLoadWindow
 
       ImGuiHelper.Text(row.Column(2), $"{mod.Name}");
 
-      if (draggingMod != null)
+      if (draggingMod != null && canReorder)
+      {
         if (mod.SortBefore(draggingMod))
           ImGuiHelper.DrawSameLine(() => ImGuiHelper.TextRightDisabled("Before"));
         else if (draggingMod.SortBefore(mod))
           ImGuiHelper.DrawSameLine(() => ImGuiHelper.TextRightDisabled("After"));
+      }
+      else
+      {
+        var sortValue = SortValueText(mod);
+        if (sortValue != null)
+          ImGuiHelper.DrawSameLine(() => ImGuiHelper.TextRightDisabled(sortValue));
+      }
 
       ImGui.PopID();
 
@@ -322,7 +526,7 @@ public static class ManualLoadWindow
 
     ImGui.EndDisabled();
 
-    if (edit && draggingIndex != -1 && hoveringIndex != -1 && draggingIndex != hoveringIndex)
+    if (canReorder && draggingIndex != -1 && hoveringIndex != -1 && draggingIndex != hoveringIndex)
     {
       dragged = true;
       if (modList.MoveModTo(draggingMod, hoveringIndex, autoSort))
@@ -345,12 +549,28 @@ public static class ManualLoadWindow
       ImGui.CalcTextSize($"{ModSourceType.Workshop}").x + spacing
     });
 
+    // Apply the same view sorting/search as the pre-load list. The actual load order is
+    // fixed at this point, so this only changes how the loaded mods are displayed.
+    IEnumerable<LoadedMod> loadedMods = ModLoader.LoadedMods;
+    if (sortField != ModList.ModSortField.LoadOrder)
+    {
+      var cmp = ModList.GetComparer(sortField, sortDescending);
+      var sorted = new List<LoadedMod>(ModLoader.LoadedMods);
+      sorted.Sort((a, b) => cmp.Compare(a.Info, b.Info));
+      loadedMods = sorted;
+    }
+    if (!string.IsNullOrWhiteSpace(searchText))
+      loadedMods = loadedMods.Where(m => MatchesSearch(m.Info));
+
     var idx = 0;
-    foreach (var mod in ModLoader.LoadedMods)
+    foreach (var mod in loadedMods)
     {
       ImGui.PushID(idx);
       var info = mod.Info;
       var isSelected = selectedMod == mod;
+
+      if ((idx & 1) == 1)
+        ImGui.GetWindowDrawList().AddRectFilled(row.Rect.TL, row.Rect.BR, RowAltColor);
 
       ImGui.SetCursorScreenPos(row.Rect.TL);
       if (ImGui.Selectable("##scopeselect", isSelected, row.Rect.Size))
@@ -364,6 +584,10 @@ public static class ManualLoadWindow
       ImGuiHelper.TextCentered(row.Column(1), $"{info.Source}");
 
       ImGuiHelper.Text(row.Column(2), info.Name);
+
+      var sortValue = SortValueText(info);
+      if (sortValue != null)
+        ImGuiHelper.DrawSameLine(() => ImGuiHelper.TextRightDisabled(sortValue));
 
       ImGui.PopID();
       idx++;
