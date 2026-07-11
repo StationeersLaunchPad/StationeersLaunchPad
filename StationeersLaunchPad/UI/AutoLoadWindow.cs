@@ -7,7 +7,7 @@ namespace StationeersLaunchPad.UI;
 public class AutoLoadWindow
 {
   // returns true if the user clicked to stop autoloading
-  public static bool Draw(LoadStage stage, StageWait wait)
+  public static bool Draw(LoadStage stage, StageWait wait, string profileName)
   {
     var stopAuto = false;
     ImGuiHelper.Draw(() =>
@@ -24,6 +24,8 @@ public class AutoLoadWindow
         LoadStage.Initializing => "Initializing",
         LoadStage.News => "Checking notices",
         LoadStage.Searching => "Finding Mods",
+        LoadStage.Configuring when !string.IsNullOrEmpty(profileName) =>
+          $"Auto loading Mod Profile \"{profileName}\" in {wait.SecondsRemaining:0.0}s",
         LoadStage.Configuring => $"Loading Mods in {wait.SecondsRemaining:0.0}s",
         LoadStage.Loading => "Loading Mods",
         LoadStage.Loaded => $"Starting game in {wait.SecondsRemaining:0.0}s",

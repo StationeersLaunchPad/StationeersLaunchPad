@@ -1,6 +1,13 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using Assets.Scripts.Networking.Transports;
+using Cysharp.Threading.Tasks;
 using ImGuiNET;
 using StationeersLaunchPad.Metadata;
+using StationeersLaunchPad.Sources;
+using UnityEngine;
 
 namespace StationeersLaunchPad.UI;
 
@@ -9,125 +16,372 @@ public static class ProfilePanel
   private static string selectedName = "";
   private static string newProfileName = "";
   private static string message = "";
+  private static string confirmDelete = "";
+  private static string confirmEmptySave = "";
+  private static DateTime confirmationExpires;
   private static bool selectActive;
+  private static readonly HashSet<ulong> subscriptions = [];
+
+  public static bool Busy => subscriptions.Count > 0;
 
   public static void SelectActive() => selectActive = true;
 
-  public static bool Draw(ProfileManager manager, ModList modList)
+  public static bool Draw(LoadStage stage, ProfileManager manager, ModList modList)
   {
+    if ((!string.IsNullOrEmpty(confirmDelete) || !string.IsNullOrEmpty(confirmEmptySave))
+      && DateTime.UtcNow > confirmationExpires)
+      ClearConfirmations();
     manager.Initialize();
     if (selectActive)
     {
       selectedName = manager.ActiveProfileName;
       selectActive = false;
     }
+    else if (string.IsNullOrEmpty(selectedName) && !string.IsNullOrEmpty(manager.ActiveProfileName))
+      selectedName = manager.ActiveProfileName;
     if (!string.IsNullOrEmpty(selectedName) && manager.FindProfile(selectedName) == null)
       selectedName = "";
 
+    var changed = DrawProfilePicker(manager, modList);
+    var selected = manager.FindProfile(selectedName);
+    if (selected == null)
+      DrawOffState(manager);
+    else
+      changed |= DrawProfileActions(manager, modList, selected);
+
+    DrawCreateProfile(manager, modList, ref changed);
+    DrawProfileContents(stage, manager, selected, modList);
+    return changed;
+  }
+
+  private static bool DrawProfilePicker(ProfileManager manager, ModList modList)
+  {
     var changed = false;
-    var activeName = string.IsNullOrEmpty(manager.ActiveProfileName)
-      ? "Off (normal mod configuration)"
-      : manager.ActiveProfileName;
-    ImGuiHelper.Text($"Active: {activeName}");
-    ImGui.Spacing();
+    ImGuiHelper.Text("Profile");
+    ImGui.SameLine();
+    if (string.IsNullOrEmpty(manager.ActiveProfileName))
+      ImGuiHelper.TextDisabled("Off");
+    else
+      ImGuiHelper.TextColored($"Selected: {manager.ActiveProfileName}", LaunchPadTheme.Accent);
 
     var selected = manager.FindProfile(selectedName);
     ImGui.SetNextItemWidth(-float.Epsilon);
-    if (ImGui.BeginCombo("##profiles", selected?.Name ?? "Off (normal mod configuration)"))
-    {
-      if (ImGui.Selectable("Off (normal mod configuration)", selected == null))
-        selectedName = "";
-      foreach (var profile in manager.AllProfiles)
-      {
-        if (ImGui.Selectable(profile.Name, profile == selected))
-          selectedName = profile.Name;
-      }
-      ImGui.EndCombo();
-    }
+    if (!ImGui.BeginCombo("##profiles", selected?.Name ?? "Off (normal mod configuration)"))
+      return false;
 
-    selected = manager.FindProfile(selectedName);
-    if (selected == null)
+    if (ImGui.Selectable("Off (normal mod configuration)", selected == null))
     {
-      ImGui.BeginDisabled(string.IsNullOrEmpty(manager.ActiveProfileName));
-      if (ImGui.Button("Use Normal Mod Configuration"))
-      {
-        manager.DisableProfiles();
-        message = "Profiles are off";
-      }
-      ImGui.EndDisabled();
-      ImGuiHelper.TextDisabled("LaunchPad will keep using its normal mod configuration.");
+      selectedName = "";
+      ClearConfirmations();
+      manager.DisableProfiles();
+      message = "Profiles are off. The current mod list is unchanged.";
+    }
+    foreach (var profile in manager.AllProfiles)
+    {
+      if (!ImGui.Selectable(profile.Name, profile == selected))
+        continue;
+
+      selectedName = profile.Name;
+      ClearConfirmations();
+      changed |= manager.ApplyProfile(profile.Name, modList);
+      message = changed ? $"Switched to {profile.Name}" : "Profile could not be loaded";
+    }
+    ImGui.EndCombo();
+    return changed;
+  }
+
+  private static void DrawOffState(ProfileManager manager)
+  {
+    ImGuiHelper.TextWrapped("Profiles are optional. Create one from the mod list on the left, or select an existing profile above.");
+    if (!string.IsNullOrEmpty(manager.ActiveProfileName) && ImGui.Button("Turn Profiles Off"))
+      manager.DisableProfiles();
+    DrawMessage();
+  }
+
+  private static bool DrawProfileActions(ProfileManager manager, ModList modList, ProfileData selected)
+  {
+    var changed = false;
+    var diverged = manager.HasDiverged(selected.Name, modList);
+    if (diverged)
+    {
+      ImGuiHelper.TextWarning("The current mod list differs from this saved profile.");
+      ImGuiHelper.TextDisabled("Save the current list, or apply the saved profile to discard these changes.");
     }
     else
+      ImGuiHelper.TextDisabled("The mod list on the left matches this profile.");
+
+    ImGui.BeginDisabled(!diverged);
+    PushPrimaryButton();
+    var emptySave = modList.EnabledMods.All(mod => mod.Source == ModSourceType.Core)
+      && selected.Mods.Any(entry => entry.Enabled && !IsCore(entry));
+    if (!emptySave)
+      confirmEmptySave = "";
+    var saveText = emptySave && confirmEmptySave == selected.Name
+      ? "Confirm Empty Profile"
+      : "Save Current List";
+    if (ImGui.Button(saveText))
     {
-      if (ImGui.Button("Use Profile"))
+      if (emptySave && confirmEmptySave != selected.Name)
       {
-        changed = manager.ApplyProfile(selected.Name, modList);
-        message = changed ? $"Loaded {selected.Name}" : "Profile could not be loaded";
+        confirmEmptySave = selected.Name;
+        confirmationExpires = DateTime.UtcNow.AddSeconds(5);
+        message = $"Click again to save {selected.Name} with no enabled mods";
       }
-      ImGui.SameLine();
-      if (ImGui.Button("Update from Current Mods"))
+      else
+      {
         message = manager.UpdateProfile(selected.Name, modList)
-          ? $"Updated {selected.Name}"
+          ? $"Saved current mod list to {selected.Name}"
           : "Profile could not be updated";
-      ImGui.SameLine();
-      if (ImGui.Button("Delete"))
+        confirmEmptySave = "";
+      }
+    }
+    ImGui.PopStyleColor(3);
+    ImGui.EndDisabled();
+
+    ImGui.SameLine();
+    if (ImGui.Button("Apply Saved Profile"))
+    {
+      ClearConfirmations();
+      changed |= manager.ApplyProfile(selected.Name, modList);
+      message = changed ? $"Applied {selected.Name}" : "Profile could not be loaded";
+    }
+    ImGui.SameLine();
+    var deleteText = confirmDelete == selected.Name ? "Confirm Delete" : "Delete Profile";
+    if (ImGui.Button(deleteText))
+    {
+      if (confirmDelete != selected.Name)
+      {
+        confirmDelete = selected.Name;
+        confirmationExpires = DateTime.UtcNow.AddSeconds(5);
+        message = $"Click again to delete {selected.Name}";
+      }
+      else
       {
         message = manager.DeleteProfile(selected.Name)
           ? $"Deleted {selected.Name}"
           : "Profile could not be deleted";
         selectedName = "";
-      }
-
-      var enabled = selected.Mods.Count(mod => mod.Enabled);
-      ImGuiHelper.TextDisabled($"{enabled} enabled, {selected.Mods.Count} installed when last updated");
-      if (manager.HasDiverged(selected.Name, modList))
-        ImGuiHelper.TextWarning("The current enabled mods or load order differ from this profile.");
-
-      var newMods = manager.GetNewMods(selected.Name, modList);
-      if (newMods.Count > 0)
-      {
-        ImGui.Separator();
-        ImGuiHelper.TextWarning($"{newMods.Count} new mod{(newMods.Count == 1 ? " is" : "s are")} not in this profile:");
-        foreach (var mod in newMods.Take(8))
-          ImGui.BulletText($"{mod.Name} ({mod.Source})");
-        if (newMods.Count > 8)
-          ImGuiHelper.TextDisabled($"...and {newMods.Count - 8} more");
-
-        if (ImGui.Button("Add to Profile"))
-        {
-          var updated = manager.UpdateProfile(selected.Name, modList);
-          changed = updated && manager.ApplyProfile(selected.Name, modList);
-          message = changed ? $"Added new mods to {selected.Name}" : "Profile could not be updated";
-        }
-        ImGui.SameLine();
-        if (ImGui.Button("Keep Profile Unchanged"))
-        {
-          changed = manager.ApplyProfile(selected.Name, modList);
-          message = changed ? $"Loaded {selected.Name} without the new mods" : "Profile could not be loaded";
-        }
+        ClearConfirmations();
       }
     }
 
-    ImGui.Separator();
-    ImGui.SetNextItemWidth(-120f);
-    var create = ImGui.InputText("##newprofile", ref newProfileName, 80, ImGuiInputTextFlags.EnterReturnsTrue);
-    ImGui.SameLine();
-    create |= ImGui.Button("Create Profile");
-    if (create)
+    var newMods = manager.GetNewMods(selected.Name, modList);
+    if (newMods.Count > 0)
     {
-      if (manager.CreateProfile(newProfileName, modList))
+      ImGui.Spacing();
+      ImGuiHelper.TextWarning($"{newMods.Count} new mod{(newMods.Count == 1 ? " is" : "s are")} not in this profile:");
+      foreach (var mod in newMods.Take(5))
+        ImGui.BulletText($"{mod.Name} ({mod.Source})");
+      if (newMods.Count > 5)
+        ImGuiHelper.TextDisabled($"...and {newMods.Count - 5} more");
+
+      if (ImGui.Button("Add to Profile"))
       {
-        selectedName = newProfileName;
-        manager.ApplyProfile(selectedName, modList);
-        message = $"Created {selectedName}";
-        newProfileName = "";
+        var updated = manager.UpdateProfile(selected.Name, modList);
+        changed |= updated && manager.ApplyProfile(selected.Name, modList);
+        message = changed ? $"Added new mods to {selected.Name}" : "Profile could not be updated";
       }
-      else
-        message = "Use a unique name without file name characters";
+      ImGui.SameLine();
+      if (ImGui.Button("Keep Profile Unchanged"))
+      {
+        changed |= manager.ApplyProfile(selected.Name, modList);
+        message = changed ? $"Loaded {selected.Name} without the new mods" : "Profile could not be loaded";
+      }
     }
 
+    DrawMessage();
+    return changed;
+  }
+
+  private static void DrawCreateProfile(ProfileManager manager, ModList modList, ref bool changed)
+  {
+    ImGui.Separator();
+    ImGuiHelper.Text("Create from the current mod list");
+
+    const string buttonText = "Create Profile";
+    var style = ImGui.GetStyle();
+    var buttonWidth = ImGui.CalcTextSize(buttonText).x + style.FramePadding.x * 2;
+    var inputWidth = Math.Max(80f, ImGui.GetContentRegionAvail().x - buttonWidth - style.ItemSpacing.x);
+    ImGui.SetNextItemWidth(inputWidth);
+    var create = ImGui.InputTextWithHint(
+      "##newprofile", "Profile name", ref newProfileName, 80,
+      ImGuiInputTextFlags.EnterReturnsTrue);
+    ImGui.SameLine();
+    create |= ImGui.Button(buttonText);
+    if (!create)
+      return;
+
+    if (manager.CreateProfile(newProfileName, modList))
+    {
+      selectedName = newProfileName;
+      ClearConfirmations();
+      changed |= manager.ApplyProfile(selectedName, modList);
+      message = $"Created {selectedName}";
+      newProfileName = "";
+    }
+    else
+      message = "Use a unique name without file name characters";
+  }
+
+  private static void DrawProfileContents(
+    LoadStage stage, ProfileManager manager, ProfileData selected, ModList modList)
+  {
+    ImGui.Separator();
+    if (selected == null)
+    {
+      ImGuiHelper.TextDisabled("No profile selected.");
+      return;
+    }
+
+    var entries = selected.Mods
+      .Where(entry => entry.Enabled && !IsCore(entry))
+      .ToList();
+    var currentCount = modList.EnabledMods.Count(mod => mod.Source != ModSourceType.Core);
+    ImGuiHelper.Text($"Saved mods in {selected.Name}");
+    ImGui.SameLine();
+    ImGuiHelper.TextDisabled($"{entries.Count} saved, {currentCount} currently enabled");
+    ImGuiHelper.TextDisabled("Edit using the mod list on the left, then save the changes here.");
+
+    ImGui.PushStyleColor(ImGuiCol.ChildBg, (Vector4)LaunchPadTheme.PanelAlt);
+    ImGui.PushStyleColor(ImGuiCol.Border, (Vector4)LaunchPadTheme.Border);
+    ImGui.BeginChild("##profilecontents", new Vector2(0, 0), true);
+    for (var i = 0; i < entries.Count; i++)
+      DrawProfileMod(stage, manager, selected, entries[i], i, modList);
+    if (entries.Count == 0)
+      ImGuiHelper.TextDisabled("This profile has no enabled mods.");
+
+    var unavailable = selected.Mods
+      .Where(entry => !entry.Enabled && !IsCore(entry)
+        && ProfileManager.FindMod(entry, modList.AllMods) == null)
+      .ToList();
+    if (unavailable.Count > 0)
+    {
+      ImGui.Separator();
+      ImGuiHelper.Text("Unavailable saved mods");
+      foreach (var (entry, index) in unavailable.Select((entry, index) => (entry, index)))
+        DrawProfileMod(stage, manager, selected, entry, entries.Count + index, modList);
+    }
+    ImGui.EndChild();
+    ImGui.PopStyleColor(2);
+  }
+
+  private static void DrawProfileMod(
+    LoadStage stage, ProfileManager manager, ProfileData profile,
+    ProfileModEntry entry, int index, ModList modList)
+  {
+    var mod = ProfileManager.FindMod(entry, modList.AllMods);
+    var source = mod?.Source.ToString() ?? (entry.Source == ModSourceType.Core ? "Mod" : entry.Source.ToString());
+    var name = mod?.Name ?? GetFallbackName(entry);
+    if (mod != null && modList.IsBetaMod(mod))
+      name += " [BETA]";
+
+    ImGui.PushID(index);
+    ImGuiHelper.TextDisabled($"{index + 1}.");
+    ImGui.SameLine();
+    ImGuiHelper.TextColored(source, LaunchPadTheme.TextMuted);
+    ImGui.SameLine();
+    ImGuiHelper.Text(name);
+    if (mod == null)
+    {
+      ImGui.SameLine();
+      ImGuiHelper.TextWarning("Not installed");
+      if (entry.WorkshopHandle > 1)
+      {
+        ImGui.SameLine();
+        var busy = subscriptions.Contains(entry.WorkshopHandle);
+        ImGui.BeginDisabled(stage != LoadStage.Configuring || busy);
+        if (ImGui.Button(busy ? "Subscribing..." : "Subscribe"))
+          Subscribe(entry).Forget();
+        ImGui.EndDisabled();
+        ImGuiHelper.ItemTooltip(
+          stage == LoadStage.Configuring
+            ? $"Subscribe to Workshop item {entry.WorkshopHandle}"
+            : "Workshop items can only be subscribed before loading mods",
+          hoverFlags: ImGuiHoveredFlags.AllowWhenDisabled);
+      }
+      ImGui.SameLine();
+      if (ImGui.Button("Remove from Profile"))
+        message = manager.RemoveMod(profile.Name, entry)
+          ? $"Removed {name} from {profile.Name}"
+          : $"Could not remove {name}";
+    }
+    else if (!mod.Enabled)
+    {
+      ImGui.SameLine();
+      ImGuiHelper.TextWarning("Pending removal");
+    }
+    ImGui.PopID();
+  }
+
+  private static async UniTask Subscribe(ProfileModEntry entry)
+  {
+    if (!subscriptions.Add(entry.WorkshopHandle))
+      return;
+
+    message = $"Subscribing to Workshop item {entry.WorkshopHandle}...";
+    try
+    {
+      if (!await Steam.SubscribeAndDownload(entry.WorkshopHandle))
+      {
+        message = $"Could not subscribe to Workshop item {entry.WorkshopHandle}";
+        return;
+      }
+
+      var config = ModConfigUtil.LoadConfig();
+      var workshop = config.Mods
+        .OfType<WorkshopModData>()
+        .FirstOrDefault(mod => (ulong)mod.WorkshopId == entry.WorkshopHandle);
+      if (workshop == null)
+      {
+        workshop = new();
+        config.Mods.Add(workshop);
+      }
+      workshop.Enabled = entry.Enabled;
+      workshop.DirectoryPath = new(entry.DirectoryPath);
+      workshop.WorkshopId = new(entry.WorkshopHandle);
+      ModConfigUtil.SaveConfig(config);
+
+      message = $"Subscribed to Workshop item {entry.WorkshopHandle}";
+      LaunchPadConfig.ReloadMods();
+    }
+    finally
+    {
+      subscriptions.Remove(entry.WorkshopHandle);
+    }
+  }
+
+  private static string GetFallbackName(ProfileModEntry entry)
+  {
+    if (!string.IsNullOrEmpty(entry.Name))
+      return entry.Name;
+    if (!string.IsNullOrEmpty(entry.ModID))
+      return entry.ModID;
+    if (entry.WorkshopHandle > 1)
+      return $"Workshop {entry.WorkshopHandle}";
+    var name = Path.GetFileName(entry.DirectoryPath?.TrimEnd('/', '\\'));
+    return string.IsNullOrEmpty(name) ? "Unknown mod" : name;
+  }
+
+  private static bool IsCore(ProfileModEntry entry) =>
+    string.IsNullOrEmpty(entry.DirectoryPath) && entry.WorkshopHandle <= 1;
+
+  private static void DrawMessage()
+  {
     if (!string.IsNullOrEmpty(message))
       ImGuiHelper.TextDisabled(message);
-    return changed;
+  }
+
+  private static void PushPrimaryButton()
+  {
+    ImGui.PushStyleColor(ImGuiCol.Button, (Vector4)LaunchPadTheme.AccentSoft);
+    ImGui.PushStyleColor(ImGuiCol.ButtonHovered, (Vector4)LaunchPadTheme.AccentStrong);
+    ImGui.PushStyleColor(ImGuiCol.ButtonActive, (Vector4)LaunchPadTheme.AccentBorder);
+  }
+
+  private static void ClearConfirmations()
+  {
+    confirmDelete = "";
+    confirmEmptySave = "";
+    confirmationExpires = DateTime.MinValue;
   }
 }

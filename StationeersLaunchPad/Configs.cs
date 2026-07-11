@@ -61,6 +61,7 @@ public static class Configs
   public static ConfigEntry<ProfilePromptMode> ProfilePrompt;
   public static ConfigEntry<string> ModProfile;
   public static ConfigEntry<string> AppliedModProfile;
+  public static ConfigEntry<string> AppliedModProfileHash;
 
   public static ConfigEntry<bool> NewsCheckOnStart;
   public static ConfigEntry<string> NewsFeedUrl;
@@ -333,6 +334,13 @@ public static class Configs
       "",
       new ConfigDescription(
         "The mod profile last applied to the normal mod configuration. Automatically managed."
+      )
+    );
+    AppliedModProfileHash = config.Bind(
+      new ConfigDefinition("Internal", "AppliedModProfileHash"),
+      "",
+      new ConfigDescription(
+        "Fingerprint of the mod configuration last applied by a profile. Automatically managed."
       )
     );
     LinuxPathPatch = config.Bind(

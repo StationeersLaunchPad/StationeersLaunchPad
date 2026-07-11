@@ -91,7 +91,7 @@ public static class LaunchPadConfig
   {
     if (AutoLoad)
     {
-      if (AutoLoadWindow.Draw(Stage, CurWait))
+      if (AutoLoadWindow.Draw(Stage, CurWait, pendingProfileName))
       {
         StopAutoLoad();
         if (!string.IsNullOrEmpty(Configs.ModProfile.Value))
@@ -415,6 +415,7 @@ public static class LaunchPadConfig
       return;
     var sortChanged = changed.HasFlag(ManualLoadWindow.ChangeFlags.AutoSort);
     var modsChanged = changed.HasFlag(ManualLoadWindow.ChangeFlags.Mods);
+    var profileChanged = changed.HasFlag(ManualLoadWindow.ChangeFlags.Profile);
     if (sortChanged)
       Configs.AutoSortOnStart.Value = AutoSort = !AutoSort;
     if (sortChanged || modsChanged)
@@ -424,7 +425,10 @@ public static class LaunchPadConfig
       if (AutoSort)
         modList.SortByDeps();
       ModConfigUtil.SaveConfig(modList.ToModConfig());
-      profileManager.SyncActiveProfile(modList);
+      if (profileChanged)
+        profileManager.MarkActiveProfileApplied(modList);
+      else
+        profileManager.MarkActiveProfileDirty();
     }
     var next = changed.HasFlag(ManualLoadWindow.ChangeFlags.NextStep);
     if (next)

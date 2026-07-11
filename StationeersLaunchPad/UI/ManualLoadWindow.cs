@@ -16,6 +16,7 @@ public static class ManualLoadWindow
     Mods = 1 << 0,
     AutoSort = 1 << 1,
     NextStep = 1 << 2,
+    Profile = 1 << 3,
   }
 
   private static LoadStage lastStage;
@@ -91,7 +92,7 @@ public static class ManualLoadWindow
         DrawModInfoTab(stage);
         DrawModConfigTab(stage);
         if (DrawProfilesTab(stage, profileManager, modList))
-          changed |= ChangeFlags.Mods;
+          changed |= ChangeFlags.Mods | ChangeFlags.Profile;
 
         if (BetaProgramsPanel.Draw(stage, modList))
           changed |= ChangeFlags.Mods;
@@ -147,6 +148,7 @@ public static class ManualLoadWindow
     ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, Vector2.zero);
     var (nextEnabled, nextText) = stage switch
     {
+      LoadStage.Configuring when ProfilePanel.Busy => (false, "Subscribing..."),
       LoadStage.Configuring when BetaProgramsPanel.Busy => (false, "Updating Betas..."),
       LoadStage.Configuring => (true, "Load Mods"),
       LoadStage.Loaded or LoadStage.Failed => (true, "Start Game"),
@@ -482,7 +484,7 @@ public static class ManualLoadWindow
       return false;
 
     ImGui.BeginChild("##profiles");
-    var changed = ProfilePanel.Draw(profileManager, modList);
+    var changed = ProfilePanel.Draw(stage, profileManager, modList);
     ImGui.EndChild();
     ImGui.EndTabItem();
     return changed;

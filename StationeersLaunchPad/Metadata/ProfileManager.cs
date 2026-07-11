@@ -15,7 +15,8 @@ public class ProfileManager
   public ProfileData ActiveProfile => FindProfile(ActiveProfileName);
   public bool WasActiveProfileApplied =>
     !string.IsNullOrEmpty(ActiveProfileName)
-    && ActiveProfileName.Equals(Configs.AppliedModProfile.Value, StringComparison.OrdinalIgnoreCase);
+    && ActiveProfileName.Equals(Configs.AppliedModProfile.Value, StringComparison.OrdinalIgnoreCase)
+    && !string.IsNullOrEmpty(Configs.AppliedModProfileHash.Value);
 
   public void Initialize()
   {
@@ -54,8 +55,7 @@ public class ProfileManager
       return false;
 
     modList.ApplyProfile(profile);
-    Configs.ModProfile.Value = profile.Name;
-    Configs.AppliedModProfile.Value = profile.Name;
+    SetAppliedProfile(profile.Name, modList);
     ModConfigUtil.SaveConfig(modList.ToModConfig());
     return true;
   }
@@ -79,8 +79,32 @@ public class ProfileManager
     if (profile == null)
       return false;
 
+    var previousMods = profile.Mods;
     profile.Mods = MergeModList(profile, modList, true);
-    return ProfileStorage.Save(profile);
+    if (!ProfileStorage.Save(profile))
+    {
+      profile.Mods = previousMods;
+      return false;
+    }
+
+    if (profile == ActiveProfile)
+      SetAppliedProfile(profile.Name, modList);
+    return true;
+  }
+
+  public bool RemoveMod(string profileName, ProfileModEntry entry)
+  {
+    var profile = FindProfile(profileName);
+    var index = profile?.Mods.IndexOf(entry) ?? -1;
+    if (index < 0)
+      return false;
+
+    profile.Mods.RemoveAt(index);
+    if (ProfileStorage.Save(profile))
+      return true;
+
+    profile.Mods.Insert(index, entry);
+    return false;
   }
 
   public bool SyncActiveProfile(ModList modList)
@@ -88,20 +112,44 @@ public class ProfileManager
     var profile = ActiveProfile;
     if (profile == null || !WasActiveProfileApplied)
       return false;
+    if (Configs.AppliedModProfileHash.Value == GetModListHash(modList))
+      return false;
 
     var mods = MergeModList(profile, modList, false);
     if (EntriesEqual(profile.Mods, mods))
       return false;
 
+    var previousMods = profile.Mods;
     profile.Mods = mods;
-    ProfileStorage.Save(profile);
+    if (!ProfileStorage.Save(profile))
+    {
+      profile.Mods = previousMods;
+      return false;
+    }
+    SetAppliedProfile(profile.Name, modList);
     return true;
+  }
+
+  public void MarkActiveProfileDirty()
+  {
+    if (ActiveProfile == null)
+      return;
+    Configs.AppliedModProfile.Value = "";
+    Configs.AppliedModProfileHash.Value = "";
+  }
+
+  public void MarkActiveProfileApplied(ModList modList)
+  {
+    var profile = ActiveProfile;
+    if (profile != null)
+      SetAppliedProfile(profile.Name, modList);
   }
 
   public void DisableProfiles()
   {
     Configs.ModProfile.Value = "";
     Configs.AppliedModProfile.Value = "";
+    Configs.AppliedModProfileHash.Value = "";
   }
 
   public bool HasDiverged(string profileName, ModList modList)
@@ -111,7 +159,11 @@ public class ProfileManager
       return false;
 
     var current = modList.EnabledMods.Select(GetIdentity);
-    var saved = profile.Mods.Where(mod => mod.Enabled).Select(GetIdentity);
+    var saved = profile.Mods
+      .Where(entry => entry.Enabled)
+      .Select(entry => FindMod(entry, modList.AllMods))
+      .Where(mod => mod != null)
+      .Select(GetIdentity);
     return !current.SequenceEqual(saved, StringComparer.OrdinalIgnoreCase);
   }
 
@@ -164,6 +216,7 @@ public class ProfileManager
 
   private static ProfileModEntry CaptureMod(ModInfo mod) => new()
   {
+    Name = mod.Name ?? "",
     Source = mod.Source,
     DirectoryPath = mod.DirectoryPath ?? "",
     WorkshopHandle = mod.WorkshopHandle,
@@ -195,4 +248,27 @@ public class ProfileManager
 
   private static string NormalizePath(string path) =>
     path?.Replace("\\", "/").Trim().ToLowerInvariant() ?? "";
+
+  private static void SetAppliedProfile(string profileName, ModList modList)
+  {
+    Configs.ModProfile.Value = profileName;
+    Configs.AppliedModProfile.Value = profileName;
+    Configs.AppliedModProfileHash.Value = GetModListHash(modList);
+  }
+
+  private static string GetModListHash(ModList modList)
+  {
+    var hash = 14695981039346656037UL;
+    foreach (var mod in modList.EnabledMods)
+    {
+      foreach (var c in GetIdentity(mod))
+      {
+        hash ^= c;
+        hash *= 1099511628211UL;
+      }
+      hash ^= 0xff;
+      hash *= 1099511628211UL;
+    }
+    return hash.ToString("x16");
+  }
 }

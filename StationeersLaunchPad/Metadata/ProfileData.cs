@@ -19,6 +19,9 @@ public class ProfileData
 
 public class ProfileModEntry
 {
+  [XmlAttribute("Name")]
+  public string Name = "";
+
   [XmlAttribute("Source")]
   public ModSourceType Source;
 
