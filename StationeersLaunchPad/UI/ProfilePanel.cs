@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Assets.Scripts;
 using Assets.Scripts.Networking.Transports;
 using Cysharp.Threading.Tasks;
 using ImGuiNET;
@@ -18,11 +19,13 @@ public static class ProfilePanel
   private static string message = "";
   private static string confirmDelete = "";
   private static string confirmEmptySave = "";
+  private static string packageCode = "";
   private static DateTime confirmationExpires;
   private static bool selectActive;
+  private static bool importingPackage;
   private static readonly HashSet<ulong> subscriptions = [];
 
-  public static bool Busy => subscriptions.Count > 0;
+  public static bool Busy => subscriptions.Count > 0 || importingPackage;
 
   public static void SelectActive() => selectActive = true;
 
@@ -45,9 +48,12 @@ public static class ProfilePanel
     var changed = DrawProfilePicker(manager, modList);
     var selected = manager.FindProfile(selectedName);
     if (selected == null)
+    {
       DrawOffState(manager);
+      DrawWorkshopPackage(stage, manager, modList, null);
+    }
     else
-      changed |= DrawProfileActions(manager, modList, selected);
+      changed |= DrawProfileActions(stage, manager, modList, selected);
 
     DrawCreateProfile(manager, modList, ref changed);
     DrawProfileContents(stage, manager, selected, modList);
@@ -72,6 +78,7 @@ public static class ProfilePanel
     if (ImGui.Selectable("Off (normal mod configuration)", selected == null))
     {
       selectedName = "";
+      packageCode = "";
       ClearConfirmations();
       manager.DisableProfiles();
       message = "Profiles are off. The current mod list is unchanged.";
@@ -82,6 +89,7 @@ public static class ProfilePanel
         continue;
 
       selectedName = profile.Name;
+      packageCode = "";
       ClearConfirmations();
       changed |= manager.ApplyProfile(profile.Name, modList);
       message = changed ? $"Switched to {profile.Name}" : "Profile could not be loaded";
@@ -98,7 +106,8 @@ public static class ProfilePanel
     DrawMessage();
   }
 
-  private static bool DrawProfileActions(ProfileManager manager, ModList modList, ProfileData selected)
+  private static bool DrawProfileActions(
+    LoadStage stage, ProfileManager manager, ModList modList, ProfileData selected)
   {
     var changed = false;
     var diverged = manager.HasDiverged(selected.Name, modList);
@@ -189,8 +198,56 @@ public static class ProfilePanel
       }
     }
 
+    DrawWorkshopPackage(stage, manager, modList, selected);
     DrawMessage();
     return changed;
+  }
+
+  private static void DrawWorkshopPackage(
+    LoadStage stage, ProfileManager manager, ModList modList, ProfileData profile)
+  {
+    var entries = profile?.Mods
+      .Where(entry => entry.Enabled && !IsCore(entry))
+      .ToList() ?? [];
+    var canCopy = entries.Count > 0 && entries.All(entry =>
+      entry.Source == ModSourceType.Workshop && entry.WorkshopHandle > 1);
+
+    ImGui.Spacing();
+    ImGuiHelper.Text("Workshop package");
+    ImGuiHelper.TextDisabled(canCopy
+      ? "Share this profile's Workshop items and load order as a package code."
+      : "Import a Workshop package into the current mod list.");
+    var import = ImGui.InputTextWithHint(
+      "##packagecode", "SLP1 package code", ref packageCode, 16384,
+      ImGuiInputTextFlags.EnterReturnsTrue);
+
+    if (canCopy && ImGui.Button("Copy Code"))
+    {
+      packageCode = WorkshopPackageCode.Encode(entries.Select(entry => entry.WorkshopHandle));
+      GameManager.Clipboard = packageCode;
+      message = "Workshop package code copied";
+    }
+    if (canCopy)
+      ImGui.SameLine();
+    var canImport = stage == LoadStage.Configuring
+      && !Busy && !string.IsNullOrWhiteSpace(packageCode);
+    ImGui.BeginDisabled(!canImport);
+    import = ImGui.Button(importingPackage ? "Importing..." : "Import Code")
+      || import && canImport;
+    if (import)
+    {
+      if (!WorkshopPackageCode.TryDecode(packageCode, out var workshopIds))
+        message = "That Workshop package code is invalid";
+      else
+        ImportPackage(manager, modList, workshopIds).Forget();
+    }
+    ImGui.EndDisabled();
+    ImGuiHelper.ItemTooltip(
+      stage == LoadStage.Configuring
+        ? "Replace the current enabled mods with this Workshop package"
+        : "Packages can only be imported before loading mods",
+      hoverFlags: ImGuiHoveredFlags.AllowWhenDisabled);
+    ImGuiHelper.TextDisabled("Import changes the current mod list. Save it to the profile when ready.");
   }
 
   private static void DrawCreateProfile(ProfileManager manager, ModList modList, ref bool changed)
@@ -347,6 +404,74 @@ public static class ProfilePanel
     finally
     {
       subscriptions.Remove(entry.WorkshopHandle);
+    }
+  }
+
+  private static async UniTask ImportPackage(
+    ProfileManager manager, ModList modList, List<ulong> workshopIds)
+  {
+    if (importingPackage)
+      return;
+
+    importingPackage = true;
+    message = $"Importing {workshopIds.Count} Workshop mods...";
+    try
+    {
+      var installed = modList.AllMods
+        .Where(mod => mod.Source == ModSourceType.Workshop)
+        .Select(mod => mod.WorkshopHandle)
+        .ToHashSet();
+      foreach (var workshopId in workshopIds.Where(id => !installed.Contains(id)))
+      {
+        if (!await Steam.SubscribeAndDownload(workshopId))
+        {
+          message = $"Could not install Workshop item {workshopId}";
+          return;
+        }
+      }
+
+      var config = modList.ToModConfig();
+      var original = config.Mods.ToList();
+      var reordered = original.Where(mod => mod is CoreModData).ToList();
+      var workshopBase = SteamTransport.WorkshopType.Mod.GetLocalDirInfo().FullName;
+      foreach (var workshopId in workshopIds)
+      {
+        var workshop = original
+          .OfType<WorkshopModData>()
+          .FirstOrDefault(mod => (ulong)mod.WorkshopId == workshopId);
+        if (workshop == null)
+        {
+          workshop = new()
+          {
+            DirectoryPath = new(Path.Combine(workshopBase, workshopId.ToString())),
+            WorkshopId = new(workshopId),
+          };
+        }
+        workshop.Enabled = true;
+        reordered.Add(workshop);
+      }
+
+      foreach (var mod in original.Where(mod => !reordered.Contains(mod)))
+      {
+        mod.Enabled = false;
+        reordered.Add(mod);
+      }
+      config.Mods.Clear();
+      config.Mods.AddRange(reordered);
+      manager.MarkActiveProfileDirty();
+      ModConfigUtil.SaveConfig(config);
+
+      message = $"Imported {workshopIds.Count} Workshop mods";
+      LaunchPadConfig.ReloadMods();
+    }
+    catch (Exception ex)
+    {
+      Logger.Global.LogException(ex);
+      message = "Workshop package could not be imported";
+    }
+    finally
+    {
+      importingPackage = false;
     }
   }
 
