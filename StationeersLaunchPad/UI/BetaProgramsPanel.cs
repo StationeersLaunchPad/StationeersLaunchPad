@@ -26,8 +26,9 @@ public static class BetaProgramsPanel
       .ToList();
     var betaMods = modList.AllMods.Where(modList.IsBetaMod).ToList();
 
+    ImGuiHelper.TextDisabled("Switch installed mods between their stable and beta Workshop versions.");
     ImGui.BeginDisabled(stage != LoadStage.Configuring || Busy);
-    if (ImGui.Button("Refresh subscribed betas"))
+    if (ImGui.Button("Refresh Subscribed Betas"))
       LaunchPadConfig.ReloadMods();
     ImGui.EndDisabled();
     ImGuiHelper.ItemTooltip(stage == LoadStage.Configuring

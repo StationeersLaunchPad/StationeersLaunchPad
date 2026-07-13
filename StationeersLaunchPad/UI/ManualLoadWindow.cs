@@ -128,7 +128,7 @@ public static class ManualLoadWindow
     var next = false;
     ImGui.SetCursorScreenPos(rect.Min);
 
-    ImGuiHelper.TextDisabled(LaunchPadInfo.VERSION);
+    ImGuiHelper.TextDisabled($"SLP {LaunchPadInfo.VERSION}");
     ImGuiHelper.DrawSameLine(() => ImGuiHelper.TextDisabled("|"), true);
 
     ImGuiHelper.Text(stage switch
@@ -148,7 +148,7 @@ public static class ManualLoadWindow
     ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, Vector2.zero);
     var (nextEnabled, nextText) = stage switch
     {
-      LoadStage.Configuring when ProfilePanel.Busy => (false, "Subscribing..."),
+      LoadStage.Configuring when ProfilePanel.Busy => (false, ProfilePanel.BusyText),
       LoadStage.Configuring when BetaProgramsPanel.Busy => (false, "Updating Betas..."),
       LoadStage.Configuring => (true, "Load Mods"),
       LoadStage.Loaded or LoadStage.Failed => (true, "Start Game"),
@@ -177,13 +177,13 @@ public static class ManualLoadWindow
 
     ImGui.AlignTextToFramePadding();
 
-    if (ImGui.Checkbox("AutoSort", ref autoSort))
+    if (ImGui.Checkbox("Auto-sort", ref autoSort))
       changed |= ChangeFlags.AutoSort;
 
     ImGui.SameLine();
     ImGuiHelper.TextDisabled("|", true);
     ImGui.SameLine();
-    ImGuiHelper.Text("Enable:");
+    ImGuiHelper.Text("Enable mods:");
 
     const byte hasEnabled = 1;
     const byte hasDisabled = 2;
@@ -417,7 +417,7 @@ public static class ManualLoadWindow
 
   private static void DrawExportButton()
   {
-    if (ImGui.Button("Export Mod Package"))
+    if (ImGui.Button("Export Server Package"))
       LaunchPadConfig.ExportModPackage();
     ImGuiHelper.ItemTooltip("Package enabled mods into a zip file for dedicated servers.");
   }
@@ -442,7 +442,7 @@ public static class ManualLoadWindow
   {
     var disabled = stage <= LoadStage.Loading;
     ImGui.BeginDisabled(disabled);
-    var open = ImGui.BeginTabItem("Mod Configuration");
+    var open = ImGui.BeginTabItem("Mod Settings");
     ImGui.EndDisabled();
     ImGuiHelper.ItemTooltip(
       disabled ? "Mods must be loaded to edit configuration" : "Edit mod specific configuration",
@@ -458,13 +458,38 @@ public static class ManualLoadWindow
   private static bool DrawLaunchPadConfigTab()
   {
     var changed = false;
-    if (ImGui.BeginTabItem("LaunchPad Configuration"))
+    if (ImGui.BeginTabItem("LaunchPad Settings"))
     {
+      DrawAppearanceSettings();
       DrawExportButton();
-      changed = ConfigPanel.DrawConfigFile(Configs.Sorted, category => category != "Internal");
+      ImGui.Separator();
+      changed = ConfigPanel.DrawConfigFile(Configs.Sorted,
+        category => category != "Internal" && category != "Appearance");
       ImGui.EndTabItem();
     }
     return changed;
+  }
+
+  private static void DrawAppearanceSettings()
+  {
+    if (!ImGui.CollapsingHeader("Appearance", ImGuiTreeNodeFlags.DefaultOpen))
+      return;
+
+    ImGuiHelper.Text("Accent color");
+    ImGui.SameLine();
+    ImGui.SetNextItemWidth(140f);
+    var accent = Configs.UiAccent.Value;
+    var open = ImGui.BeginCombo("##accentcolor", accent.ToString());
+    ImGuiHelper.ItemTooltip("Classic keeps StationeersLaunchPad's existing colors.");
+    if (open)
+    {
+      foreach (var value in (UiAccentColor[])Enum.GetValues(typeof(UiAccentColor)))
+      {
+        if (ImGui.Selectable(value.ToString(), value == accent))
+          Configs.UiAccent.Value = value;
+      }
+      ImGui.EndCombo();
+    }
   }
 
   private static bool DrawProfilesTab(LoadStage stage, ProfileManager profileManager, ModList modList)

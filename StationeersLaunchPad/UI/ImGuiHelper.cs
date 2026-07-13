@@ -125,6 +125,7 @@ public static partial class ImGuiHelper
   public static void Draw(Action drawFunc)
   {
     PushDefaultStyle();
+    var accentColors = LaunchPadTheme.PushAccent();
 
     try
     {
@@ -136,6 +137,8 @@ public static partial class ImGuiHelper
       Logger.Global.LogException(ex);
     }
 
+    if (accentColors > 0)
+      ImGui.PopStyleColor(accentColors);
     PopDefaultStyle();
   }
 
@@ -241,12 +244,15 @@ public static partial class ImGuiHelper
     ImGui.PushStyleVar(ImGuiStyleVar.CellPadding, new Vector2(3, 2));
     ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, new Vector2(3, 2));
     ImGui.PushStyleVar(ImGuiStyleVar.WindowRounding, 3);
+    ImGui.PushStyleVar(ImGuiStyleVar.ChildRounding, 2);
+    ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 2);
+    ImGui.PushStyleVar(ImGuiStyleVar.TabRounding, 2);
     ImGui.PushStyleVar(ImGuiStyleVar.Alpha, 1.0f);
   }
 
   public static void PopDefaultStyle()
   {
-    ImGui.PopStyleVar(4);
+    ImGui.PopStyleVar(7);
     ImGui.PopStyleColor((int)ImGuiCol.COUNT);
   }
 

@@ -3,10 +3,7 @@ using UnityEngine;
 
 namespace StationeersLaunchPad.UI;
 
-// Color palette and ImGui style for the LaunchPad UI (dark panels with a single accent).
-// The accent is defined once (AccentRgb) and every accent shade is derived from it, so the
-// whole UI can be retinted by changing that one value. No view should reference a raw hex
-// color or a color-specific name; use the semantic fields below instead.
+// Color palette and ImGui style for the LaunchPad UI.
 public static class LaunchPadTheme
 {
   public static Color Hex(uint rgb, float a = 1f) =>
@@ -21,14 +18,11 @@ public static class LaunchPadTheme
   public static readonly Color Border = new(1f, 1f, 1f, 0.07f);
   public static readonly Color RowAlt = new(1f, 1f, 1f, 0.025f);
 
-  // Single source of truth for the accent. Swap this one value to retheme the UI.
-  public const uint AccentRgb = 0xF47A2A;
-
-  public static readonly Color Accent = Hex(AccentRgb);
-  public static readonly Color AccentFaint = Hex(AccentRgb, 0.10f);
-  public static readonly Color AccentSoft = Hex(AccentRgb, 0.16f);
-  public static readonly Color AccentStrong = Hex(AccentRgb, 0.22f);
-  public static readonly Color AccentBorder = Hex(AccentRgb, 0.25f);
+  public static Color Accent => AccentColor();
+  public static Color AccentFaint => WithAlpha(Accent, 0.10f);
+  public static Color AccentSoft => WithAlpha(Accent, 0.16f);
+  public static Color AccentStrong => WithAlpha(Accent, 0.22f);
+  public static Color AccentBorder => WithAlpha(Accent, 0.25f);
 
   public static readonly Color Text = Hex(0xF1F3F6);
   public static readonly Color TextSub = Hex(0xB7BDC9);
@@ -41,6 +35,44 @@ public static class LaunchPadTheme
 
   private static int colors;
   private static int vars;
+
+  public static int PushAccent()
+  {
+    if (Configs.UiAccent?.Value is null or UiAccentColor.Classic)
+      return 0;
+
+    var count = 0;
+    void C(ImGuiCol color, float alpha)
+    {
+      ImGui.PushStyleColor(color, (Vector4)WithAlpha(Accent, alpha));
+      count++;
+    }
+
+    C(ImGuiCol.Button, 0.40f);
+    C(ImGuiCol.ButtonHovered, 0.80f);
+    C(ImGuiCol.ButtonActive, 1f);
+    C(ImGuiCol.FrameBgHovered, 0.40f);
+    C(ImGuiCol.FrameBgActive, 0.67f);
+    C(ImGuiCol.Header, 0.31f);
+    C(ImGuiCol.HeaderHovered, 0.80f);
+    C(ImGuiCol.HeaderActive, 1f);
+    C(ImGuiCol.Tab, 0.25f);
+    C(ImGuiCol.TabHovered, 0.80f);
+    C(ImGuiCol.TabActive, 0.65f);
+    C(ImGuiCol.TabUnfocused, 0.20f);
+    C(ImGuiCol.TabUnfocusedActive, 0.35f);
+    C(ImGuiCol.CheckMark, 1f);
+    C(ImGuiCol.SliderGrab, 0.54f);
+    C(ImGuiCol.SliderGrabActive, 1f);
+    C(ImGuiCol.SeparatorHovered, 0.78f);
+    C(ImGuiCol.SeparatorActive, 1f);
+    C(ImGuiCol.ResizeGrip, 0.20f);
+    C(ImGuiCol.ResizeGripHovered, 0.67f);
+    C(ImGuiCol.ResizeGripActive, 0.95f);
+    C(ImGuiCol.TextSelectedBg, 0.35f);
+    C(ImGuiCol.NavHighlight, 1f);
+    return count;
+  }
 
   public static void Push()
   {
@@ -101,4 +133,21 @@ public static class LaunchPadTheme
   }
 
   private static uint U32(Color c) => ImGui.ColorConvertFloat4ToU32((Vector4)c);
+
+  private static Color AccentColor() => Configs.UiAccent?.Value switch
+  {
+    UiAccentColor.Orange => Hex(0xF47A2A),
+    UiAccentColor.Blue => Hex(0x4A90E2),
+    UiAccentColor.Green => Hex(0x5FAF5F),
+    _ => StyleColor(ImGuiCol.CheckMark),
+  };
+
+  private static Color StyleColor(ImGuiCol color)
+  {
+    var value = ImGui.GetStyle().Colors[(int)color];
+    return new(value.x, value.y, value.z, value.w);
+  }
+
+  private static Color WithAlpha(Color color, float alpha) =>
+    new(color.r, color.g, color.b, alpha);
 }

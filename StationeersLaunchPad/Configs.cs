@@ -15,6 +15,14 @@ public enum ProfilePromptMode
   Always,
 }
 
+public enum UiAccentColor
+{
+  Classic,
+  Orange,
+  Blue,
+  Green,
+}
+
 // config values that have different defaults depending on platform
 public struct ConfigDefaults
 {
@@ -51,6 +59,7 @@ public static class Configs
   public static ConfigEntry<bool> CompactLogs;
   public static ConfigEntry<bool> LinuxPathPatch;
   public static ConfigEntry<bool> CompactConfigPanel;
+  public static ConfigEntry<UiAccentColor> UiAccent;
   public static ConfigEntry<bool> RepoCheckUpdates;
   public static ConfigEntry<int> RepoUpdateFrequency;
   public static ConfigEntry<int> RepoFetchTimeout;
@@ -355,6 +364,13 @@ public static class Configs
       false,
       new ConfigDescription(
         "Display configuration entires on the same line with their names"
+      )
+    );
+    UiAccent = config.Bind(
+      new ConfigDefinition("Appearance", "AccentColor"),
+      UiAccentColor.Classic,
+      new ConfigDescription(
+        "Accent color for LaunchPad controls. Classic uses the existing SLP theme."
       )
     );
     Sorted = new SortedConfigFile(config);

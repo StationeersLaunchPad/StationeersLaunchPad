@@ -129,8 +129,8 @@ public static class LaunchPadConfig
     do
     {
       await StageSearching(firstLoad);
+      await StageConfiguring(firstLoad);
       firstLoad = false;
-      await StageConfiguring();
     }
     while (Stage == LoadStage.Searching);
     await StageLoading();
@@ -331,7 +331,7 @@ public static class LaunchPadConfig
     }
   }
 
-  private static async UniTask StageConfiguring()
+  private static async UniTask StageConfiguring(bool firstLoad)
   {
     if (Stage == LoadStage.Failed) return;
     Stage = LoadStage.Configuring;
@@ -339,7 +339,7 @@ public static class LaunchPadConfig
     CurWait = new(Configs.AutoLoadWaitTime.Value, AutoLoad);
 
     await SLPCommand.MoveToStage(CommandStage.ConfigLoaded);
-    PrepareProfileStartup();
+    PrepareProfileStartup(firstLoad);
     await Platform.Wait(CurWait, CommandStage.ConfigLoaded);
 
     if (!AutoLoad || string.IsNullOrEmpty(pendingProfileName))
@@ -435,7 +435,7 @@ public static class LaunchPadConfig
       CurWait.Skip();
   }
 
-  private static void PrepareProfileStartup()
+  private static void PrepareProfileStartup(bool firstLoad)
   {
     pendingProfileName = "";
     if (string.IsNullOrEmpty(Configs.ModProfile.Value))
@@ -462,7 +462,8 @@ public static class LaunchPadConfig
 
     if (!AutoLoad)
     {
-      ManualLoadWindow.OpenProfilesTab();
+      if (firstLoad)
+        ManualLoadWindow.OpenProfilesTab();
       return;
     }
 

@@ -153,6 +153,10 @@ public class ProfileManager
   }
 
   public bool HasDiverged(string profileName, ModList modList)
+    => HasDiverged(profileName, modList, BuildModIndex(modList.AllMods));
+
+  internal bool HasDiverged(
+    string profileName, ModList modList, IReadOnlyDictionary<string, ModInfo> modIndex)
   {
     var profile = FindProfile(profileName);
     if (profile == null)
@@ -161,7 +165,7 @@ public class ProfileManager
     var current = modList.EnabledMods.Select(GetIdentity);
     var saved = profile.Mods
       .Where(entry => entry.Enabled)
-      .Select(entry => FindMod(entry, modList.AllMods))
+      .Select(entry => FindMod(entry, modIndex))
       .Where(mod => mod != null)
       .Select(GetIdentity);
     return !current.SequenceEqual(saved, StringComparer.OrdinalIgnoreCase);
@@ -173,8 +177,11 @@ public class ProfileManager
     if (profile == null)
       return [];
 
+    var knownMods = profile.Mods
+      .Select(GetIdentity)
+      .ToHashSet(StringComparer.OrdinalIgnoreCase);
     return modList.AllMods
-      .Where(mod => profile.Mods.All(entry => !Matches(entry, mod)))
+      .Where(mod => !knownMods.Contains(GetIdentity(mod)))
       .ToList();
   }
 
@@ -188,6 +195,18 @@ public class ProfileManager
 
   internal static ModInfo FindMod(ProfileModEntry entry, IEnumerable<ModInfo> mods) =>
     mods.FirstOrDefault(mod => Matches(entry, mod));
+
+  internal static ModInfo FindMod(
+    ProfileModEntry entry, IReadOnlyDictionary<string, ModInfo> modIndex) =>
+    modIndex.TryGetValue(GetIdentity(entry), out var mod) ? mod : null;
+
+  internal static Dictionary<string, ModInfo> BuildModIndex(IEnumerable<ModInfo> mods)
+  {
+    var index = new Dictionary<string, ModInfo>(StringComparer.OrdinalIgnoreCase);
+    foreach (var mod in mods)
+      index.TryAdd(GetIdentity(mod), mod);
+    return index;
+  }
 
   private static List<ProfileModEntry> MergeModList(ProfileData profile, ModList modList, bool addNew)
   {
