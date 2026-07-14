@@ -178,6 +178,12 @@ public class ModList
         prefMods.Add(mod);
         continue;
       }
+      if (pref.IsBetaRelated(mod))
+      {
+        Logger.Global.LogDebug($"Beta program pair detected for {mod.Name}, skipping duplicate handling");
+        prefMods.AddBetaRelated(mod);
+        continue;
+      }
       var nonPref = mod;
       var prefPrio = pref.Source switch
       {

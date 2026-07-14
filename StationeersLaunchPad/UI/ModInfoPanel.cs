@@ -65,6 +65,14 @@ public class ModInfoPanel
       DrawOneLine("ModID:", mod.ModID);
     if (mod.WorkshopHandle > 1)
       DrawOneLine("Workshop ID:", $"{mod.WorkshopHandle}");
+    if (mod.HasBetaProgram)
+    {
+      DrawOneLine("Beta Workshop ID:", $"{mod.BetaWorkshopHandle}");
+      if (ImGui.Button("Open Beta Workshop Page"))
+        Steam.OpenWorkshopPage(mod.BetaWorkshopHandle);
+    }
+    if (mod.IsBetaProgramMod)
+      DrawOneLine("Beta Program:", "Yes");
     if (!string.IsNullOrEmpty(about.Author))
       DrawOneLine("Author", about.Author.Trim());
     if (!string.IsNullOrEmpty(about.Version))
