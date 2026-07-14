@@ -8,10 +8,10 @@ namespace StationeersLaunchPad.UI;
 
 public static class BetaProgramsPanel
 {
-  private static readonly HashSet<ulong> downloads = [];
+  private static readonly HashSet<ulong> operations = [];
   private static readonly Dictionary<ulong, string> statuses = [];
 
-  public static bool Busy => downloads.Count > 0;
+  public static bool Busy => operations.Count > 0;
 
   public static bool Draw(LoadStage stage, ModList modList)
   {
@@ -24,7 +24,7 @@ public static class BetaProgramsPanel
       .GroupBy(mod => mod.BetaWorkshopHandle)
       .Select(mods => mods.FirstOrDefault(mod => mod.Enabled) ?? mods.First())
       .ToList();
-    var betaMods = modList.AllMods.Where(mod => mod.IsBetaProgramMod).ToList();
+    var betaMods = modList.AllMods.Where(modList.IsBetaMod).ToList();
 
     ImGui.BeginDisabled(stage != LoadStage.Configuring || Busy);
     if (ImGui.Button("Refresh subscribed betas"))
@@ -45,7 +45,7 @@ public static class BetaProgramsPanel
     {
       var beta = modList.AllMods.FirstOrDefault(mod =>
         mod.WorkshopHandle == stable.BetaWorkshopHandle);
-      var downloading = downloads.Contains(stable.BetaWorkshopHandle);
+      var busy = operations.Contains(stable.BetaWorkshopHandle);
 
       ImGui.PushID($"beta-{stable.BetaWorkshopHandle}");
       ImGui.Spacing();
@@ -57,21 +57,23 @@ public static class BetaProgramsPanel
 
       if (beta == null)
       {
-        ImGui.BeginDisabled(stage != LoadStage.Configuring || downloading);
-        if (ImGui.Button(downloading ? "Downloading..." : "Subscribe to Beta"))
+        ImGui.BeginDisabled(stage != LoadStage.Configuring || busy);
+        if (ImGui.Button(busy ? "Downloading..." : "Subscribe to Beta"))
           SubscribeToBeta(stable, modList).Forget();
         ImGui.EndDisabled();
       }
       else
       {
         var useBeta = beta.Enabled;
-        ImGui.BeginDisabled(stage != LoadStage.Configuring);
+        ImGui.BeginDisabled(stage != LoadStage.Configuring || busy);
         if (ImGui.Checkbox("Use Beta Version", ref useBeta))
         {
           stable.Enabled = !useBeta;
           beta.Enabled = useBeta;
           changed = true;
           Logger.Global.LogInfo($"Switched {stable.Name} to {(useBeta ? "beta" : "stable")}");
+          if (!useBeta)
+            UnsubscribeFromBeta(stable, beta, modList).Forget();
         }
         ImGui.EndDisabled();
       }
@@ -109,7 +111,7 @@ public static class BetaProgramsPanel
   private static async UniTask SubscribeToBeta(ModInfo stable, ModList modList)
   {
     var workshopId = stable.BetaWorkshopHandle;
-    if (!downloads.Add(workshopId))
+    if (!operations.Add(workshopId))
       return;
 
     statuses[workshopId] = "Subscribing and downloading...";
@@ -128,7 +130,34 @@ public static class BetaProgramsPanel
     }
     finally
     {
-      downloads.Remove(workshopId);
+      operations.Remove(workshopId);
+    }
+  }
+
+  private static async UniTask UnsubscribeFromBeta(ModInfo stable, ModInfo beta, ModList modList)
+  {
+    var workshopId = beta.WorkshopHandle;
+    if (!operations.Add(workshopId))
+      return;
+
+    stable.Enabled = true;
+    beta.Enabled = false;
+    ModConfigUtil.SaveConfig(modList.ToModConfig());
+    statuses[workshopId] = "Unsubscribing from beta...";
+    try
+    {
+      if (!await Steam.Unsubscribe(workshopId))
+      {
+        statuses[workshopId] = "Unsubscribe failed. The beta remains disabled.";
+        return;
+      }
+
+      statuses[workshopId] = "Beta unsubscribed.";
+      LaunchPadConfig.ReloadMods();
+    }
+    finally
+    {
+      operations.Remove(workshopId);
     }
   }
 }

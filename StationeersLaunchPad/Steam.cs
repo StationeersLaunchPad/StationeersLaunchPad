@@ -104,19 +104,7 @@ public static class Steam
       Logger.Global.LogInfo($"Workshop item {workshopId} subscribed and downloaded successfully");
 
       if (unsubscribeWorkshopId is > 1 && unsubscribeWorkshopId != workshopId)
-      {
-        try
-        {
-          var oldItem = new Item(new PublishedFileId { Value = unsubscribeWorkshopId.Value });
-          var unsubscribed = await oldItem.Unsubscribe();
-          Logger.Global.LogInfo($"Unsubscribed old workshop {unsubscribeWorkshopId} (success={unsubscribed})");
-        }
-        catch (Exception ex)
-        {
-          Logger.Global.LogException(ex);
-          // Unsubscribe failure should not fail the completed install
-        }
-      }
+        await Unsubscribe(unsubscribeWorkshopId.Value);
 
       return true;
     }
@@ -124,6 +112,26 @@ public static class Steam
     {
       Logger.Global.LogException(ex);
       Logger.Global.LogError($"Workshop install failed for {workshopId}");
+      return false;
+    }
+  }
+
+  public static async UniTask<bool> Unsubscribe(ulong workshopId)
+  {
+    if (workshopId < 2)
+      return false;
+
+    try
+    {
+      var item = new Item(new PublishedFileId { Value = workshopId });
+      var unsubscribed = await item.Unsubscribe();
+      Logger.Global.LogInfo($"Unsubscribed workshop item {workshopId} (success={unsubscribed})");
+      return unsubscribed;
+    }
+    catch (Exception ex)
+    {
+      Logger.Global.LogException(ex);
+      Logger.Global.LogError($"Workshop unsubscribe failed for {workshopId}");
       return false;
     }
   }
