@@ -67,14 +67,7 @@ public static class BetaProgramsPanel
         var useBeta = beta.Enabled;
         ImGui.BeginDisabled(stage != LoadStage.Configuring || busy);
         if (ImGui.Checkbox("Use Beta Version", ref useBeta))
-        {
-          stable.Enabled = !useBeta;
-          beta.Enabled = useBeta;
-          changed = true;
-          Logger.Global.LogInfo($"Switched {stable.Name} to {(useBeta ? "beta" : "stable")}");
-          if (!useBeta)
-            UnsubscribeFromBeta(stable, beta, modList).Forget();
-        }
+          changed = SetBetaEnabled(stable, beta, modList, useBeta);
         ImGui.EndDisabled();
       }
 
@@ -106,6 +99,39 @@ public static class BetaProgramsPanel
 
     ImGui.EndTabItem();
     return changed;
+  }
+
+  public static bool SetModEnabled(ModList modList, ModInfo mod, bool enabled)
+  {
+    if (modList.IsBetaMod(mod))
+    {
+      var stable = modList.AllMods.FirstOrDefault(stable => stable.IsBetaProgramFor(mod));
+      if (stable != null)
+        return SetBetaEnabled(stable, mod, modList, enabled);
+    }
+    else if (enabled && mod.HasBetaProgram)
+    {
+      var beta = modList.AllMods.FirstOrDefault(beta =>
+        beta.WorkshopHandle == mod.BetaWorkshopHandle);
+      if (beta?.Enabled == true)
+        return SetBetaEnabled(mod, beta, modList, false);
+    }
+
+    mod.Enabled = enabled;
+    return true;
+  }
+
+  private static bool SetBetaEnabled(ModInfo stable, ModInfo beta, ModList modList, bool enabled)
+  {
+    if (operations.Contains(beta.WorkshopHandle))
+      return false;
+
+    stable.Enabled = !enabled;
+    beta.Enabled = enabled;
+    Logger.Global.LogInfo($"Switched {stable.Name} to {(enabled ? "beta" : "stable")}");
+    if (!enabled)
+      UnsubscribeFromBeta(stable, beta, modList).Forget();
+    return true;
   }
 
   private static async UniTask SubscribeToBeta(ModInfo stable, ModList modList)
