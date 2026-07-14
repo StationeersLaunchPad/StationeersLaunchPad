@@ -13,6 +13,14 @@ public class OrderGraph
     {
       if (!mod.Enabled || mod.Source == ModSourceType.Core)
         continue;
+      foreach (var modRef in mod.About.DependsOn ?? [])
+      {
+        foreach (var mod2 in mods)
+        {
+          if (mod2 != mod && mod2.Enabled && mod2.Satisfies(modRef))
+            graph.AddOrder(mod2, mod);
+        }
+      }
       foreach (var modRef in mod.About.OrderBefore ?? [])
       {
         foreach (var mod2 in mods)

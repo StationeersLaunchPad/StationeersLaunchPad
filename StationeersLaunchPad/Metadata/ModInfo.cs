@@ -59,6 +59,8 @@ public class ModInfo
 
   public bool SortBefore(ModInfo other)
   {
+    if (other.About?.DependsOn?.Any(Satisfies) ?? false)
+      return true;
     if (other.About?.OrderAfter?.Any(Satisfies) ?? false)
       return true;
     return About?.OrderBefore?.Any(other.Satisfies) ?? false;

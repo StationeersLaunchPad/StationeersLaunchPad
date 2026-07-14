@@ -140,7 +140,7 @@ public static class Configs
       new ConfigDefinition("Startup", "AutoSort"),
       true,
       new ConfigDescription(
-        "Automatically sort based on OrderBefore/OrderAfter tags in mod data"
+        "Automatically sort based on dependencies and OrderBefore/OrderAfter tags in mod data"
       )
     );
     DisableSteamOnStart = config.Bind(
