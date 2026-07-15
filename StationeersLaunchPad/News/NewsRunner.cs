@@ -57,6 +57,11 @@ public static class NewsRunner
     {
       await ExecuteWorkshopModInstall(act.WorkshopId);
     }
+
+    if (act.Action == "workshop_mod_subscribe")
+    {
+      await ExecuteWorkshopModInstall(act.WorkshopId);
+    }
   }
 
   public static async UniTask ExecuteSecondaryAction(NewsEntry entry)
@@ -64,6 +69,9 @@ public static class NewsRunner
     var act = entry?.Actions?.Secondary;
     if (act?.Action == "open_url" && !string.IsNullOrEmpty(act.Url))
       Application.OpenURL(act.Url);
+
+    if (act?.Action == "workshop_mod_subscribe")
+      await ExecuteWorkshopModInstall(act.WorkshopId);
   }
 
   public static async UniTask<bool> ExecuteRepoModInstall(string url, string modId = null)

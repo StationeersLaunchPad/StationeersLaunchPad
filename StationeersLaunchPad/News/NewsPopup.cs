@@ -230,9 +230,7 @@ public static class NewsPopup
       {
         var sw = Mathf.Min(180f, avail * 0.32f);
         if (ImGui.Button(entry.Actions.Secondary.Label ?? "Details", new Vector2(sw, btnH)) && canAct)
-        {
-          _ = NewsRunner.ExecuteSecondaryAction(entry);
-        }
+          OnAction(entry, entry.Actions.Secondary, -1);
         ImGui.SameLine();
         avail -= sw + spacing;
       }
@@ -362,6 +360,17 @@ public static class NewsPopup
       return;
     }
 
+    if (action.Action == "workshop_mod_subscribe")
+    {
+      isActionBusy = true;
+      actionStatus = null;
+      actionCompleted = false;
+      actionSucceeded = false;
+      actionResultMessage = null;
+      _ = DoWorkshopModSubscribe(action);
+      return;
+    }
+
     if (action.Action == "acknowledge" || action.Action == "dismiss" || string.IsNullOrEmpty(action.Action))
     {
       // just close the notice and do nothing else. Default for info type notices.
@@ -418,6 +427,27 @@ public static class NewsPopup
       actionCompleted = true;
       actionSucceeded = false;
       actionResultMessage = "Migration failed. See log.";
+    }
+  }
+
+  private static async UniTask DoWorkshopModSubscribe(NewsAction action)
+  {
+    actionStatus = null;
+    try
+    {
+      bool ok = await NewsRunner.ExecuteWorkshopModInstall(action?.WorkshopId);
+      isActionBusy = false;
+      actionCompleted = true;
+      actionSucceeded = ok;
+      actionResultMessage = ok ? "Workshop mod installed!" : "Workshop install failed. Check log.";
+    }
+    catch (Exception ex)
+    {
+      Logger.Global.LogException(ex);
+      isActionBusy = false;
+      actionCompleted = true;
+      actionSucceeded = false;
+      actionResultMessage = "Workshop install failed. See log.";
     }
   }
 
