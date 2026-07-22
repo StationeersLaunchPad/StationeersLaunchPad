@@ -1,11 +1,20 @@
 
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Text;
 using System.Xml;
 using System.Xml.Schema;
 using System.Xml.Serialization;
 
 namespace StationeersLaunchPad.Metadata;
+
+public enum ModSide
+{
+  Unknown,
+  Both,
+  Client,
+  Server,
+}
 
 [XmlRoot("ModMetadata")]
 public class ModAboutEx
@@ -46,6 +55,10 @@ public class ModAboutEx
 
   [XmlElement("IsBetaProgramMod")]
   public bool IsBetaProgramMod;
+
+  [XmlElement("ModSide")]
+  [DefaultValue(ModSide.Unknown)]
+  public ModSide ModSide;
 
   [XmlArray("Tags"), XmlArrayItem("Tag")]
   public List<string> Tags;
