@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using ImGuiNET;
 using StationeersLaunchPad.Loading;
 using StationeersLaunchPad.Metadata;
@@ -16,7 +17,6 @@ public static class ManualLoadWindow
     Mods = 1 << 0,
     AutoSort = 1 << 1,
     NextStep = 1 << 2,
-    Profile = 1 << 3,
   }
 
   private static LoadStage lastStage;
@@ -33,10 +33,18 @@ public static class ManualLoadWindow
     ProfilePanel.SelectActive();
   }
 
+  public static void OpenModInfoTab()
+  {
+    openProfiles = false;
+    openInfo = true;
+  }
+
   public static ChangeFlags Draw(LoadStage stage, ModList modList, bool autoSort, ProfileManager profileManager)
   {
     Platform.SetBackgroundEnabled(false);
     var changed = ChangeFlags.None;
+    profileManager.Initialize();
+    var vanillaActive = ProfileManager.IsVanillaProfile(profileManager.ActiveProfileName);
 
     // when we move into the loading step, clear the selected mod so all the logs are visible
     if (lastStage < LoadStage.Loaded && stage >= LoadStage.Loading)
@@ -56,7 +64,7 @@ public static class ManualLoadWindow
 
       leftRect.SplitOY(ImGui.GetTextLineHeight(), out var statusRect, out leftRect);
 
-      if (DrawStatusLine(statusRect, stage))
+      if (DrawStatusLine(statusRect, stage, profileManager, modList))
         changed |= ChangeFlags.NextStep;
 
       ImGui.SetCursorScreenPos(leftRect.Min);
@@ -69,10 +77,16 @@ public static class ManualLoadWindow
 
       if (stage is LoadStage.Searching or LoadStage.Configuring)
       {
+        if (vanillaActive)
+          ImGuiHelper.TextDisabled(
+            "Vanilla profile active: choose another profile or Disable Profiles to edit mods.");
+        ImGui.BeginDisabled(vanillaActive);
         changed |= DrawModSelectOptions(modList, autoSort);
+        ImGui.EndDisabled();
         leftRect = leftRect.From(ImGui.GetCursorScreenPos());
         ImGui.BeginChild("##modselect", leftRect.Size);
-        if (DrawModSelectTable(modList, stage == LoadStage.Configuring, autoSort))
+        if (DrawModSelectTable(
+          modList, stage == LoadStage.Configuring && !vanillaActive, autoSort))
           changed |= ChangeFlags.Mods;
         ImGui.EndChild();
       }
@@ -87,22 +101,25 @@ public static class ManualLoadWindow
 
       ImGui.SetCursorScreenPos(rightRect.Min);
       ImGui.BeginChild("##right", rightRect.Size);
+      var tabBorderSize = style.TabBorderSize;
+      style.TabBorderSize = 0f;
       if (ImGui.BeginTabBar("##right"))
       {
         DrawModInfoTab(stage);
         DrawModConfigTab(stage);
         if (DrawProfilesTab(stage, profileManager, modList))
-          changed |= ChangeFlags.Mods | ChangeFlags.Profile;
+          changed |= ChangeFlags.Mods;
 
         if (BetaProgramsPanel.Draw(stage, modList))
           changed |= ChangeFlags.Mods;
 
         // If we changed launchpad config and haven't loaded mods yet, mark mods changed to apply disable/sort behaviour
-        if (DrawLaunchPadConfigTab() && stage <= LoadStage.Configuring)
+        if (DrawLaunchPadConfigTab(stage) && stage <= LoadStage.Configuring)
           changed |= ChangeFlags.Mods;
 
         ImGui.EndTabBar();
       }
+      style.TabBorderSize = tabBorderSize;
       ImGui.EndChild();
 
       ImGuiHelper.SeparatorLine(bottomRect.TL, bottomRect.TR);
@@ -123,25 +140,32 @@ public static class ManualLoadWindow
     return changed;
   }
 
-  private static bool DrawStatusLine(Rect rect, LoadStage stage)
+  private static bool DrawStatusLine(
+    Rect rect, LoadStage stage, ProfileManager profileManager, ModList modList)
   {
     var next = false;
+    var activeProfile = profileManager.ActiveProfile;
+    var missingMods = stage == LoadStage.Configuring && activeProfile != null
+      ? profileManager.GetMissingMods(activeProfile.Name, modList).Count
+      : 0;
     ImGui.SetCursorScreenPos(rect.Min);
 
     ImGuiHelper.TextDisabled($"SLP {LaunchPadInfo.VERSION}");
     ImGuiHelper.DrawSameLine(() => ImGuiHelper.TextDisabled("|"), true);
 
-    ImGuiHelper.Text(stage switch
-    {
-      LoadStage.Updating => "Checking for updates to StationeersLaunchPad",
-      LoadStage.Initializing => "Initializing core components",
-      LoadStage.Searching => "Locating installed local and workshop mods",
-      LoadStage.Configuring => "Ready to load mods",
-      LoadStage.Loading => "Loading selected mods",
-      LoadStage.Loaded => "Ready to start game",
-      LoadStage.Failed => "Mods failed to load. Game may not function properly",
-      _ => "",
-    });
+    ImGuiHelper.Text(missingMods > 0
+      ? $"Loading paused: {activeProfile.Name} is missing {missingMods} required mod{(missingMods == 1 ? "" : "s")}"
+      : stage switch
+      {
+        LoadStage.Updating => "Checking for updates to StationeersLaunchPad",
+        LoadStage.Initializing => "Initializing core components",
+        LoadStage.Searching => "Locating installed local and workshop mods",
+        LoadStage.Configuring => "Ready to load mods",
+        LoadStage.Loading => "Loading selected mods",
+        LoadStage.Loaded => "Ready to start game",
+        LoadStage.Failed => "Mods failed to load. Game may not function properly",
+        _ => "",
+      });
 
     rect.SplitOX(-150f, out _, out var buttonRect);
     buttonRect = buttonRect.Shift(-ImGui.GetStyle().ItemSpacing.x, 0f);
@@ -150,6 +174,8 @@ public static class ManualLoadWindow
     {
       LoadStage.Configuring when ProfilePanel.Busy => (false, ProfilePanel.BusyText),
       LoadStage.Configuring when BetaProgramsPanel.Busy => (false, "Updating Betas..."),
+      LoadStage.Configuring when missingMods > 0 =>
+        (true, $"Resolve {missingMods} Missing"),
       LoadStage.Configuring => (true, "Load Mods"),
       LoadStage.Loaded or LoadStage.Failed => (true, "Start Game"),
       _ => (false, "..."),
@@ -164,6 +190,8 @@ public static class ManualLoadWindow
     if (ImGui.Button(nextText, buttonRect.Size))
       next = true;
     ImGui.EndDisabled();
+    if (missingMods > 0)
+      ImGuiHelper.ItemTooltip("Restore the missing mods or remove them from the active profile before loading.");
     if (nextEnabled)
       ImGui.PopStyleColor();
     ImGui.PopStyleVar();
@@ -258,7 +286,8 @@ public static class ManualLoadWindow
     return changed;
   }
 
-  private static bool DrawModSelectTable(ModList modList, bool edit = false, bool autoSort = false)
+  private static bool DrawModSelectTable(
+    ModList modList, bool edit = false, bool autoSort = false)
   {
     var changed = false;
     if (!ImGui.IsMouseDown(ImGuiMouseButton.Left))
@@ -455,19 +484,38 @@ public static class ManualLoadWindow
     }
   }
 
-  private static bool DrawLaunchPadConfigTab()
+  private static bool DrawLaunchPadConfigTab(LoadStage stage)
   {
     var changed = false;
     if (ImGui.BeginTabItem("LaunchPad Settings"))
     {
       DrawAppearanceSettings();
       DrawExportButton();
+      DrawAdvancedSettings(stage);
       ImGui.Separator();
       changed = ConfigPanel.DrawConfigFile(Configs.Sorted,
         category => category != "Internal" && category != "Appearance");
       ImGui.EndTabItem();
     }
     return changed;
+  }
+
+  private static void DrawAdvancedSettings(LoadStage stage)
+  {
+    if (!ImGui.CollapsingHeader("Advanced"))
+      return;
+
+    var canReload = stage == LoadStage.Configuring && !ProfilePanel.Busy
+      && !BetaProgramsPanel.Busy;
+    ImGui.BeginDisabled(!canReload);
+    if (ImGui.Button("Reload Mod List"))
+      LaunchPadConfig.ReloadMods();
+    ImGui.EndDisabled();
+    ImGuiHelper.ItemTooltip(
+      canReload
+        ? "Re-scan local, Workshop, and repository mod files from disk."
+        : "The mod list can only be reloaded while configuring mods.",
+      hoverFlags: ImGuiHoveredFlags.AllowWhenDisabled);
   }
 
   private static void DrawAppearanceSettings()

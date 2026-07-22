@@ -7,16 +7,14 @@ namespace StationeersLaunchPad.Metadata;
 
 public class ProfileManager
 {
+  public const string VanillaProfileName = "Vanilla";
+
   private List<ProfileData> profiles = [];
 
   public IReadOnlyList<ProfileData> AllProfiles => profiles;
   public bool IsInitialized { get; private set; }
   public string ActiveProfileName => Configs.ModProfile.Value;
   public ProfileData ActiveProfile => FindProfile(ActiveProfileName);
-  public bool WasActiveProfileApplied =>
-    !string.IsNullOrEmpty(ActiveProfileName)
-    && ActiveProfileName.Equals(Configs.AppliedModProfile.Value, StringComparison.OrdinalIgnoreCase)
-    && !string.IsNullOrEmpty(Configs.AppliedModProfileHash.Value);
 
   public void Initialize()
   {
@@ -24,7 +22,9 @@ public class ProfileManager
       return;
 
     profiles = ProfileStorage.LoadAll();
-    profiles.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
+    profiles.RemoveAll(profile => IsVanillaProfile(profile.Name));
+    profiles.Add(CreateVanillaProfile());
+    SortProfiles();
     IsInitialized = true;
 
     if (string.IsNullOrEmpty(ActiveProfileName) || ActiveProfile != null)
@@ -36,7 +36,8 @@ public class ProfileManager
 
   public bool CreateProfile(string profileName, ModList modList)
   {
-    if (!ProfileStorage.IsValidName(profileName) || FindProfile(profileName) != null)
+    if (IsVanillaProfile(profileName)
+      || !ProfileStorage.IsValidName(profileName) || FindProfile(profileName) != null)
       return false;
 
     var profile = CaptureModList(profileName, modList);
@@ -44,7 +45,7 @@ public class ProfileManager
       return false;
 
     profiles.Add(profile);
-    profiles.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
+    SortProfiles();
     return true;
   }
 
@@ -55,13 +56,30 @@ public class ProfileManager
       return false;
 
     modList.ApplyProfile(profile);
-    SetAppliedProfile(profile.Name, modList);
+    Configs.ModProfile.Value = profile.Name;
     ModConfigUtil.SaveConfig(modList.ToModConfig());
     return true;
   }
 
+  public void DisableModsOutsideProfile(string profileName, ModList modList)
+  {
+    var profile = FindProfile(profileName);
+    if (profile == null)
+      return;
+
+    var included = profile.Mods
+      .Select(GetIdentity)
+      .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    foreach (var mod in modList.AllMods)
+      if (!included.Contains(GetIdentity(mod)))
+        mod.Enabled = false;
+    ModConfigUtil.SaveConfig(modList.ToModConfig());
+  }
+
   public bool DeleteProfile(string profileName)
   {
+    if (IsVanillaProfile(profileName))
+      return false;
     var profile = FindProfile(profileName);
     if (profile == null || !ProfileStorage.Delete(profile.Name))
       return false;
@@ -75,81 +93,52 @@ public class ProfileManager
 
   public bool UpdateProfile(string profileName, ModList modList)
   {
+    if (IsVanillaProfile(profileName))
+      return false;
     var profile = FindProfile(profileName);
     if (profile == null)
       return false;
 
     var previousMods = profile.Mods;
-    profile.Mods = MergeModList(profile, modList, true);
+    profile.Mods = CaptureEnabledMods(modList);
     if (!ProfileStorage.Save(profile))
     {
       profile.Mods = previousMods;
       return false;
     }
 
-    if (profile == ActiveProfile)
-      SetAppliedProfile(profile.Name, modList);
     return true;
   }
 
   public bool RemoveMod(string profileName, ProfileModEntry entry)
   {
-    var profile = FindProfile(profileName);
-    var index = profile?.Mods.IndexOf(entry) ?? -1;
-    if (index < 0)
-      return false;
-
-    profile.Mods.RemoveAt(index);
-    if (ProfileStorage.Save(profile))
-      return true;
-
-    profile.Mods.Insert(index, entry);
-    return false;
+    return RemoveMods(profileName, [entry]);
   }
 
-  public bool SyncActiveProfile(ModList modList)
+  public bool RemoveMods(string profileName, IEnumerable<ProfileModEntry> entries)
   {
-    var profile = ActiveProfile;
-    if (profile == null || !WasActiveProfileApplied)
+    if (IsVanillaProfile(profileName))
       return false;
-    if (Configs.AppliedModProfileHash.Value == GetModListHash(modList))
+    var profile = FindProfile(profileName);
+    if (profile == null)
       return false;
 
-    var mods = MergeModList(profile, modList, false);
-    if (EntriesEqual(profile.Mods, mods))
+    var remove = entries.ToHashSet();
+    if (remove.Count == 0 || !profile.Mods.Any(remove.Contains))
       return false;
 
     var previousMods = profile.Mods;
-    profile.Mods = mods;
-    if (!ProfileStorage.Save(profile))
-    {
-      profile.Mods = previousMods;
-      return false;
-    }
-    SetAppliedProfile(profile.Name, modList);
-    return true;
-  }
+    profile.Mods = profile.Mods.Where(entry => !remove.Contains(entry)).ToList();
+    if (ProfileStorage.Save(profile))
+      return true;
 
-  public void MarkActiveProfileDirty()
-  {
-    if (ActiveProfile == null)
-      return;
-    Configs.AppliedModProfile.Value = "";
-    Configs.AppliedModProfileHash.Value = "";
-  }
-
-  public void MarkActiveProfileApplied(ModList modList)
-  {
-    var profile = ActiveProfile;
-    if (profile != null)
-      SetAppliedProfile(profile.Name, modList);
+    profile.Mods = previousMods;
+    return false;
   }
 
   public void DisableProfiles()
   {
     Configs.ModProfile.Value = "";
-    Configs.AppliedModProfile.Value = "";
-    Configs.AppliedModProfileHash.Value = "";
   }
 
   public bool HasDiverged(string profileName, ModList modList)
@@ -164,26 +153,27 @@ public class ProfileManager
 
     var current = modList.EnabledMods.Select(GetIdentity);
     var saved = profile.Mods
-      .Where(entry => entry.Enabled)
       .Select(entry => FindMod(entry, modIndex))
       .Where(mod => mod != null)
       .Select(GetIdentity);
     return !current.SequenceEqual(saved, StringComparer.OrdinalIgnoreCase);
   }
 
-  public List<ModInfo> GetNewMods(string profileName, ModList modList)
+  public List<ProfileModEntry> GetMissingMods(string profileName, ModList modList)
   {
     var profile = FindProfile(profileName);
     if (profile == null)
       return [];
 
-    var knownMods = profile.Mods
-      .Select(GetIdentity)
-      .ToHashSet(StringComparer.OrdinalIgnoreCase);
-    return modList.AllMods
-      .Where(mod => !knownMods.Contains(GetIdentity(mod)))
+    var modIndex = BuildModIndex(modList.AllMods);
+    return profile.Mods
+      .Where(entry => GetIdentity(entry) != "Core"
+        && FindMod(entry, modIndex) == null)
       .ToList();
   }
+
+  public static bool IsVanillaProfile(string profileName) =>
+    VanillaProfileName.Equals(profileName, StringComparison.OrdinalIgnoreCase);
 
   public ProfileData FindProfile(string profileName)
   {
@@ -208,30 +198,38 @@ public class ProfileManager
     return index;
   }
 
-  private static List<ProfileModEntry> MergeModList(ProfileData profile, ModList modList, bool addNew)
-  {
-    var entries = new List<ProfileModEntry>();
-    var matched = new HashSet<ProfileModEntry>();
-    foreach (var mod in modList.AllMods)
-    {
-      var existing = profile.Mods.FirstOrDefault(entry => Matches(entry, mod));
-      if (existing == null && !addNew)
-        continue;
-
-      entries.Add(CaptureMod(mod));
-      if (existing != null)
-        matched.Add(existing);
-    }
-
-    entries.AddRange(profile.Mods.Where(entry => !matched.Contains(entry)));
-    return entries;
-  }
-
   private static ProfileData CaptureModList(string profileName, ModList modList) => new()
   {
     Name = profileName,
-    Mods = [.. modList.AllMods.Select(CaptureMod)],
+    Mods = CaptureEnabledMods(modList),
   };
+
+  private static List<ProfileModEntry> CaptureEnabledMods(ModList modList) =>
+    [.. modList.EnabledMods.Select(CaptureMod)];
+
+  private static ProfileData CreateVanillaProfile() => new()
+  {
+    Name = VanillaProfileName,
+    Description = "Launch Stationeers without mods.",
+    Mods =
+    [
+      new()
+      {
+        Name = "Core",
+        Source = ModSourceType.Core,
+        DirectoryPath = "",
+      },
+    ],
+  };
+
+  private void SortProfiles() => profiles.Sort((a, b) =>
+  {
+    var aVanilla = IsVanillaProfile(a.Name);
+    var bVanilla = IsVanillaProfile(b.Name);
+    if (aVanilla != bVanilla)
+      return aVanilla ? -1 : 1;
+    return string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
+  });
 
   private static ProfileModEntry CaptureMod(ModInfo mod) => new()
   {
@@ -240,19 +238,7 @@ public class ProfileManager
     DirectoryPath = mod.DirectoryPath ?? "",
     WorkshopHandle = mod.WorkshopHandle,
     ModID = mod.ModID,
-    Enabled = mod.Enabled,
   };
-
-  private static bool EntriesEqual(List<ProfileModEntry> left, List<ProfileModEntry> right)
-  {
-    if (left.Count != right.Count)
-      return false;
-
-    return left.Zip(right, (a, b) =>
-      a.Enabled == b.Enabled
-      && GetIdentity(a).Equals(GetIdentity(b), StringComparison.OrdinalIgnoreCase)
-    ).All(equal => equal);
-  }
 
   private static bool Matches(ProfileModEntry entry, ModInfo mod) =>
     GetIdentity(entry).Equals(GetIdentity(mod), StringComparison.OrdinalIgnoreCase);
@@ -268,26 +254,4 @@ public class ProfileManager
   private static string NormalizePath(string path) =>
     path?.Replace("\\", "/").Trim().ToLowerInvariant() ?? "";
 
-  private static void SetAppliedProfile(string profileName, ModList modList)
-  {
-    Configs.ModProfile.Value = profileName;
-    Configs.AppliedModProfile.Value = profileName;
-    Configs.AppliedModProfileHash.Value = GetModListHash(modList);
-  }
-
-  private static string GetModListHash(ModList modList)
-  {
-    var hash = 14695981039346656037UL;
-    foreach (var mod in modList.EnabledMods)
-    {
-      foreach (var c in GetIdentity(mod))
-      {
-        hash ^= c;
-        hash *= 1099511628211UL;
-      }
-      hash ^= 0xff;
-      hash *= 1099511628211UL;
-    }
-    return hash.ToString("x16");
-  }
 }

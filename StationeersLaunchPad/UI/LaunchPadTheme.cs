@@ -32,6 +32,7 @@ public static class LaunchPadTheme
   public static readonly Color Ok = Hex(0x5FAF5F);
   public static readonly Color Warn = Hex(0xD8B14A);
   public static readonly Color Err = Hex(0xD9534F);
+  public static readonly Color Info = Hex(0x4A90E2);
 
   private static int colors;
   private static int vars;

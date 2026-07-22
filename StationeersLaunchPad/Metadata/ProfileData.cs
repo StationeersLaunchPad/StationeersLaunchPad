@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Xml.Serialization;
 using StationeersLaunchPad.Sources;
 
@@ -35,5 +36,6 @@ public class ProfileModEntry
   public string ModID;
 
   [XmlAttribute("Enabled")]
-  public bool Enabled;
+  [DefaultValue(true)]
+  public bool LegacyEnabled = true;
 }

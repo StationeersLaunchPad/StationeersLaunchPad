@@ -17,11 +17,14 @@ public static class ProfilePanel
   private static string selectedName = "";
   private static string newProfileName = "";
   private static string message = "";
+  private static ProfileStatusKind messageKind = ProfileStatusKind.Saved;
   private static string confirmDelete = "";
   private static string confirmEmptySave = "";
+  private static string pendingProfileName = "";
   private static string packageCode = "";
   private static DateTime confirmationExpires;
   private static bool selectActive;
+  private static bool confirmProfileSwitch;
   private static bool importingPackage;
   private static readonly HashSet<ulong> subscriptions = [];
   private static ModList indexedModList;
@@ -31,6 +34,14 @@ public static class ProfilePanel
   public static string BusyText => importingPackage ? "Importing SLP1..." : "Subscribing...";
 
   public static void SelectActive() => selectActive = true;
+
+  public static void ShowLoadBlocked(string profileName, int missingModCount)
+  {
+    selectedName = profileName;
+    SetMessage(
+      $"Loading paused. Restore or remove {missingModCount} missing mod{(missingModCount == 1 ? "" : "s")} from {profileName}.",
+      ProfileStatusKind.Error);
+  }
 
   public static bool Draw(LoadStage stage, ProfileManager manager, ModList modList)
   {
@@ -96,55 +107,114 @@ public static class ProfilePanel
   private static bool DrawProfilePicker(ProfileManager manager, ModList modList)
   {
     var changed = false;
-    ImGuiHelper.Text("Profile");
-    ImGui.SameLine();
-    if (string.IsNullOrEmpty(manager.ActiveProfileName))
-      ImGuiHelper.TextDisabled("Off");
-    else
-      ImGuiHelper.TextColored($"Selected: {manager.ActiveProfileName}", LaunchPadTheme.Accent);
+    ImGuiHelper.Text("Active Mod Profile");
 
     var selected = manager.FindProfile(selectedName);
     ImGui.SetNextItemWidth(-float.Epsilon);
-    if (!ImGui.BeginCombo("##profiles", selected?.Name ?? "Off (normal mod configuration)"))
+    if (ImGui.BeginCombo("##profiles", selected?.Name ?? "Disable Profiles"))
+    {
+      if (ImGui.Selectable("Disable Profiles", selected == null)
+        && selected != null)
+        changed |= RequestProfileSwitch("", manager, modList);
+      foreach (var profile in manager.AllProfiles)
+      {
+        var missing = manager.GetMissingMods(profile.Name, modList).Count;
+        var label = missing > 0
+          ? $"{profile.Name}  [{missing} missing]"
+          : profile.Name;
+        if (missing > 0)
+          ImGui.PushStyleColor(
+            ImGuiCol.Text, (Vector4)ProfileStatusIndicator.ColorFor(ProfileStatusKind.Error));
+        var picked = ImGui.Selectable(label, profile == selected);
+        if (missing > 0)
+          ImGui.PopStyleColor();
+        if (picked && profile != selected)
+          changed |= RequestProfileSwitch(profile.Name, manager, modList);
+      }
+      ImGui.EndCombo();
+    }
+
+    changed |= DrawProfileSwitchConfirmation(manager, modList);
+    return changed;
+  }
+
+  private static bool RequestProfileSwitch(
+    string profileName, ProfileManager manager, ModList modList)
+  {
+    var active = manager.ActiveProfile;
+    var hasPendingChanges = active != null
+      && manager.HasDiverged(active.Name, modList);
+    if (!hasPendingChanges)
+      return SwitchProfile(profileName, manager, modList);
+
+    pendingProfileName = profileName;
+    confirmProfileSwitch = true;
+    ImGui.OpenPopup("Discard unsaved profile changes?##switchprofile");
+    return false;
+  }
+
+  private static bool DrawProfileSwitchConfirmation(ProfileManager manager, ModList modList)
+  {
+    const string popupName = "Discard unsaved profile changes?##switchprofile";
+    if (confirmProfileSwitch)
+      ImGui.OpenPopup(popupName);
+    if (!ImGui.BeginPopupModal(popupName,
+      ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoSavedSettings))
       return false;
 
-    if (ImGui.Selectable("Off (normal mod configuration)", selected == null))
-    {
-      selectedName = "";
-      packageCode = "";
-      ClearConfirmations();
-      manager.DisableProfiles();
-      message = "Profiles are off. The current mod list is unchanged.";
-    }
-    foreach (var profile in manager.AllProfiles)
-    {
-      if (!ImGui.Selectable(profile.Name, profile == selected))
-        continue;
-      if (profile == selected)
-        continue;
+    var activeName = manager.ActiveProfileName;
+    var targetName = string.IsNullOrEmpty(pendingProfileName)
+      ? "disabled profiles"
+      : pendingProfileName;
+    ImGuiHelper.TextWrapped($"{activeName} has unsaved changes. Discard them and switch to {targetName}?");
+    ImGui.Spacing();
 
-      var active = manager.ActiveProfile;
-      if (active != null && (manager.HasDiverged(active.Name, modList)
-        || manager.GetNewMods(active.Name, modList).Count > 0))
-      {
-        message = $"Save or revert changes to {active.Name} before switching profiles";
-        continue;
-      }
-
-      selectedName = profile.Name;
-      packageCode = "";
-      ClearConfirmations();
-      changed |= manager.ApplyProfile(profile.Name, modList);
-      message = changed ? $"Switched to {profile.Name}" : "Profile could not be loaded";
+    var changed = false;
+    PushPrimaryButton();
+    if (ImGui.Button("Discard and Switch"))
+    {
+      changed = SwitchProfile(pendingProfileName, manager, modList);
+      confirmProfileSwitch = false;
+      pendingProfileName = "";
+      ImGui.CloseCurrentPopup();
     }
-    ImGui.EndCombo();
+    ImGui.PopStyleColor(3);
+    ImGui.SameLine();
+    if (ImGui.Button("Cancel"))
+    {
+      confirmProfileSwitch = false;
+      pendingProfileName = "";
+      ImGui.CloseCurrentPopup();
+    }
+    ImGui.EndPopup();
     return changed;
+  }
+
+  private static bool SwitchProfile(
+    string profileName, ProfileManager manager, ModList modList)
+  {
+    selectedName = profileName;
+    packageCode = "";
+    ClearConfirmations();
+    if (string.IsNullOrEmpty(profileName))
+    {
+      manager.DisableProfiles();
+      SetMessage("Profiles disabled. The current mod list is unchanged.",
+        ProfileStatusKind.Info);
+      return false;
+    }
+
+    var applied = manager.ApplyProfile(profileName, modList);
+    SetMessage(applied ? $"Switched to {profileName}" : "Profile could not be loaded",
+      applied ? ProfileStatusKind.Saved : ProfileStatusKind.Error);
+    return applied;
   }
 
   private static void DrawOffState(ProfileManager manager)
   {
-    ImGuiHelper.TextWrapped("Profiles are optional. Create one from the mod list on the left, or select an existing profile above.");
-    if (!string.IsNullOrEmpty(manager.ActiveProfileName) && ImGui.Button("Turn Profiles Off"))
+    ImGuiHelper.TextWrapped(
+      "Profiles are disabled. Select Vanilla to load no mods, create a profile from the list on the left, or choose an existing profile.");
+    if (!string.IsNullOrEmpty(manager.ActiveProfileName) && ImGui.Button("Disable Profiles"))
       manager.DisableProfiles();
     DrawMessage();
   }
@@ -154,111 +224,90 @@ public static class ProfilePanel
     IReadOnlyDictionary<string, ModInfo> modIndex)
   {
     var changed = false;
+    var status = ProfileStatusIndicator.Evaluate(manager, selected, modList);
     var diverged = manager.HasDiverged(selected.Name, modList, modIndex);
-    var newMods = manager.GetNewMods(selected.Name, modList);
-    var hasPendingChanges = diverged || newMods.Count > 0;
-    if (diverged)
-    {
-      ImGuiHelper.TextWarning($"Unsaved changes to {selected.Name}");
-      ImGuiHelper.TextDisabled("The mod list on the left is a working copy. Save it, or revert to the saved profile.");
-    }
-    else if (newMods.Count > 0)
-    {
-      ImGuiHelper.TextWarning($"{newMods.Count} new mod{(newMods.Count == 1 ? " needs" : "s need")} a profile decision");
-      ImGuiHelper.TextDisabled("Save Changes to include their current state, or keep the saved profile.");
-    }
-    else
-    {
-      ImGuiHelper.TextSuccess($"{selected.Name} matches the mod list on the left.");
-      ImGuiHelper.TextDisabled("Changes made on the left are not saved to this profile automatically.");
-    }
+    var missingMods = manager.GetMissingMods(selected.Name, modList);
+    var isVanilla = ProfileManager.IsVanillaProfile(selected.Name);
+    var hasPendingChanges = diverged;
+    ProfileStatusIndicator.Draw(status, prominent: true);
+    if (missingMods.Count > 0)
+      ImGuiHelper.TextWrapped(
+        "Loading is paused. Subscribe to the missing Workshop mods or remove them from the profile below.");
 
-    ImGui.BeginDisabled(!hasPendingChanges);
-    PushPrimaryButton();
     var emptySave = modList.EnabledMods.All(mod => mod.Source == ModSourceType.Core)
-      && selected.Mods.Any(entry => entry.Enabled && !IsCore(entry));
+      && selected.Mods.Any(entry => !IsCore(entry));
     if (!emptySave)
       confirmEmptySave = "";
     var saveText = emptySave && confirmEmptySave == selected.Name
       ? "Confirm Save Empty"
       : "Save Changes";
+    ImGui.BeginDisabled(!hasPendingChanges || isVanilla);
     if (ImGui.Button(saveText))
     {
       if (emptySave && confirmEmptySave != selected.Name)
       {
         confirmEmptySave = selected.Name;
         confirmationExpires = DateTime.UtcNow.AddSeconds(5);
-        message = $"Click again to save {selected.Name} with no enabled mods";
+        SetMessage($"Click again to save {selected.Name} with no enabled mods",
+          ProfileStatusKind.Unsaved);
       }
       else
       {
-        message = manager.UpdateProfile(selected.Name, modList)
-          ? $"Saved changes to {selected.Name}"
-          : "Profile could not be updated";
+        var saved = manager.UpdateProfile(selected.Name, modList);
+        SetMessage(saved ? $"Saved changes to {selected.Name}" : "Profile could not be updated",
+          saved ? ProfileStatusKind.Saved : ProfileStatusKind.Error);
         confirmEmptySave = "";
       }
     }
-    ImGui.PopStyleColor(3);
     ImGui.EndDisabled();
     ImGuiHelper.ItemTooltip(
-      $"Update {selected.Name} with the mod states and load order shown on the left.",
+      isVanilla
+        ? "Vanilla is built in and cannot be changed. Create a profile to save a custom mod list."
+        : hasPendingChanges
+        ? $"Update {selected.Name} with the mod states and load order shown on the left."
+        : "The working mod list already matches this profile.",
       hoverFlags: ImGuiHoveredFlags.AllowWhenDisabled);
 
     ImGui.SameLine();
     ImGui.BeginDisabled(!hasPendingChanges);
-    var revertText = newMods.Count > 0 ? "Keep Saved Profile" : "Revert Changes";
-    if (ImGui.Button(revertText))
+    if (ImGui.Button("Revert Changes"))
     {
       ClearConfirmations();
       var applied = manager.ApplyProfile(selected.Name, modList);
       changed |= applied;
-      var remembered = applied
-        && (newMods.Count == 0 || manager.UpdateProfile(selected.Name, modList));
-      message = !applied
-        ? "Profile could not be loaded"
-        : !remembered
-          ? "The new mod decision could not be saved"
-          : newMods.Count > 0
-            ? $"Kept {selected.Name} unchanged and disabled new mods"
-            : $"Reverted to the saved {selected.Name} profile";
+      SetMessage(applied
+          ? $"Reverted to the saved {selected.Name} profile"
+          : "Profile could not be loaded",
+        applied ? ProfileStatusKind.Saved : ProfileStatusKind.Error);
     }
     ImGui.EndDisabled();
     ImGuiHelper.ItemTooltip(
-      newMods.Count > 0
-        ? $"Keep the saved {selected.Name} mods and remember new mods as disabled."
-        : $"Discard pending changes and restore the saved {selected.Name} profile.",
+      $"Discard pending changes and restore the saved {selected.Name} profile.",
       hoverFlags: ImGuiHoveredFlags.AllowWhenDisabled);
     ImGui.SameLine();
     var deleteText = confirmDelete == selected.Name ? "Confirm Delete" : "Delete Profile";
+    ImGui.BeginDisabled(isVanilla);
     if (ImGui.Button(deleteText))
     {
       if (confirmDelete != selected.Name)
       {
         confirmDelete = selected.Name;
         confirmationExpires = DateTime.UtcNow.AddSeconds(5);
-        message = $"Click again to delete {selected.Name}";
+        SetMessage($"Click again to delete {selected.Name}", ProfileStatusKind.Unsaved);
       }
       else
       {
-        message = manager.DeleteProfile(selected.Name)
-          ? $"Deleted {selected.Name}"
-          : "Profile could not be deleted";
+        var deleted = manager.DeleteProfile(selected.Name);
+        SetMessage(deleted ? $"Deleted {selected.Name}" : "Profile could not be deleted",
+          deleted ? ProfileStatusKind.Saved : ProfileStatusKind.Error);
         selectedName = "";
         ClearConfirmations();
       }
     }
-
-    if (newMods.Count > 0)
-    {
-      ImGui.Spacing();
-      ImGuiHelper.TextWarning($"{newMods.Count} new mod{(newMods.Count == 1 ? " is" : "s are")} not in this profile:");
-      foreach (var mod in newMods.Take(5))
-        ImGui.BulletText($"{mod.Name} ({mod.Source})");
-      if (newMods.Count > 5)
-        ImGuiHelper.TextDisabled($"...and {newMods.Count - 5} more");
-
-      ImGuiHelper.TextDisabled("Save Changes includes them; Keep Saved Profile remembers them as disabled.");
-    }
+    ImGui.EndDisabled();
+    ImGuiHelper.ItemTooltip(
+      isVanilla ? "Vanilla is a built-in profile and cannot be deleted." : $"Delete {selected.Name}.",
+      hoverFlags: ImGuiHoveredFlags.AllowWhenDisabled);
 
     DrawMessage();
     return changed;
@@ -269,7 +318,7 @@ public static class ProfilePanel
     IReadOnlyDictionary<string, ModInfo> modIndex)
   {
     var entries = profile?.Mods
-      .Where(entry => entry.Enabled && !IsCore(entry))
+      .Where(entry => !IsCore(entry))
       .ToList() ?? [];
     var savedCanCopy = entries.Count > 0 && entries.All(entry =>
       entry.Source == ModSourceType.Workshop && entry.WorkshopHandle > 1);
@@ -279,8 +328,7 @@ public static class ProfilePanel
     var currentCanCopy = currentMods.Count > 0 && currentMods.All(mod =>
       mod.Source == ModSourceType.Workshop && mod.WorkshopHandle > 1);
     var hasPendingChanges = profile != null
-      && (manager.HasDiverged(profile.Name, modList, modIndex)
-        || manager.GetNewMods(profile.Name, modList).Count > 0);
+      && manager.HasDiverged(profile.Name, modList, modIndex);
     var canCopy = savedCanCopy && !hasPendingChanges;
     var showCopy = canCopy || currentCanCopy;
     var copyRequirement = profile == null
@@ -290,11 +338,14 @@ public static class ProfilePanel
         : "Remove non-Workshop entries from the saved profile before copying an SLP1 code.";
 
     ImGuiHelper.Text("Shareable SLP1 codes");
-    ImGuiHelper.TextDisabled(savedCanCopy
+    var shareDescription = savedCanCopy
       ? "Copy this Workshop-only profile's mod IDs and load order."
       : profile != null && entries.Count > 0
-        ? "Only Workshop-only profiles can be copied. You can still load an SLP1 code below."
-        : "SLP1 codes share Workshop mod IDs and load order. Paste one below to load it.");
+        ? "Only Workshop-only profiles can be copied. The selected profile does not meet this requirement. You can still load an SLP1 code below."
+        : "SLP1 codes share Workshop mod IDs and load order. Paste one below to load it.";
+    ImGui.PushStyleColor(ImGuiCol.Text, (Vector4)LaunchPadTheme.TextMuted);
+    ImGuiHelper.TextWrapped(shareDescription);
+    ImGui.PopStyleColor();
     if (showCopy && !canCopy)
       ImGuiHelper.TextWarning(copyRequirement);
     ImGuiHelper.TextDisabled("They contain IDs and order, not mod files; missing Workshop items are downloaded.");
@@ -309,7 +360,7 @@ public static class ProfilePanel
       {
         packageCode = WorkshopPackageCode.Encode(entries.Select(entry => entry.WorkshopHandle));
         GameManager.Clipboard = packageCode;
-        message = "Shareable SLP1 code copied";
+        SetMessage("Shareable SLP1 code copied", ProfileStatusKind.Saved);
       }
       ImGui.EndDisabled();
       ImGuiHelper.ItemTooltip(
@@ -325,7 +376,7 @@ public static class ProfilePanel
     if (import)
     {
       if (!WorkshopPackageCode.TryDecode(packageCode, out var workshopIds))
-        message = "That SLP1 code is invalid";
+        SetMessage("That SLP1 code is invalid", ProfileStatusKind.Error);
       else
         ImportPackage(manager, modList, workshopIds).Forget();
     }
@@ -361,11 +412,11 @@ public static class ProfilePanel
       selectedName = newProfileName;
       ClearConfirmations();
       changed |= manager.ApplyProfile(selectedName, modList);
-      message = $"Created {selectedName}";
+      SetMessage($"Created {selectedName}", ProfileStatusKind.Saved);
       newProfileName = "";
     }
     else
-      message = "Use a unique name without file name characters";
+      SetMessage("Use a unique name without special characters", ProfileStatusKind.Error);
   }
 
   private static void DrawProfileContents(
@@ -380,10 +431,10 @@ public static class ProfilePanel
     }
 
     var entries = selected.Mods
-      .Where(entry => entry.Enabled && !IsCore(entry))
+      .Where(entry => !IsCore(entry))
       .ToList();
     var currentCount = modList.EnabledMods.Count(mod => mod.Source != ModSourceType.Core);
-    ImGuiHelper.Text($"Saved mods in {selected.Name}");
+    ImGuiHelper.Text($"Enabled mods in {selected.Name}");
     ImGui.SameLine();
     ImGuiHelper.TextDisabled($"{entries.Count} saved, {currentCount} currently enabled");
     ImGuiHelper.TextDisabled("The list on the left is your working copy. Use Save Changes to update this profile.");
@@ -395,16 +446,6 @@ public static class ProfilePanel
     if (entries.Count == 0)
       ImGuiHelper.TextDisabled("This profile has no enabled mods.");
 
-    var unavailable = selected.Mods
-      .Where(entry => !entry.Enabled && !IsCore(entry)
-        && ProfileManager.FindMod(entry, modIndex) == null)
-      .ToList();
-    if (unavailable.Count > 0)
-    {
-      ImGui.Separator();
-      ImGuiHelper.Text("Unavailable saved mods");
-      DrawProfileMods(stage, manager, selected, unavailable, entries.Count, modList, modIndex);
-    }
     ImGui.EndChild();
     ImGui.PopStyleColor(2);
   }
@@ -469,9 +510,13 @@ public static class ProfilePanel
       }
       ImGui.SameLine();
       if (ImGui.Button("Remove from Profile"))
-        message = manager.RemoveMod(profile.Name, entry)
-          ? $"Removed {name} from {profile.Name}"
-          : $"Could not remove {name}";
+      {
+        var removed = manager.RemoveMod(profile.Name, entry);
+        SetMessage(removed
+            ? $"Removed {name} from {profile.Name}"
+            : $"Could not remove {name}",
+          removed ? ProfileStatusKind.Saved : ProfileStatusKind.Error);
+      }
     }
     else if (!mod.Enabled)
     {
@@ -486,12 +531,14 @@ public static class ProfilePanel
     if (!subscriptions.Add(entry.WorkshopHandle))
       return;
 
-    message = $"Subscribing to Workshop item {entry.WorkshopHandle}...";
+    SetMessage($"Subscribing to Workshop item {entry.WorkshopHandle}...",
+      ProfileStatusKind.Info);
     try
     {
       if (!await Steam.SubscribeAndDownload(entry.WorkshopHandle))
       {
-        message = $"Could not subscribe to Workshop item {entry.WorkshopHandle}";
+        SetMessage($"Could not subscribe to Workshop item {entry.WorkshopHandle}",
+          ProfileStatusKind.Error);
         return;
       }
 
@@ -504,12 +551,13 @@ public static class ProfilePanel
         workshop = new();
         config.Mods.Add(workshop);
       }
-      workshop.Enabled = entry.Enabled;
+      workshop.Enabled = true;
       workshop.DirectoryPath = new(entry.DirectoryPath);
       workshop.WorkshopId = new(entry.WorkshopHandle);
       ModConfigUtil.SaveConfig(config);
 
-      message = $"Subscribed to Workshop item {entry.WorkshopHandle}";
+      SetMessage($"Subscribed to Workshop item {entry.WorkshopHandle}",
+        ProfileStatusKind.Saved);
       LaunchPadConfig.ReloadMods();
     }
     finally
@@ -525,7 +573,8 @@ public static class ProfilePanel
       return;
 
     importingPackage = true;
-    message = $"Loading {workshopIds.Count} Workshop mods from SLP1...";
+    SetMessage($"Loading {workshopIds.Count} Workshop mods from SLP1...",
+      ProfileStatusKind.Info);
     try
     {
       var installed = modList.AllMods
@@ -536,7 +585,8 @@ public static class ProfilePanel
       {
         if (!await Steam.SubscribeAndDownload(workshopId))
         {
-          message = $"Could not install Workshop item {workshopId}";
+          SetMessage($"Could not install Workshop item {workshopId}",
+            ProfileStatusKind.Error);
           return;
         }
       }
@@ -575,16 +625,16 @@ public static class ProfilePanel
       }
       config.Mods.Clear();
       config.Mods.AddRange(reordered);
-      manager.MarkActiveProfileDirty();
       ModConfigUtil.SaveConfig(config);
 
-      message = $"Loaded {workshopIds.Count} Workshop mods from SLP1";
+      SetMessage($"Loaded {workshopIds.Count} Workshop mods from SLP1",
+        ProfileStatusKind.Saved);
       LaunchPadConfig.ReloadMods();
     }
     catch (Exception ex)
     {
       Logger.Global.LogException(ex);
-      message = "The SLP1 code could not be loaded";
+      SetMessage("The SLP1 code could not be loaded", ProfileStatusKind.Error);
     }
     finally
     {
@@ -610,7 +660,13 @@ public static class ProfilePanel
   private static void DrawMessage()
   {
     if (!string.IsNullOrEmpty(message))
-      ImGuiHelper.TextDisabled(message);
+      ProfileStatusIndicator.Draw(messageKind, message);
+  }
+
+  private static void SetMessage(string text, ProfileStatusKind kind)
+  {
+    message = text;
+    messageKind = kind;
   }
 
   private static void PushPrimaryButton()

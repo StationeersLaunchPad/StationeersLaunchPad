@@ -22,7 +22,10 @@ public static class ProfileStorage
       {
         var profile = XmlSerialization.Deserialize<ProfileData>(file);
         if (profile != null && IsValidName(profile.Name))
+        {
+          profile.Mods = profile.Mods.Where(entry => entry.LegacyEnabled).ToList();
           profiles.Add(profile);
+        }
         else
           Logger.Global.LogWarning($"Skipping invalid profile file: {file}");
       }

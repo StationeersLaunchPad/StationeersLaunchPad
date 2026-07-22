@@ -126,17 +126,17 @@ public class ModList
 
     var ordered = new List<ModInfo>();
     var matched = new HashSet<ModInfo>();
-    var unavailable = 0;
+    var missing = 0;
     foreach (var entry in profile.Mods)
     {
       var mod = ProfileManager.FindMod(entry, mods);
       if (mod == null)
       {
-        unavailable++;
+        missing++;
         continue;
       }
 
-      mod.Enabled = entry.Enabled;
+      mod.Enabled = true;
       if (matched.Add(mod))
         ordered.Add(mod);
     }
@@ -146,8 +146,8 @@ public class ModList
         ordered.Add(mod);
 
     mods = ordered;
-    if (unavailable > 0)
-      Logger.Global.LogDebug($"Profile '{profile.Name}' skipped {unavailable} unavailable mod(s)");
+    if (missing > 0)
+      Logger.Global.LogDebug($"Profile '{profile.Name}' skipped {missing} missing mod(s)");
   }
 
   // returns true if the mod was moved (even if it wasn't moved all the way to the target index)
