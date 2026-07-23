@@ -13,7 +13,7 @@ public class ModInfoPanel
   {
     if (mod == null)
     {
-      ImGuiHelper.TextDisabled("Selected a mod to view detailed info");
+      ImGuiHelper.TextDisabled("Select a mod on the left to view its details.");
       return;
     }
 
@@ -65,8 +65,16 @@ public class ModInfoPanel
       DrawOneLine("ModID:", mod.ModID);
     if (mod.WorkshopHandle > 1)
       DrawOneLine("Workshop ID:", $"{mod.WorkshopHandle}");
+    if (mod.HasBetaProgram)
+    {
+      DrawOneLine("Beta Workshop ID:", $"{mod.BetaWorkshopHandle}");
+      if (ImGui.Button("Open Beta Workshop Page"))
+        Steam.OpenWorkshopPage(mod.BetaWorkshopHandle);
+    }
+    if (mod.IsBetaProgramMod)
+      DrawOneLine("Beta Program:", "Yes");
     if (!string.IsNullOrEmpty(about.Author))
-      DrawOneLine("Author", about.Author.Trim());
+      DrawOneLine("Author:", about.Author.Trim());
     if (!string.IsNullOrEmpty(about.Version))
       DrawOneLine("Version:", about.Version.Trim());
     if (!string.IsNullOrEmpty(about.ChangeLog))

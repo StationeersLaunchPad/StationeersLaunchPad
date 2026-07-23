@@ -15,6 +15,8 @@ public class ModList
   public IEnumerable<ModInfo> AllMods => mods;
   public IEnumerable<ModInfo> EnabledMods => mods.Where(mod => mod.Enabled);
   public int IndexOf(ModInfo mod) => mods.IndexOf(mod);
+  public bool IsBetaMod(ModInfo mod) =>
+    mod.IsBetaProgramMod || mods.Any(stable => stable != mod && stable.IsBetaProgramFor(mod));
 
   public static ModList NewEmpty() => new();
   public static ModList FromDefs(List<ModDefinition> defs)
@@ -117,6 +119,37 @@ public class ModList
     mods = newMods;
   }
 
+  public void ApplyProfile(ProfileData profile)
+  {
+    foreach (var mod in mods)
+      mod.Enabled = false;
+
+    var ordered = new List<ModInfo>();
+    var matched = new HashSet<ModInfo>();
+    var missing = 0;
+    foreach (var entry in profile.Mods)
+    {
+      var mod = ProfileManager.FindMod(entry, mods);
+      if (mod == null)
+      {
+        missing++;
+        continue;
+      }
+
+      mod.Enabled = true;
+      if (matched.Add(mod))
+        ordered.Add(mod);
+    }
+
+    foreach (var mod in mods)
+      if (!matched.Contains(mod))
+        ordered.Add(mod);
+
+    mods = ordered;
+    if (missing > 0)
+      Logger.Global.LogDebug($"Profile '{profile.Name}' skipped {missing} missing mod(s)");
+  }
+
   // returns true if the mod was moved (even if it wasn't moved all the way to the target index)
   public bool MoveModTo(ModInfo mod, int index, bool keepOrder)
   {
@@ -176,6 +209,12 @@ public class ModList
       if (!prefMods.TryGetExisting(mod, out var pref) || !pref.Enabled)
       {
         prefMods.Add(mod);
+        continue;
+      }
+      if (pref.IsBetaRelated(mod))
+      {
+        Logger.Global.LogDebug($"Beta program pair detected for {mod.Name}, skipping duplicate handling");
+        prefMods.AddBetaRelated(mod);
         continue;
       }
       var nonPref = mod;

@@ -82,7 +82,7 @@ internal static class ConfigPanel
 
     if (requireRestartOriginalValues.Count > 0)
     {
-      ImGuiHelper.TextColored("Changes in configuration require a restart to apply", new Color(0.863f, 0.078f, 0.235f));
+      ImGuiHelper.TextError("Changes in configuration require a restart to apply");
     }
     else
       ImGuiHelper.TextDisabled("These configurations may require a restart to apply");

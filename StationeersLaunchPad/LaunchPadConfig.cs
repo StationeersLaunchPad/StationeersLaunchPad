@@ -58,6 +58,7 @@ public static class LaunchPadConfig
   public static SplashBehaviour SplashBehaviour;
 
   private static ModList modList = ModList.NewEmpty();
+  private static readonly ProfileManager profileManager = new();
 
   private static LoadStage Stage = LoadStage.Initializing;
   public static bool ModsLoaded => Stage > LoadStage.Configuring;
@@ -66,6 +67,8 @@ public static class LaunchPadConfig
   private static bool AutoSort;
   private static bool AutoLoad = true;
   private static bool SteamDisabled;
+  private static bool quickProfileOpen;
+  private static bool preserveSelectionAfterReload = true;
 
   private static StageWait CurWait = new(0, false);
 
@@ -75,10 +78,11 @@ public static class LaunchPadConfig
     CurWait.Auto = false;
   }
 
-  public static void ReloadMods()
+  public static void ReloadMods(bool preserveSelection = true)
   {
     if (Stage != LoadStage.Configuring)
       return;
+    preserveSelectionAfterReload = preserveSelection;
     Logger.Global.LogInfo("Reloading Mod List");
     Stage = LoadStage.Searching;
     CurWait.Skip();
@@ -89,12 +93,55 @@ public static class LaunchPadConfig
   {
     if (AutoLoad)
     {
-      if (AutoLoadWindow.Draw(Stage, CurWait))
+      var profileAction = ProfileLaunchWindow.Draw(
+        Stage, profileManager, modList, quickProfileOpen, out var profileChanged);
+      if (profileChanged)
+      {
+        NormalizeModList();
+        ProfilePanel.SelectActive();
+      }
+
+      if (profileAction == ProfileLaunchAction.OpenSelector)
+      {
+        quickProfileOpen = true;
+        CurWait.Auto = false;
+      }
+      else if (profileAction == ProfileLaunchAction.Continue)
+      {
+        var activeProfile = profileManager.ActiveProfile;
+        var missingMods = activeProfile == null
+          ? []
+          : profileManager.GetMissingMods(activeProfile.Name, modList);
+        if (missingMods.Count > 0)
+        {
+          quickProfileOpen = true;
+          CurWait.Auto = false;
+          Logger.Global.LogWarning(
+            $"Profile '{activeProfile.Name}' has {missingMods.Count} missing required mod(s)");
+        }
+        else
+        {
+          quickProfileOpen = false;
+          CurWait.Skip();
+        }
+      }
+      else if (profileAction == ProfileLaunchAction.OpenMenu)
+      {
+        quickProfileOpen = false;
         StopAutoLoad();
+        ManualLoadWindow.OpenProfilesTab();
+      }
+
+      if (AutoLoad && AutoLoadWindow.Draw(Stage, CurWait))
+      {
+        quickProfileOpen = false;
+        StopAutoLoad();
+        ManualLoadWindow.OpenModInfoTab();
+      }
     }
     else
     {
-      var changed = ManualLoadWindow.Draw(Stage, modList, AutoSort);
+      var changed = ManualLoadWindow.Draw(Stage, modList, AutoSort, profileManager);
       HandleChange(changed);
     }
 
@@ -123,8 +170,8 @@ public static class LaunchPadConfig
     do
     {
       await StageSearching(firstLoad);
+      await StageConfiguring(firstLoad);
       firstLoad = false;
-      await StageConfiguring();
     }
     while (Stage == LoadStage.Searching);
     await StageLoading();
@@ -325,7 +372,7 @@ public static class LaunchPadConfig
     }
   }
 
-  private static async UniTask StageConfiguring()
+  private static async UniTask StageConfiguring(bool firstLoad)
   {
     if (Stage == LoadStage.Failed) return;
     Stage = LoadStage.Configuring;
@@ -333,6 +380,8 @@ public static class LaunchPadConfig
     CurWait = new(Configs.AutoLoadWaitTime.Value, AutoLoad);
 
     await SLPCommand.MoveToStage(CommandStage.ConfigLoaded);
+    PrepareProfileStartup(firstLoad, preserveSelectionAfterReload);
+    preserveSelectionAfterReload = true;
     await Platform.Wait(CurWait, CommandStage.ConfigLoaded);
   }
 
@@ -388,16 +437,106 @@ public static class LaunchPadConfig
     if (sortChanged)
       Configs.AutoSortOnStart.Value = AutoSort = !AutoSort;
     if (sortChanged || modsChanged)
-    {
-      modList.CheckDependencies();
-      modList.DisableDuplicates();
-      if (AutoSort)
-        modList.SortByDeps();
-      ModConfigUtil.SaveConfig(modList.ToModConfig());
-    }
+      NormalizeModList();
     var next = changed.HasFlag(ManualLoadWindow.ChangeFlags.NextStep);
     if (next)
-      CurWait.Skip();
+    {
+      var vanillaDiverged = ProfileManager.IsVanillaProfile(profileManager.ActiveProfileName)
+        && profileManager.HasDiverged(profileManager.ActiveProfileName, modList);
+      var missingMods = profileManager.ActiveProfile == null
+        ? []
+        : profileManager.GetMissingMods(profileManager.ActiveProfileName, modList);
+      if (vanillaDiverged)
+      {
+        Logger.Global.LogWarning("Vanilla profile cannot load with mods enabled");
+        ManualLoadWindow.OpenProfilesTab();
+      }
+      else if (missingMods.Count > 0)
+      {
+        Logger.Global.LogWarning(
+          $"Profile '{profileManager.ActiveProfileName}' has {missingMods.Count} missing required mod(s)");
+        ProfilePanel.ShowLoadBlocked(profileManager.ActiveProfileName, missingMods.Count);
+        ManualLoadWindow.OpenProfilesTab();
+      }
+      else
+        CurWait.Skip();
+    }
+  }
+
+  private static void PrepareProfileStartup(bool firstLoad, bool preserveSelection)
+  {
+    if (string.IsNullOrEmpty(Configs.ModProfile.Value))
+      return;
+
+    var profileName = Configs.ModProfile.Value;
+    var wasInitialized = profileManager.IsInitialized;
+    profileManager.Initialize();
+    var profile = profileManager.FindProfile(profileName);
+    if (profile == null)
+    {
+      if (wasInitialized)
+        Logger.Global.LogWarning($"Configured mod profile '{profileName}' was not found");
+      profileManager.DisableProfiles();
+      return;
+    }
+
+    if (!firstLoad && preserveSelection)
+    {
+      if (profileManager.GetMissingMods(profile.Name, modList).Count > 0)
+        ManualLoadWindow.OpenProfilesTab();
+      return;
+    }
+    if (!profileManager.ApplyProfile(profile.Name, modList))
+    {
+      Logger.Global.LogError($"Could not apply mod profile '{profile.Name}'");
+      StopAutoLoad();
+      return;
+    }
+    var depNotice = NormalizeModList();
+    if (Platform.IsServer)
+      return;
+
+    var missingMods = profileManager.GetMissingMods(profile.Name, modList);
+    if (missingMods.Count > 0)
+    {
+      Logger.Global.LogWarning(
+        $"Profile '{profile.Name}' has {missingMods.Count} missing required mod(s)");
+      if (AutoLoad)
+      {
+        quickProfileOpen = true;
+        CurWait.Auto = false;
+      }
+      else
+        ManualLoadWindow.OpenProfilesTab();
+      return;
+    }
+
+    if (depNotice && Platform.PauseOnDepNotice)
+    {
+      StopAutoLoad();
+      ManualLoadWindow.OpenModInfoTab();
+      return;
+    }
+
+    if (!AutoLoad)
+      return;
+
+    if (quickProfileOpen)
+    {
+      CurWait.Auto = false;
+      return;
+    }
+
+  }
+
+  private static bool NormalizeModList()
+  {
+    var depNotice = !modList.CheckDependencies();
+    depNotice = modList.DisableDuplicates() || depNotice;
+    if (AutoSort)
+      depNotice = !modList.SortByDeps() || depNotice;
+    ModConfigUtil.SaveConfig(modList.ToModConfig());
+    return depNotice;
   }
 
   private static void StartGame()

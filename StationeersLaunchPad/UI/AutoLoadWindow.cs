@@ -24,6 +24,7 @@ public class AutoLoadWindow
         LoadStage.Initializing => "Initializing",
         LoadStage.News => "Checking notices",
         LoadStage.Searching => "Finding Mods",
+        LoadStage.Configuring when !wait.Auto => "Mod loading paused",
         LoadStage.Configuring => $"Loading Mods in {wait.SecondsRemaining:0.0}s",
         LoadStage.Loading => "Loading Mods",
         LoadStage.Loaded => $"Starting game in {wait.SecondsRemaining:0.0}s",

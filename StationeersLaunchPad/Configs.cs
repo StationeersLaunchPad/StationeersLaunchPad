@@ -8,6 +8,19 @@ using StationeersLaunchPad.Loading;
 
 namespace StationeersLaunchPad;
 
+public enum UiAccentColor
+{
+  Classic,
+  Orange,
+  Blue,
+  Green,
+  Pink,
+  Yellow,
+  Purple,
+  Teal,
+  Dark,
+}
+
 // config values that have different defaults depending on platform
 public struct ConfigDefaults
 {
@@ -35,6 +48,7 @@ public static class Configs
   public static ConfigEntry<LoadStrategyMode> LoadStrategyMode;
   public static ConfigEntry<bool> DisableSteamOnStart;
   public static ConfigEntry<string> SavePathOnStart;
+  public static ConfigEntry<bool> RetainWorkshopMods;
   public static ConfigEntry<bool> PostUpdateCleanup;
   public static ConfigEntry<bool> OneTimeBoosterInstall;
   public static ConfigEntry<bool> AutoScrollLogs;
@@ -43,6 +57,7 @@ public static class Configs
   public static ConfigEntry<bool> CompactLogs;
   public static ConfigEntry<bool> LinuxPathPatch;
   public static ConfigEntry<bool> CompactConfigPanel;
+  public static ConfigEntry<UiAccentColor> UiAccent;
   public static ConfigEntry<bool> RepoCheckUpdates;
   public static ConfigEntry<int> RepoUpdateFrequency;
   public static ConfigEntry<int> RepoFetchTimeout;
@@ -50,6 +65,7 @@ public static class Configs
   public static ConfigEntry<int> RepoModFetchTimeout;
   public static ConfigEntry<bool> RepoModValidateDigest;
   public static ConfigEntry<bool> RepoModValidateVersion;
+  public static ConfigEntry<string> ModProfile;
 
   public static ConfigEntry<bool> NewsCheckOnStart;
   public static ConfigEntry<string> NewsFeedUrl;
@@ -119,7 +135,7 @@ public static class Configs
       new ConfigDefinition("Startup", "AutoSort"),
       true,
       new ConfigDescription(
-        "Automatically sort based on OrderBefore/OrderAfter tags in mod data"
+        "Automatically sort based on dependencies and OrderBefore/OrderAfter tags in mod data"
       )
     );
     DisableSteamOnStart = config.Bind(
@@ -187,6 +203,13 @@ public static class Configs
         "This setting allows you to override the default path that config and save files are stored. Notice, due to how this path is implemented in the base game, this setting can only be applied on server start.  Changing it while in game will not have an effect until after a restart."
       )
     );
+    RetainWorkshopMods = config.Bind(
+      new ConfigDefinition("Mod Loading", "RetainWorkshopMods"),
+      true,
+      new ConfigDescription(
+        "When running with steam disabled, use the workshop mods already in the mod config as the list of available workshop mods."
+      )
+    );
     RepoCheckUpdates = config.Bind(
       new ConfigDefinition("Mod Repos", "RepoCheckUpdates"),
       true,
@@ -236,7 +259,6 @@ public static class Configs
         "Reject new mod versions when they don't match the target ModID and Version."
       )
     );
-
     NewsCheckOnStart = config.Bind(
       new ConfigDefinition("News", "NewsCheckOnStart"),
       true,
@@ -296,6 +318,13 @@ public static class Configs
         "This setting is automatically managed and should probably not be manually changed. Remove update backup files on start."
       )
     );
+    ModProfile = config.Bind(
+      new ConfigDefinition("Internal", "ModProfile"),
+      "",
+      new ConfigDescription(
+        "The active mod profile. Leave empty to use the normal mod configuration."
+      )
+    );
     LinuxPathPatch = config.Bind(
       new ConfigDefinition("Internal", "LinuxPathPatch"),
       platformDefaults.LinuxPathPatch,
@@ -308,6 +337,13 @@ public static class Configs
       false,
       new ConfigDescription(
         "Display configuration entires on the same line with their names"
+      )
+    );
+    UiAccent = config.Bind(
+      new ConfigDefinition("Appearance", "AccentColor"),
+      UiAccentColor.Classic,
+      new ConfigDescription(
+        "Accent color for LaunchPad controls. Classic uses the existing SLP theme."
       )
     );
     Sorted = new SortedConfigFile(config);

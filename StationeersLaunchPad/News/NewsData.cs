@@ -45,6 +45,9 @@ public class NewsTrigger
   [XmlAttribute("workshop_id")]
   public string WorkshopId;
 
+  [XmlAttribute("unless_workshop_id")]
+  public string UnlessWorkshopId;
+
   [XmlAttribute("mod_name")]
   public string ModName;
 

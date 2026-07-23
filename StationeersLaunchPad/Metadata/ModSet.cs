@@ -18,6 +18,13 @@ public class ModSet
     all.Add(mod);
   }
 
+  public void AddBetaRelated(ModInfo mod)
+  {
+    if (mod.WorkshopHandle > 1)
+      byWorkshopHandle[mod.WorkshopHandle] = mod;
+    all.Add(mod);
+  }
+
   public bool TryGetExisting(ModInfo mod, out ModInfo existing)
   {
     if (mod.WorkshopHandle > 1 && byWorkshopHandle.TryGetValue(mod.WorkshopHandle, out existing))

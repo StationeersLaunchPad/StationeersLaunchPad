@@ -22,7 +22,7 @@ public static class NewsMatcher
     var dismissedSet = dismissed ?? new HashSet<string>(StringComparer.Ordinal);
     var installedRepoModIDs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     var installedWorkshopIds = new HashSet<ulong>();
-    foreach (var mod in modList.EnabledMods)
+    foreach (var mod in modList.AllMods)
     {
       if (mod.Source == ModSourceType.Repo && !string.IsNullOrEmpty(mod.ModID))
         installedRepoModIDs.Add(mod.ModID);
@@ -47,6 +47,14 @@ public static class NewsMatcher
       if (!TriggerMatches(entry.Trigger, modList))
       {
         Logger.Global.LogDebug($"News: skipping {entry.Id} (no matching enabled mod)");
+        continue;
+      }
+
+      if (ulong.TryParse(entry.Trigger.UnlessWorkshopId, out var excludedWid)
+          && excludedWid > 1
+          && installedWorkshopIds.Contains(excludedWid))
+      {
+        Logger.Global.LogDebug($"News: skipping {entry.Id} (excluded workshop mod already installed)");
         continue;
       }
 

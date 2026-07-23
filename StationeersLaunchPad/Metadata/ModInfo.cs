@@ -28,6 +28,9 @@ public class ModInfo
   public string DirectoryName => new DirectoryInfo(DirectoryPath).Name;
   public ulong WorkshopHandle => Def.WorkshopHandle;
   public string ModID => About.ModID ?? "";
+  public bool HasBetaProgram => About?.BetaProgram?.WorkshopHandle > 1;
+  public ulong BetaWorkshopHandle => HasBetaProgram ? About.BetaProgram.WorkshopHandle : 0;
+  public bool IsBetaProgramMod => About?.IsBetaProgramMod ?? false;
 
   public string AboutPath => Path.Combine(DirectoryPath, "About");
   public string AboutXmlPath => Path.Combine(AboutPath, "About.xml");
@@ -56,6 +59,8 @@ public class ModInfo
 
   public bool SortBefore(ModInfo other)
   {
+    if (other.About?.DependsOn?.Any(Satisfies) ?? false)
+      return true;
     if (other.About?.OrderAfter?.Any(Satisfies) ?? false)
       return true;
     return About?.OrderBefore?.Any(other.Satisfies) ?? false;
@@ -67,4 +72,17 @@ public class ModInfo
       return true;
     return !string.IsNullOrEmpty(modRef.ModID) && ModID == modRef.ModID;
   }
+
+  public bool IsBetaProgramFor(ModInfo mod)
+  {
+    var beta = About?.BetaProgram;
+    if (beta == null)
+      return false;
+    if (beta.WorkshopHandle > 1)
+      return beta.WorkshopHandle == mod.WorkshopHandle;
+    return !string.IsNullOrEmpty(beta.ModID) && beta.ModID == mod.ModID;
+  }
+
+  public bool IsBetaRelated(ModInfo mod) =>
+    IsBetaProgramFor(mod) || mod.IsBetaProgramFor(this);
 }

@@ -5,8 +5,6 @@ using Cysharp.Threading.Tasks;
 using StationeersLaunchPad;
 using StationeersLaunchPad.Metadata;
 using StationeersLaunchPad.Repos;
-using Steamworks.Data;
-using Steamworks.Ugc;
 using UnityEngine;
 
 namespace StationeersLaunchPad.News;
@@ -59,6 +57,11 @@ public static class NewsRunner
     {
       await ExecuteWorkshopModInstall(act.WorkshopId);
     }
+
+    if (act.Action == "workshop_mod_subscribe")
+    {
+      await ExecuteWorkshopModInstall(act.WorkshopId);
+    }
   }
 
   public static async UniTask ExecuteSecondaryAction(NewsEntry entry)
@@ -66,6 +69,9 @@ public static class NewsRunner
     var act = entry?.Actions?.Secondary;
     if (act?.Action == "open_url" && !string.IsNullOrEmpty(act.Url))
       Application.OpenURL(act.Url);
+
+    if (act?.Action == "workshop_mod_subscribe")
+      await ExecuteWorkshopModInstall(act.WorkshopId);
   }
 
   public static async UniTask<bool> ExecuteRepoModInstall(string url, string modId = null)
@@ -165,56 +171,6 @@ public static class NewsRunner
       return false;
     }
 
-    try
-    {
-      var pfid = new PublishedFileId { Value = wid };
-      var item = new Item(pfid);
-
-      Logger.Global.LogInfo($"news: subscribing to workshop item {wid}");
-      bool subOk = await item.Subscribe();
-      if (!subOk)
-      {
-        Logger.Global.LogError($"news: Subscribe() returned false for workshop {wid}");
-        return false;
-      }
-
-      Logger.Global.LogInfo($"news: downloading workshop item {wid}");
-      bool dlOk = await item.DownloadAsync();
-      if (!dlOk)
-      {
-        Logger.Global.LogError($"news: DownloadAsync() failed or was not successful for workshop {wid}");
-        return false;
-      }
-
-      Logger.Global.LogInfo($"news: workshop mod {wid} subscribed and downloaded successfully");
-
-      if (unsubscribeWorkshopId.HasValue)
-      {
-        var oldWid = unsubscribeWorkshopId.Value;
-        if (oldWid > 1 && oldWid != wid)
-        {
-          try
-          {
-            var oldPfid = new PublishedFileId { Value = oldWid };
-            var oldItem = new Item(oldPfid);
-            bool unsubOk = await oldItem.Unsubscribe();
-            Logger.Global.LogInfo($"news: unsubscribed old workshop {oldWid} (success={unsubOk})");
-          }
-          catch (Exception ex)
-          {
-            Logger.Global.LogException(ex);
-            // Unsubscribe failure should not fail the overall migration
-          }
-        }
-      }
-
-      return true;
-    }
-    catch (Exception ex)
-    {
-      Logger.Global.LogException(ex);
-      Logger.Global.LogError("news: workshop_mod_install failed");
-      return false;
-    }
+    return await Steam.SubscribeAndDownload(wid, unsubscribeWorkshopId);
   }
 }
