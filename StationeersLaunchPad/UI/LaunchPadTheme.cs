@@ -140,6 +140,11 @@ public static class LaunchPadTheme
     UiAccentColor.Orange => Hex(0xF47A2A),
     UiAccentColor.Blue => Hex(0x4A90E2),
     UiAccentColor.Green => Hex(0x5FAF5F),
+    UiAccentColor.Pink => Hex(0xE66AA5),
+    UiAccentColor.Yellow => Hex(0xE0B83F),
+    UiAccentColor.Purple => Hex(0x9B7AE6),
+    UiAccentColor.Teal => Hex(0x45B8AC),
+    UiAccentColor.Dark => Hex(0x8B93A7),
     _ => StyleColor(ImGuiCol.CheckMark),
   };
 

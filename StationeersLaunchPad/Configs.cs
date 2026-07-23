@@ -14,6 +14,11 @@ public enum UiAccentColor
   Orange,
   Blue,
   Green,
+  Pink,
+  Yellow,
+  Purple,
+  Teal,
+  Dark,
 }
 
 // config values that have different defaults depending on platform
