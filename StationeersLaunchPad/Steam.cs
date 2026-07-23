@@ -61,6 +61,8 @@ public static class Steam
       foreach (var item in needsUpdate)
         Logger.Global.LogInfo($"- {item.Title} ({item.Id})");
 
+      await UniTask.SwitchToMainThread();
+
       await UniTask.WhenAll(needsUpdate.Select(item => item.DownloadAsync().AsUniTask()));
     }
 
