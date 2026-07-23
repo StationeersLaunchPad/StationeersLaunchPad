@@ -164,7 +164,8 @@ public static class LaunchPadConfig
     Settings.CurrentData.SavePath = LaunchPadPaths.SavePath;
 
     await StageInitializing();
-    await StageUpdating();
+    if (!await StageUpdating())
+      return;
 
     var firstLoad = true;
     do
@@ -232,10 +233,11 @@ public static class LaunchPadConfig
     await SLPCommand.MoveToStage(CommandStage.Init);
   }
 
-  private static async UniTask StageUpdating()
+  // Returns false when startup must stop, such as after a server update requests shutdown.
+  private static async UniTask<bool> StageUpdating()
   {
     if (Stage == LoadStage.Failed || !Configs.CheckForUpdate.Value)
-      return;
+      return true;
 
     Stage = LoadStage.Updating;
     try
@@ -243,13 +245,13 @@ public static class LaunchPadConfig
       Logger.Global.LogInfo("Checking Version");
       var release = await LaunchPadUpdater.GetUpdateRelease();
       if (release == null)
-        return;
+        return true;
 
       if (!Configs.AutoUpdateOnStart.Value && !await LaunchPadUpdater.CheckShouldUpdate(release))
-        return;
+        return true;
 
       if (!await LaunchPadUpdater.UpdateToRelease(release))
-        return;
+        return true;
 
       Logger.Global.LogError($"StationeersLaunchPad updated to {release.TagName}, please restart your game!");
       Configs.PostUpdateCleanup.Value = true;
@@ -259,11 +261,19 @@ public static class LaunchPadConfig
       Logger.Global.LogError("An error occurred during update.");
       Logger.Global.LogException(ex);
       StopAutoLoad();
-      return;
+      return true;
     }
 
-    if (!await Platform.ContinueAfterUpdate())
+    if (await Platform.ContinueAfterUpdate())
+      return true;
+
+    if (!Platform.IsServer)
+    {
       StopAutoLoad();
+      return true;
+    }
+
+    return false;
   }
 
   private static async UniTask StageSearching(bool firstLoad)
