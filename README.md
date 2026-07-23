@@ -6,13 +6,6 @@ A Stationeers mod loader that allows you to edit mod configuration at game start
 
 Visit the [StationeersLaunchPad docs](https://stationeerslaunchpad.github.io/docs/) for more info on StationeersLaunchPad and modding Stationeers.
 
-## v0.2.25 Update Error
-StationeersLaunchPad v0.2.25 contains a bug that prevents the auto-update from functioning.
-
-Please follow the [Manual Update Instructions](https://stationeerslaunchpad.github.io/docs/slp/update_error_0.2.25/) if you are encountering this error.
-
-![Update Error](https://stationeerslaunchpad.github.io/docs/img/update_error_0.2.25.png)
-
 ## Installation
 
 ### Fresh
@@ -47,6 +40,58 @@ __StationeersLaunchPad and StationeersMods can't be installed together__. Both m
   - To resume loading and step through stages, click the highlighted stage upper-left of the loading window
 - Mod will auto be updated unless otherwise chosen in configuration.
 
+## Mod Profiles
+
+Mod Profiles are optional saved lists of enabled mods and their load order. A profile can include Local, Workshop, and Repo mods, and the selected profile is applied automatically on startup.
+
+<details>
+<summary><b>How to create and use a profile</b></summary>
+
+1. Open the LaunchPad menu during startup by clicking the SLP box that appears on the games "Boot Screen" (Splash Screen) and select the **Mod Profiles** tab.
+2. Enable and disable the mods in the list on the left using the checkboxes
+3. Enter a name under **Create from the current mod list**, then select **Create Profile**.
+4. Use **Save Changes** after changing the enabled mods or their order. Use **Revert Changes** to restore the saved profile.
+5. Select another profile from the profile picker when needed.
+
+Select the built-in **Vanilla** profile to launch without any mods, or select **Disable Profiles** to return to the normal, classic workflow.
+
+</details>
+
+<details>
+<summary><b>How to share a profile</b></summary>
+
+Only profiles that exclusively contain mods from the workshop can be shared as compact `SLP1` codes (for now):
+
+1. Save the profile, then open **SLP Window > Mod Profiles > Share Profile**.
+2. Select **Copy SLP1 Code** and send the code to another user.
+3. To import one, paste it into the same tab and select **Load SLP1 Code**.
+4. SLP downloads missing Workshop items and applies the shared load order. Enter a name to save the imported list as a profile.
+
+SLP1 codes contain only Workshop IDs, load order, and an integrity checksum. They do not contain mod files, local or Repo mods, or mod configuration data.
+
+</details>
+
+<details>
+<summary><b>Profile FAQ</b></summary>
+
+**Do I have to use profiles?**
+
+No. Profiles are opt-in, and disabling them leaves the current mod list unchanged.
+
+**What do "Unsaved changes" and "Revert Changes" mean?**
+
+The mod list on the left is the working copy. **Save Changes** updates the selected profile; **Revert Changes** restores its saved enabled mods and order.
+
+**What happens when a profile is missing mods?**
+
+Loading pauses and lists the missing entries. Workshop items can be resubscribed directly; Local and Repo mods must be restored manually or removed from the profile.
+
+**Where are profiles stored?**
+
+Profiles are stored as separate XML files under the LaunchPad save path - usually `Documents\My Games\Stationeers`
+
+</details>
+
 ## Dedicated Server
 
 - Install Bepinex into dedicated server folder
@@ -69,3 +114,10 @@ Information on modding stationeers can be found at:
 
 ### Linking against StationeersLaunchPad
 Linking against StationeersLaunchPad (using any class in the `StationeersLaunchPad` namespace or nested namespaces) is unsupported. These classes are not a stable API, and will change without notice. The code is MIT licensed so you are free to copy any utilities you want to use into your own mod. LaunchPadBooster also contains utilities with a stable API that can be used by mods. If there is something you need that only StationeersLaunchPad has, reach out on github or discord and it can be added as an injected parameter to the Default Entrypoint.
+
+## v0.2.25 Update Error
+StationeersLaunchPad v0.2.25 contains a bug that prevents the auto-update from functioning.
+
+Please follow the [Manual Update Instructions](https://stationeerslaunchpad.github.io/docs/slp/update_error_0.2.25/) if you are encountering this error.
+
+![Update Error](https://stationeerslaunchpad.github.io/docs/img/update_error_0.2.25.png)
