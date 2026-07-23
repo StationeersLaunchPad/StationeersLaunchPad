@@ -61,21 +61,6 @@ public class ProfileManager
     return true;
   }
 
-  public void DisableModsOutsideProfile(string profileName, ModList modList)
-  {
-    var profile = FindProfile(profileName);
-    if (profile == null)
-      return;
-
-    var included = profile.Mods
-      .Select(GetIdentity)
-      .ToHashSet(StringComparer.OrdinalIgnoreCase);
-    foreach (var mod in modList.AllMods)
-      if (!included.Contains(GetIdentity(mod)))
-        mod.Enabled = false;
-    ModConfigUtil.SaveConfig(modList.ToModConfig());
-  }
-
   public bool DeleteProfile(string profileName)
   {
     if (IsVanillaProfile(profileName))

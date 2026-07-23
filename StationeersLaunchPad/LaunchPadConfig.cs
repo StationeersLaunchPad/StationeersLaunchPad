@@ -68,6 +68,7 @@ public static class LaunchPadConfig
   private static bool AutoLoad = true;
   private static bool SteamDisabled;
   private static bool quickProfileOpen;
+  private static bool preserveSelectionAfterReload = true;
 
   private static StageWait CurWait = new(0, false);
 
@@ -77,10 +78,11 @@ public static class LaunchPadConfig
     CurWait.Auto = false;
   }
 
-  public static void ReloadMods()
+  public static void ReloadMods(bool preserveSelection = true)
   {
     if (Stage != LoadStage.Configuring)
       return;
+    preserveSelectionAfterReload = preserveSelection;
     Logger.Global.LogInfo("Reloading Mod List");
     Stage = LoadStage.Searching;
     CurWait.Skip();
@@ -378,7 +380,8 @@ public static class LaunchPadConfig
     CurWait = new(Configs.AutoLoadWaitTime.Value, AutoLoad);
 
     await SLPCommand.MoveToStage(CommandStage.ConfigLoaded);
-    PrepareProfileStartup(firstLoad);
+    PrepareProfileStartup(firstLoad, preserveSelectionAfterReload);
+    preserveSelectionAfterReload = true;
     await Platform.Wait(CurWait, CommandStage.ConfigLoaded);
   }
 
@@ -460,7 +463,7 @@ public static class LaunchPadConfig
     }
   }
 
-  private static void PrepareProfileStartup(bool firstLoad)
+  private static void PrepareProfileStartup(bool firstLoad, bool preserveSelection)
   {
     if (string.IsNullOrEmpty(Configs.ModProfile.Value))
       return;
@@ -477,9 +480,8 @@ public static class LaunchPadConfig
       return;
     }
 
-    if (!firstLoad && !AutoLoad)
+    if (!firstLoad && preserveSelection)
     {
-      profileManager.DisableModsOutsideProfile(profile.Name, modList);
       if (profileManager.GetMissingMods(profile.Name, modList).Count > 0)
         ManualLoadWindow.OpenProfilesTab();
       return;

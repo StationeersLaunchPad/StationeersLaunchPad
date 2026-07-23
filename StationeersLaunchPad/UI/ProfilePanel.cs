@@ -22,10 +22,12 @@ public static class ProfilePanel
   private static string confirmEmptySave = "";
   private static string pendingProfileName = "";
   private static string packageCode = "";
+  private static string importedProfileName = "";
   private static DateTime confirmationExpires;
   private static bool selectActive;
   private static bool confirmProfileSwitch;
   private static bool importingPackage;
+  private static bool importedProfileReady;
   private static readonly HashSet<ulong> subscriptions = [];
   private static ModList indexedModList;
   private static IReadOnlyDictionary<string, ModInfo> modIndex;
@@ -81,6 +83,7 @@ public static class ProfilePanel
       else
         ImGuiHelper.TextColored($"Selected: {selected.Name}", LaunchPadTheme.Accent);
       DrawWorkshopPackage(stage, manager, modList, selected, modIndex);
+      changed |= DrawImportedProfileCreate(stage, manager, modList);
       DrawMessage();
       ImGui.EndTabItem();
     }
@@ -394,17 +397,7 @@ public static class ProfilePanel
     ImGui.Separator();
     ImGuiHelper.Text("Create from the current mod list");
 
-    const string buttonText = "Create Profile";
-    var style = ImGui.GetStyle();
-    var buttonWidth = ImGui.CalcTextSize(buttonText).x + style.FramePadding.x * 2;
-    var inputWidth = Math.Max(80f, ImGui.GetContentRegionAvail().x - buttonWidth - style.ItemSpacing.x);
-    ImGui.SetNextItemWidth(inputWidth);
-    var create = ImGui.InputTextWithHint(
-      "##newprofile", "Profile name", ref newProfileName, 80,
-      ImGuiInputTextFlags.EnterReturnsTrue);
-    ImGui.SameLine();
-    create |= ImGui.Button(buttonText);
-    if (!create)
+    if (!DrawCreateProfileRow("newprofile", ref newProfileName))
       return;
 
     if (manager.CreateProfile(newProfileName, modList))
@@ -417,6 +410,59 @@ public static class ProfilePanel
     }
     else
       SetMessage("Use a unique name without special characters", ProfileStatusKind.Error);
+  }
+
+  private static bool DrawImportedProfileCreate(
+    LoadStage stage, ProfileManager manager, ModList modList)
+  {
+    if (!importedProfileReady)
+      return false;
+
+    ImGui.Separator();
+    ImGuiHelper.Text("Save the imported SLP1 mod list");
+    ImGui.BeginDisabled(stage != LoadStage.Configuring || Busy);
+    var create = DrawCreateProfileRow("importedprofile", ref importedProfileName);
+    ImGui.EndDisabled();
+    if (!create)
+      return false;
+
+    if (!manager.CreateProfile(importedProfileName, modList))
+    {
+      SetMessage("Use a unique name without special characters", ProfileStatusKind.Error);
+      return false;
+    }
+
+    selectedName = importedProfileName;
+    ClearConfirmations();
+    var applied = manager.ApplyProfile(selectedName, modList);
+    SetMessage(applied
+        ? $"Created and switched to {selectedName}"
+        : "Profile was created but could not be loaded",
+      applied ? ProfileStatusKind.Saved : ProfileStatusKind.Error);
+    if (applied)
+    {
+      importedProfileName = "";
+      importedProfileReady = false;
+    }
+    return applied;
+  }
+
+  private static bool DrawCreateProfileRow(string id, ref string profileName)
+  {
+    const string buttonText = "Create Profile";
+    var style = ImGui.GetStyle();
+    var buttonWidth = ImGui.CalcTextSize(buttonText).x + style.FramePadding.x * 2;
+    var inputWidth = Math.Max(80f, ImGui.GetContentRegionAvail().x - buttonWidth - style.ItemSpacing.x);
+
+    ImGui.PushID(id);
+    ImGui.SetNextItemWidth(inputWidth);
+    var create = ImGui.InputTextWithHint(
+      "##profilename", "Profile name", ref profileName, 80,
+      ImGuiInputTextFlags.EnterReturnsTrue);
+    ImGui.SameLine();
+    create |= ImGui.Button(buttonText);
+    ImGui.PopID();
+    return create;
   }
 
   private static void DrawProfileContents(
@@ -573,6 +619,8 @@ public static class ProfilePanel
       return;
 
     importingPackage = true;
+    importedProfileReady = false;
+    importedProfileName = "";
     SetMessage($"Loading {workshopIds.Count} Workshop mods from SLP1...",
       ProfileStatusKind.Info);
     try
@@ -629,6 +677,7 @@ public static class ProfilePanel
 
       SetMessage($"Loaded {workshopIds.Count} Workshop mods from SLP1",
         ProfileStatusKind.Saved);
+      importedProfileReady = true;
       LaunchPadConfig.ReloadMods();
     }
     catch (Exception ex)
