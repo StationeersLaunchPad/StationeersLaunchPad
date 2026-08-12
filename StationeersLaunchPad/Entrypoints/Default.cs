@@ -93,6 +93,8 @@ public class DefaultEntrypoint : BehaviourEntrypoint<MonoBehaviour>
       null,
       System.Type.EmptyTypes,
       null);
+    if (unloadMethod != null && unloadMethod.ReturnType != typeof(void))
+      unloadMethod = null;
     
     return new (mod, type, loadMethod, unloadMethod, eparams);
   }
