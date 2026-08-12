@@ -77,6 +77,9 @@ public class DefaultEntrypoint : BehaviourEntrypoint<MonoBehaviour>
   {
     if (loadMethod.Name != DEFAULT_METHOD_NAME)
       return null;
+    if (loadMethod.ReturnType != typeof(void) &&
+        loadMethod.ReturnType != typeof(bool))
+      return null;    
     var mparams = loadMethod.GetParameters();
     if (mparams.Length == 0)
       return null;
