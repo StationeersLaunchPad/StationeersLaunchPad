@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Reflection;
 using BepInEx.Configuration;
 using Cysharp.Threading.Tasks;
@@ -125,7 +124,7 @@ public class LoadedMod
     Logger.LogDebug("Loading Entrypoints");
 
     _entryGameObject  = new GameObject { name = Info.Name };
-    Object.DontDestroyOnLoad(_entryGameObject);
+    UnityEngine.Object.DontDestroyOnLoad(_entryGameObject);
     
     // Instantiate entry points
     foreach (var entrypoint in Entrypoints)
@@ -193,7 +192,7 @@ public class LoadedMod
 
     if (_entryGameObject != null)
     {
-      Object.Destroy(_entryGameObject);
+      UnityEngine.Object.Destroy(_entryGameObject);
       _entryGameObject = null;
     }
     
