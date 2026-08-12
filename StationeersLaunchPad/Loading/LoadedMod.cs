@@ -27,7 +27,7 @@ public class LoadedMod
   public ContentHandler ContentHandler;
 
   public List<ModEntrypoint> Entrypoints = [];
-  private GameObject _entrypointRoot;
+  private GameObject _entryGameObject;
 
   public List<ConfigFile> ConfigFiles = [];
 
@@ -119,12 +119,12 @@ public class LoadedMod
   {
     Logger.LogDebug("Loading Entrypoints");
 
-    _entrypointRoot  = new GameObject { name = Info.Name };
+    _entryGameObject  = new GameObject { name = Info.Name };
     Object.DontDestroyOnLoad(gameObj);
 
     // instantiate all entrypoints
     foreach (var entrypoint in Entrypoints)
-      entrypoint.Instantiate(_entrypointRoot );
+      entrypoint.Instantiate(_entryGameObject );
 
     // initialize all entrypoints
     foreach (var entrypoint in Entrypoints)
