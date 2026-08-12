@@ -16,6 +16,9 @@ public abstract class ModEntrypoint
   public abstract void Instantiate(GameObject parent);
   public abstract void Initialize(LoadedMod mod);
   public abstract IEnumerable<ConfigFile> Configs();
+  public virtual void Unload()
+  {
+  }
 }
 
 public abstract class BehaviourEntrypoint<T>(Type type) : ModEntrypoint where T : MonoBehaviour
