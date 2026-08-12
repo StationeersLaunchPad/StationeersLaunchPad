@@ -144,7 +144,7 @@ public class LoadedMod
     }
 
     foreach (var config in ConfigFiles)
-      config.SettingChanged += (_, _) => DirtyConfig();
+      config.SettingChanged += OnConfigSettingChanged;
 
     ConfigFiles.Sort((a, b) => a.ConfigFilePath.CompareTo(b.ConfigFilePath));
 
@@ -171,6 +171,11 @@ public class LoadedMod
     return assets;
   }
 
+  private void OnConfigSettingChanged(object sender, SettingChangedEventArgs e)
+  {
+    DirtyConfig();
+  }
+  
   public void Unload()
   {
     for (var i = _initializedEntrypoints.Count - 1; i >= 0; i--)
