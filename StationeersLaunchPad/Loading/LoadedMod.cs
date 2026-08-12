@@ -123,7 +123,12 @@ public class LoadedMod
 
     _entryGameObject  = new GameObject { name = Info.Name };
     Object.DontDestroyOnLoad(_entryGameObject);
+    
+    // Instantiate entry points
+    foreach (var entrypoint in Entrypoints)
+      entrypoint.Instantiate(_entryGameObject);
 
+    // Try initializing the entry points
     foreach (var entrypoint in Entrypoints)
     {
       _initializedEntrypoints.Add(entrypoint);
@@ -173,7 +178,7 @@ public class LoadedMod
     {
       try
       {
-        _initializedEntrypoints[i].Unload(this);
+        _initializedEntrypoints[i].Unload();
       }
       catch (Exception ex)
       {
