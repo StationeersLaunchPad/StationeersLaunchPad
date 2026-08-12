@@ -196,6 +196,9 @@ public class LoadedMod
     foreach (var assetBundle in AssetBundles)
       assetBundle?.Unload(false);
     AssetBundles.Clear();
+    Prefabs.Clear();
+    Exports.Clear();
+    Entrypoints.Clear();
   }
   
   private UniTask<ExportSettings> LoadAssetBundleExportSettings(string path, AssetBundle bundle)
