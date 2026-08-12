@@ -16,6 +16,7 @@ public abstract class ModEntrypoint
   public abstract void Instantiate(GameObject parent);
   public abstract void Initialize(LoadedMod mod);
   public abstract IEnumerable<ConfigFile> Configs();
+  public virtual bool CanUnload() => true;
   public virtual void Unload()
   {
   }

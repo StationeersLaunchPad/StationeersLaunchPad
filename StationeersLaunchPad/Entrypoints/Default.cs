@@ -14,20 +14,24 @@ namespace StationeersLaunchPad.Entrypoints;
 public class DefaultEntrypoint : BehaviourEntrypoint<MonoBehaviour>
 {
   private const string DEFAULT_METHOD_NAME = "OnLoaded";
+  private const string CAN_UNLOAD_METHOD_NAME = "CanUnload";
   private const string UNLOAD_METHOD_NAME = "OnUnloaded";
 
   public readonly LoadedMod Mod;
   public readonly MethodInfo LoadMethod;
+  public readonly MethodInfo CanUnloadMethod;
   public readonly MethodInfo UnloadMethod;
   public readonly List<EntrypointParam> Params;
 
   private DefaultEntrypoint(
     LoadedMod mod, Type type,
-    MethodInfo loadMethod, MethodInfo unloadMethod, List<EntrypointParam> eparams) : base(type)
+    MethodInfo loadMethod, MethodInfo unloadMethod,  MethodInfo canUnloadMethod,
+    List<EntrypointParam> eparams) : base(type)
   {
     Mod = mod;
     LoadMethod = loadMethod;
     UnloadMethod = unloadMethod;
+    CanUnloadMethod = canUnloadMethod;
     Params = eparams;
   }
 
@@ -61,6 +65,14 @@ public class DefaultEntrypoint : BehaviourEntrypoint<MonoBehaviour>
     return true;
   }
 
+  public override bool CanUnload()
+  {
+    if (CanUnloadMethod == null)
+      return true;
+
+    return (bool)CanUnloadMethod.Invoke(Instance, null);
+  }
+  
   public override void Unload()
   {
     UnloadMethod?.Invoke(Instance, null);
@@ -98,7 +110,18 @@ public class DefaultEntrypoint : BehaviourEntrypoint<MonoBehaviour>
     if (unloadMethod != null && unloadMethod.ReturnType != typeof(void))
       unloadMethod = null;
     
-    return new (mod, type, loadMethod, unloadMethod, eparams);
+    var canUnloadMethod = type.GetMethod(
+      CAN_UNLOAD_METHOD_NAME,
+      BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+      null,
+      System.Type.EmptyTypes,
+      null);
+
+    if (canUnloadMethod != null &&
+        canUnloadMethod.ReturnType != typeof(bool))
+      canUnloadMethod = null;
+    
+    return new (mod, type, loadMethod, unloadMethod, canUnloadMethod, eparams);
   }
 
   private static readonly ParamPatternMatch<EntrypointParam> Parser =
