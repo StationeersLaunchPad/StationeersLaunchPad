@@ -104,7 +104,10 @@ public class LoadedMod
       Logger.LogDebug("Finding Entrypoints");
 
       Entrypoints.AddRange(EntrypointSearch.FindEntrypoints(this, Assemblies, Exports));
-
+      
+      if (Configs.SafeMode.Value && Entrypoints.Count == 0)
+        throw new Exception("No Safe Mode compatible entrypoints found");
+      
       Logger.LogInfo($"Found {Entrypoints.Count} Entrypoints");
     });
   }
