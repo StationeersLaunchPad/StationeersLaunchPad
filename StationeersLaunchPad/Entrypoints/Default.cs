@@ -43,6 +43,21 @@ public class DefaultEntrypoint : BehaviourEntrypoint<MonoBehaviour>
       eparams[i] = Params[i].GetParam(this);
     LoadMethod.Invoke(Instance, eparams);
   }
+  
+  public override bool TryInitialize(LoadedMod mod)
+  {
+    var eparams = new object[Params.Count];
+
+    for (var i = 0; i < eparams.Length; i++)
+      eparams[i] = Params[i].GetParam(this);
+
+    var result = LoadMethod.Invoke(Instance, eparams);
+
+    if (LoadMethod.ReturnType == typeof(bool))
+      return (bool)result;
+
+    return true;
+  }
 
   public override void Unload()
   {
