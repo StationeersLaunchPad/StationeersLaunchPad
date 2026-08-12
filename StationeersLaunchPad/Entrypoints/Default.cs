@@ -14,17 +14,20 @@ namespace StationeersLaunchPad.Entrypoints;
 public class DefaultEntrypoint : BehaviourEntrypoint<MonoBehaviour>
 {
   private const string DEFAULT_METHOD_NAME = "OnLoaded";
+  private const string UNLOAD_METHOD_NAME = "OnUnloaded";
 
   public readonly LoadedMod Mod;
   public readonly MethodInfo LoadMethod;
+  public readonly MethodInfo UnloadMethod;
   public readonly List<EntrypointParam> Params;
 
   private DefaultEntrypoint(
     LoadedMod mod, Type type,
-    MethodInfo loadMethod, List<EntrypointParam> eparams) : base(type)
+    MethodInfo loadMethod, MethodInfo unloadMethod, List<EntrypointParam> eparams) : base(type)
   {
     Mod = mod;
     LoadMethod = loadMethod;
+    UnloadMethod = unloadMethod;
     Params = eparams;
   }
 
@@ -41,6 +44,11 @@ public class DefaultEntrypoint : BehaviourEntrypoint<MonoBehaviour>
     LoadMethod.Invoke(Instance, eparams);
   }
 
+  public override void Unload()
+  {
+    UnloadMethod?.Invoke(Instance, null);
+  }
+  
   public override IEnumerable<ConfigFile> Configs()
   {
     foreach (var p in Params)
@@ -60,7 +68,15 @@ public class DefaultEntrypoint : BehaviourEntrypoint<MonoBehaviour>
     var eparams = Parser.Parse(mparams);
     if (eparams == null)
       return null;
-    return new(mod, type, loadMethod, eparams);
+    
+    var unloadMethod = type.GetMethod(
+      UNLOAD_METHOD_NAME,
+      BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+      null,
+      System.Type.EmptyTypes,
+      null);
+    
+    return new (mod, type, loadMethod, unloadMethod, eparams);
   }
 
   private static readonly ParamPatternMatch<EntrypointParam> Parser =
