@@ -208,6 +208,10 @@ public class LoadedMod
     foreach (var config in ConfigFiles)
       config.SettingChanged -= OnConfigSettingChanged;
     ConfigFiles.Clear();
+    
+    LoadedAssets = false;
+    LoadedEntryPoints = false;
+    LoadFinished = false;
   }
   
   private UniTask<ExportSettings> LoadAssetBundleExportSettings(string path, AssetBundle bundle)
