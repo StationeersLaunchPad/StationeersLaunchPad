@@ -179,6 +179,35 @@ public class LoadedMod
     DirtyConfig();
   }
   
+  public bool TryUnload()
+  {
+    if (!CanSafelyUnload)
+      return false;
+
+    foreach (var entrypoint in _initializedEntrypoints)
+    {
+      try
+      {
+        if (!entrypoint.CanUnload())
+        {
+          Logger.LogWarning(
+            $"Entrypoint {entrypoint.DebugName()} refused unload"
+          );
+
+          return false;
+        }
+      }
+      catch (Exception ex)
+      {
+        Logger.LogException(ex);
+        return false;
+      }
+    }
+
+    Unload();
+    return true;
+  }
+  
   public void Unload()
   {
     for (var i = _initializedEntrypoints.Count - 1; i >= 0; i--)
