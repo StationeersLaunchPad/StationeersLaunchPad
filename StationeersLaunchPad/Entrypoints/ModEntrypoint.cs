@@ -24,6 +24,7 @@ public abstract class ModEntrypoint
     Initialize(mod);
     return true;
   }
+  public virtual bool SafeModeCompatible => false;
 }
 
 public abstract class BehaviourEntrypoint<T>(Type type) : ModEntrypoint where T : MonoBehaviour

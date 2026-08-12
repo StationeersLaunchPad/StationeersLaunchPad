@@ -31,6 +31,8 @@ public class DefaultEntrypoint : BehaviourEntrypoint<MonoBehaviour>
     Params = eparams;
   }
 
+  public override bool SafeModeCompatible => LoadMethod.ReturnType == typeof(bool) && UnloadMethod != null;
+  
   public override string DebugName() => $"Default Entry {Type.FullName}";
 
   public override void Instantiate(GameObject parent) =>
