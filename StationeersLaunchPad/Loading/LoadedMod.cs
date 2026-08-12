@@ -208,6 +208,22 @@ public class LoadedMod
     return true;
   }
   
+  private void RemoveLaunchPadBoosterRegistrations()
+  {
+    var modType = Type.GetType("LaunchPadBooster.Mod, LaunchPadBooster");
+    var removeOwnedBy = modType?.GetMethod(
+      "RemoveOwnedBy",
+      BindingFlags.Public | BindingFlags.Static
+    );
+
+    if (removeOwnedBy == null)
+      return;
+
+    foreach (var assembly in Assemblies)
+      removeOwnedBy.Invoke(null, [assembly]);
+  }
+  
+  
   public void Unload()
   {
     for (var i = _initializedEntrypoints.Count - 1; i >= 0; i--)
@@ -223,6 +239,15 @@ public class LoadedMod
     }
 
     _initializedEntrypoints.Clear();
+    
+    try
+    {
+      RemoveLaunchPadBoosterRegistrations();
+    }
+    catch (Exception ex)
+    {
+      Logger.LogException(ex);
+    }    
 
     if (_entryGameObject != null)
     {
