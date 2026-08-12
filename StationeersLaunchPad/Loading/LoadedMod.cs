@@ -125,7 +125,8 @@ public class LoadedMod
 
     // instantiate all entrypoints
     foreach (var entrypoint in Entrypoints)
-      entrypoint.Instantiate(_entryGameObject );
+      if (!entrypoint.TryInitialize(this))
+        throw new Exception($"Entrypoint {entrypoint.DebugName()} failed to initialize");
 
     // initialize all entrypoints
     foreach (var entrypoint in Entrypoints)
