@@ -173,7 +173,8 @@ public class LoadedMod
 
   public void Unload()
   {
-    foreach (var entrypoint in _initializedEntrypoints)
+    for (var i = _initializedEntrypoints.Count - 1; i >= 0; i--)
+    {
       try
       {
         entrypoint.Unload(this);
@@ -182,7 +183,10 @@ public class LoadedMod
       {
         Logger.LogException(ex);
       }
-    
+    }
+
+    _initializedEntrypoints.Clear();
+
     if (_entryGameObject != null)
     {
       Object.Destroy(_entryGameObject);
