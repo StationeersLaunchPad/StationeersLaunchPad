@@ -164,7 +164,14 @@ public class LoadedMod
   public void Unload()
   {
     foreach (var entrypoint in Entrypoints)
-      entrypoint.Unload(this);
+      try
+      {
+        entrypoint.Unload(this);
+      }
+      catch (Exception ex)
+      {
+        Logger.LogException(ex);
+      }
     
     if (_entryGameObject != null)
     {
