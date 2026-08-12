@@ -460,10 +460,12 @@ public static class ManualLoadWindow
     {
       ImGui.BeginChild("##modinfo", ImGuiWindowFlags.HorizontalScrollbar);
       
-      if (selectedMod != null  && selectedMod.CanSafelyUnload && selectedMod.LoadFinished)
+      if (selectedMod != null &&
+          selectedMod.LoadFinished &&
+          selectedMod.CanSafelyUnload)
       {
         if (ImGui.Button("Unload"))
-          selectedMod.Unload();
+          selectedMod.TryUnload();
 
         ImGui.Spacing();
       }
