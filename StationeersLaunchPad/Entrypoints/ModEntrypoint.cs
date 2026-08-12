@@ -19,6 +19,11 @@ public abstract class ModEntrypoint
   public virtual void Unload()
   {
   }
+  public virtual bool TryInitialize(LoadedMod mod)
+  {
+    Initialize(mod);
+    return true;
+  }
 }
 
 public abstract class BehaviourEntrypoint<T>(Type type) : ModEntrypoint where T : MonoBehaviour
