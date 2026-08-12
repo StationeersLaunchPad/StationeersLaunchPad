@@ -21,6 +21,7 @@ public class LoadedMod
   public Logger Logger;
 
   public List<Assembly> Assemblies = [];
+  public List<AssetBundle> AssetBundles = [];
   public List<GameObject> Prefabs = [];
   public List<ExportSettings> Exports = [];
   public ContentHandler ContentHandler;
@@ -69,6 +70,9 @@ public class LoadedMod
   private async UniTask LoadAssetsSingle(string path)
   {
     var bundle = await LoadAssetBundle(path);
+    lock (_lock)
+      AssetBundles.Add(bundle);
+    
     var prefabs = await LoadAssetBundleGameObjects(path, bundle);
     lock (_lock)
       Prefabs.AddRange(prefabs);
