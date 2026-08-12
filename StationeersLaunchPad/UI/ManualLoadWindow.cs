@@ -460,11 +460,7 @@ public static class ManualLoadWindow
     {
       ImGui.BeginChild("##modinfo", ImGuiWindowFlags.HorizontalScrollbar);
       
-      var canUnload = selectedMod != null &&
-                      selectedMod.LoadFinished &&
-                      selectedMod.Entrypoints.All(e => e.SafeModeCompatible);
-      
-      if (selectedMod != null  && canUnload && selectedMod.LoadFinished)
+      if (selectedMod != null  && selectedMod.CanSafelyUnload && selectedMod.LoadFinished)
       {
         if (ImGui.Button("Unload"))
           selectedMod.Unload();

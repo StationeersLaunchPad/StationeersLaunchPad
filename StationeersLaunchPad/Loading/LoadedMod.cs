@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using BepInEx.Configuration;
 using Cysharp.Threading.Tasks;
@@ -38,6 +39,10 @@ public class LoadedMod
   public bool LoadFinished;
   public bool LoadFailed;
 
+  public bool CanSafelyUnload =>
+    _initializedEntrypoints.Count == 0 ||
+    _initializedEntrypoints.All(entrypoint => entrypoint.SafeModeCompatible);
+  
   public LoadedMod(ModInfo info)
   {
     Logger = Logger.Global.CreateChild(info.Name);
