@@ -204,6 +204,10 @@ public class LoadedMod
     Prefabs.Clear();
     Exports.Clear();
     Entrypoints.Clear();
+    
+    foreach (var config in ConfigFiles)
+      config.SettingChanged -= OnConfigSettingChanged;
+    ConfigFiles.Clear();
   }
   
   private UniTask<ExportSettings> LoadAssetBundleExportSettings(string path, AssetBundle bundle)
