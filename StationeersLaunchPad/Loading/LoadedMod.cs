@@ -161,6 +161,12 @@ public class LoadedMod
     return assets;
   }
 
+  public void Unload()
+  {
+    foreach (var entrypoint in Entrypoints)
+      entrypoint.Unload(this);
+  }
+  
   private UniTask<ExportSettings> LoadAssetBundleExportSettings(string path, AssetBundle bundle)
   {
     var name = Path.GetFileName(path);
