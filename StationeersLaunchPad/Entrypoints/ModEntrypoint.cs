@@ -65,10 +65,19 @@ public partial class EntrypointSearch
 
     var allEntries = new List<ModEntrypoint>();
 
-    allEntries.AddRange(FindStationeersModsEntrypoints());
-    allEntries.AddRange(FindPrefabEntrypoints());
-    allEntries.AddRange(FindBepInExEntrypoints());
-    allEntries.AddRange(FindDefaultEntrypoints());
+    if (Configs.SafeMode.Value)
+    {
+      allEntries.AddRange(
+        FindDefaultEntrypoints().Where(entry => entry.SafeModeCompatible)
+      );
+    }
+    else
+    {
+      allEntries.AddRange(FindStationeersModsEntrypoints());
+      allEntries.AddRange(FindPrefabEntrypoints());
+      allEntries.AddRange(FindBepInExEntrypoints());
+      allEntries.AddRange(FindDefaultEntrypoints());
+    }
 
     return allEntries;
   }
