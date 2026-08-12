@@ -218,6 +218,11 @@ public class LoadedMod
     LoadedAssets = false;
     LoadedEntryPoints = false;
     LoadFinished = false;
+    
+    foreach (var assembly in Assemblies)
+      ModLoader.UnregisterAssembly(assembly);
+
+    Assemblies.Clear();
   }
   
   private UniTask<ExportSettings> LoadAssetBundleExportSettings(string path, AssetBundle bundle)
