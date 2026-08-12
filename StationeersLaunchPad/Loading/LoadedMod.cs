@@ -171,6 +171,10 @@ public class LoadedMod
       Object.Destroy(_entryGameObject);
       _entryGameObject = null;
     }
+    
+    foreach (var assetBundle in AssetBundles)
+      assetBundle?.Unload(false);
+    AssetBundles.Clear();
   }
   
   private UniTask<ExportSettings> LoadAssetBundleExportSettings(string path, AssetBundle bundle)
