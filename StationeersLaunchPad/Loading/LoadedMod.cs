@@ -124,23 +124,14 @@ public class LoadedMod
     _entryGameObject  = new GameObject { name = Info.Name };
     Object.DontDestroyOnLoad(gameObj);
 
-    // guarded initialization of entrypoints, Unload if fails
-    try
+    foreach (var entrypoint in Entrypoints)
     {
-      foreach (var entrypoint in Entrypoints)
-      {
-        _initializedEntrypoints.Add(entrypoint);
+      _initializedEntrypoints.Add(entrypoint);
 
-        if (!entrypoint.TryInitialize(this))
-          throw new Exception($"Entrypoint {entrypoint.DebugName()} failed to initialize");
+      if (!entrypoint.TryInitialize(this))
+        throw new Exception($"Entrypoint {entrypoint.DebugName()} failed to initialize");
 
-        ConfigFiles.AddRange(entrypoint.Configs());
-      }
-    }
-    catch
-    {
-      Unload();
-      throw;
+      ConfigFiles.AddRange(entrypoint.Configs());
     }
 
     foreach (var config in ConfigFiles)

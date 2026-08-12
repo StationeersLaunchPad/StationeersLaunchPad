@@ -58,6 +58,8 @@ public abstract class LoadStrategy
   public void LoadFailed(LoadedMod mod, Exception ex)
   {
     mod.Logger.LogException(ex);
+    mod.Unload();
+    
     mod.LoadFailed = true;
     mod.LoadFinished = false;
 
