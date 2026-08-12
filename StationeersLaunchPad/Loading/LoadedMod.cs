@@ -122,7 +122,7 @@ public class LoadedMod
     Logger.LogDebug("Loading Entrypoints");
 
     _entryGameObject  = new GameObject { name = Info.Name };
-    Object.DontDestroyOnLoad(gameObj);
+    Object.DontDestroyOnLoad(_entryGameObject);
 
     foreach (var entrypoint in Entrypoints)
     {
@@ -173,7 +173,7 @@ public class LoadedMod
     {
       try
       {
-        entrypoint.Unload(this);
+        _initializedEntrypoints[i].Unload(this);
       }
       catch (Exception ex)
       {
