@@ -199,8 +199,18 @@ public class LoadedMod
     }
     
     foreach (var assetBundle in AssetBundles)
-      assetBundle?.Unload(false);
+    {
+      try
+      {
+        assetBundle?.Unload(false);
+      }
+      catch (Exception ex)
+      {
+        Logger.LogException(ex);
+      }
+    }
     AssetBundles.Clear();
+    
     Prefabs.Clear();
     Exports.Clear();
     Entrypoints.Clear();
