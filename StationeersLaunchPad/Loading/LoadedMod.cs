@@ -165,6 +165,12 @@ public class LoadedMod
   {
     foreach (var entrypoint in Entrypoints)
       entrypoint.Unload(this);
+    
+    if (_entryGameObject != null)
+    {
+      Object.Destroy(_entryGameObject);
+      _entryGameObject = null;
+    }
   }
   
   private UniTask<ExportSettings> LoadAssetBundleExportSettings(string path, AssetBundle bundle)
