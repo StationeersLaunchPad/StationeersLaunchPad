@@ -28,6 +28,7 @@ public class LoadedMod
   public ContentHandler ContentHandler;
 
   public List<ModEntrypoint> Entrypoints = [];
+  private readonly List<ModEntrypoint> _initializedEntrypoints = [];
   private GameObject _entryGameObject;
 
   public List<ConfigFile> ConfigFiles = [];
@@ -123,15 +124,14 @@ public class LoadedMod
     _entryGameObject  = new GameObject { name = Info.Name };
     Object.DontDestroyOnLoad(gameObj);
 
-    // instantiate all entrypoints
-    foreach (var entrypoint in Entrypoints)
-      if (!entrypoint.TryInitialize(this))
-        throw new Exception($"Entrypoint {entrypoint.DebugName()} failed to initialize");
-
     // initialize all entrypoints
     foreach (var entrypoint in Entrypoints)
     {
-      entrypoint.Initialize(this);
+      _initializedEntrypoints.Add(entrypoint);
+
+      if (!entrypoint.TryInitialize(this))
+        throw new Exception($"Entrypoint {entrypoint.DebugName()} failed to initialize");
+
       ConfigFiles.AddRange(entrypoint.Configs());
     }
 
@@ -165,7 +165,7 @@ public class LoadedMod
 
   public void Unload()
   {
-    foreach (var entrypoint in Entrypoints)
+    foreach (var entrypoint in _initializedEntrypoints)
       try
       {
         entrypoint.Unload(this);
