@@ -55,6 +55,41 @@ public abstract class LoadStrategy
     return !failed;
   }
 
+#if DEBUG
+  // To test round-trip of unloading/loading
+  public async UniTask<bool> LoadMod(LoadedMod mod)
+  {
+    try
+    {
+      if (!mod.LoadedAssemblies)
+      {
+        await mod.LoadAssembliesSerial();
+        mod.LoadedAssemblies = true;
+      }
+
+      if (!mod.LoadedAssets)
+      {
+        await mod.LoadAssetsSerial();
+        mod.LoadedAssets = true;
+      }
+
+      if (!mod.LoadedEntryPoints)
+      {
+        await mod.FindEntrypoints();
+        mod.PrintEntrypoints();
+        mod.LoadEntrypoints();
+        mod.LoadedEntryPoints = true;
+      }
+
+      return true;
+    }
+    catch (Exception ex)
+    {
+      LoadFailed(mod, ex);
+      return false;
+    }
+  }
+#endif
   public void LoadFailed(LoadedMod mod, Exception ex)
   {
     mod.Logger.LogException(ex);
@@ -197,4 +232,5 @@ public class LoadStrategyLinearParallel : LoadStrategy
       }
     }));
   }
+
 }
