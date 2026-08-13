@@ -251,6 +251,7 @@ public class LoadedMod
       config.SettingChanged -= OnConfigSettingChanged;
     ConfigFiles.Clear();
     
+    LoadedAssemblies = false; // Need to mark the assembly as unloaded in any case.
     LoadedAssets = false;
     LoadedEntryPoints = false;
     LoadFinished = false;
