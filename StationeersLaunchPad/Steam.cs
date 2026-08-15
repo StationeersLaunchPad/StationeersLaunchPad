@@ -24,33 +24,14 @@ public static class Steam
   {
     var allItems = new List<Item>();
     var page = 1;
-    const int batchSize = 5; // number of pages to fetch in parallel
 
     while (true)
     {
-      // Prepare batch of pages
-      var pageTasks = new List<UniTask<Item[]>>();
-      for (var i = 0; i < batchSize; i++)
-      {
-        var currentPage = page + i;
-        pageTasks.Add(FetchWorkshopPage(currentPage));
-      }
-
-      var results = await UniTask.WhenAll(pageTasks);
-      var hasItems = false;
-      foreach (var items in results)
-      {
-        if (items.Length > 0)
-        {
-          allItems.AddRange(items);
-          hasItems = true;
-        }
-      }
-
-      if (!hasItems)
-        break; // no more pages
-
-      page += batchSize;
+      var items = await FetchWorkshopPage(page);
+      if (items.Length == 0)
+        break;
+      allItems.AddRange(items);
+      page++;
     }
 
     // Determine which items need updates
@@ -70,12 +51,30 @@ public static class Steam
   // Helper to fetch a single workshop page
   private static async UniTask<Item[]> FetchWorkshopPage(int page)
   {
-    var query = Query.Items.WithTag("Mod");
-    using var result = await query.AllowCachedResponse(0).WhereUserSubscribed().GetPageAsync(page);
+    const int maxAttempts = 3;
+    for (var attempt = 1; attempt <= maxAttempts; attempt++)
+    {
+      try
+      {
+        var query = Query.Items.WithTag("Mod");
+        using var result = await query.AllowCachedResponse(0)
+          .WhereUserSubscribed().GetPageAsync(page);
 
-    return !result.HasValue || result.Value.ResultCount == 0
-      ? []
-      : [.. result.Value.Entries.Where(item => item.Result != Result.FileNotFound)];
+        return !result.HasValue || result.Value.ResultCount == 0
+          ? []
+          : [.. result.Value.Entries.Where(item => item.Result != Result.FileNotFound)];
+      }
+      catch (Exception ex)
+      {
+        Logger.Global.LogWarning(
+          $"Workshop query page {page} failed (attempt {attempt}/{maxAttempts})");
+        Logger.Global.LogException(ex);
+        if (attempt == maxAttempts)
+          throw;
+        await UniTask.Yield();
+      }
+    }
+    return [];
   }
 
   public static async UniTask<bool> SubscribeAndDownload(ulong workshopId, ulong? unsubscribeWorkshopId = null)
