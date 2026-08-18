@@ -66,6 +66,7 @@ public static class LaunchPadConfig
 
   private static bool AutoSort;
   private static bool AutoLoad = true;
+  private static bool SkipNextAutoWaits;
   private static bool SteamDisabled;
   private static bool quickProfileOpen;
   private static bool preserveSelectionAfterReload = true;
@@ -77,7 +78,22 @@ public static class LaunchPadConfig
     AutoLoad = false;
     CurWait.Auto = false;
   }
-
+  public static void SkipAutoWaits()
+    {
+      if (!AutoLoad || !CurWait.Auto)
+          return;
+      SkipNextAutoWaits = true;
+      CurWait.Skip();
+    }
+  private static StageWait NewAutoWait()
+  {
+    var wait = new StageWait(Configs.AutoLoadWaitTime.Value, AutoLoad);
+    
+    if (AutoLoad && SkipNextAutoWaits)
+      wait.Skip();
+    
+    return wait;
+  }
   public static void ReloadMods(bool preserveSelection = true)
   {
     if (Stage != LoadStage.Configuring)
@@ -155,6 +171,7 @@ public static class LaunchPadConfig
     await UniTask.Yield();
 
     var initState = Platform.InitLoadState;
+    SkipNextAutoWaits = false;
     SteamDisabled = initState.SteamDisabled;
     AutoLoad &= initState.AutoLoad;
     AutoSort = Configs.AutoSortOnStart.Value;
@@ -377,7 +394,7 @@ public static class LaunchPadConfig
     if (Stage == LoadStage.Failed) return;
     Stage = LoadStage.Configuring;
 
-    CurWait = new(Configs.AutoLoadWaitTime.Value, AutoLoad);
+    CurWait = NewAutoWait();
 
     await SLPCommand.MoveToStage(CommandStage.ConfigLoaded);
     PrepareProfileStartup(firstLoad, preserveSelectionAfterReload);
@@ -420,7 +437,7 @@ public static class LaunchPadConfig
 
     await SLPCommand.MoveToStage(CommandStage.ModsLoaded);
 
-    CurWait = new(Configs.AutoLoadWaitTime.Value, AutoLoad);
+    CurWait = NewAutoWait();
     await Platform.Wait(CurWait, CommandStage.ModsLoaded);
     await SLPRefCheck.RunRefCheck();
   }

@@ -14,7 +14,7 @@ public class AutoLoadWindow
     if ((stage == LoadStage.Configuring || stage == LoadStage.Loaded)
         && wait.Auto
         && ImGui.IsKeyPressed(ImGuiKey.Escape, false))
-      wait.Skip();
+      LaunchPadConfig.SkipAutoWaits();
     
     ImGuiHelper.Draw(() =>
     {
