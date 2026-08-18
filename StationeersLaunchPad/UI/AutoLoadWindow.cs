@@ -11,7 +11,9 @@ public class AutoLoadWindow
   {
     var stopAuto = false;
     
-    if ((stage == LoadStage.Configuring || stage == LoadStage.Loaded) && wait.Auto)
+    if ((stage == LoadStage.Configuring || stage == LoadStage.Loaded)
+        && wait.Auto
+        && ImGui.IsKeyPressed(ImGuiKey.Escape, false))
       wait.Skip();
     
     ImGuiHelper.Draw(() =>
