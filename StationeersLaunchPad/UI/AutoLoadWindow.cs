@@ -10,6 +10,10 @@ public class AutoLoadWindow
   public static bool Draw(LoadStage stage, StageWait wait)
   {
     var stopAuto = false;
+    
+    if ((stage == LoadStage.Configuring || stage == LoadStage.Loaded) && wait.Auto)
+      wait.Skip();
+    
     ImGuiHelper.Draw(() =>
     {
       var windowRect = ImGuiHelper.ScreenRect().Shrink(25f);
@@ -25,9 +29,9 @@ public class AutoLoadWindow
         LoadStage.News => "Checking notices",
         LoadStage.Searching => "Finding Mods",
         LoadStage.Configuring when !wait.Auto => "Mod loading paused",
-        LoadStage.Configuring => $"Loading Mods in {wait.SecondsRemaining:0.0}s",
+        LoadStage.Configuring => $"Loading Mods in {wait.SecondsRemaining:0.0}s (Esc to continue, Click to enter setup)",
         LoadStage.Loading => "Loading Mods",
-        LoadStage.Loaded => $"Starting game in {wait.SecondsRemaining:0.0}s",
+        LoadStage.Loaded => $"Starting game in {wait.SecondsRemaining:0.0}s (Esc to continue)",
         LoadStage.Running => "Game Running",
         LoadStage.Failed => "Loading Failed",
         _ => throw new ArgumentOutOfRangeException(),
