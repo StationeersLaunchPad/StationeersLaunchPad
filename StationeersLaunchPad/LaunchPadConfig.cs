@@ -64,7 +64,6 @@ public static class LaunchPadConfig
   public static bool ModsLoaded => Stage > LoadStage.Configuring;
   public static bool GameRunning => Stage == LoadStage.Running;
 
-  private static bool AutoSort;
   private static bool AutoLoad = true;
   private static bool SkipNextAutoWaits;
   private static bool SteamDisabled;
@@ -166,7 +165,7 @@ public static class LaunchPadConfig
     }
     else
     {
-      var changed = ManualLoadWindow.Draw(Stage, modList, AutoSort, profileManager);
+      var changed = ManualLoadWindow.Draw(Stage, modList, profileManager);
       HandleChange(changed);
     }
 
@@ -183,7 +182,6 @@ public static class LaunchPadConfig
     SkipNextAutoWaits = false;
     SteamDisabled = initState.SteamDisabled;
     AutoLoad &= initState.AutoLoad;
-    AutoSort = Configs.AutoSortOnStart.Value;
 
     // The save path on startup was used to load the mod list, so we can't change it at runtime.
     CustomSavePathPatches.SavePath = Configs.SavePathOnStart.Value;
@@ -346,8 +344,7 @@ public static class LaunchPadConfig
 
       var depNotice = !modList.CheckDependencies();
       depNotice = modList.DisableDuplicates() || depNotice;
-      if (AutoSort)
-        depNotice = !modList.SortByDeps() || depNotice;
+      depNotice = !modList.SortCanonical() || depNotice;
 
       if (depNotice && Platform.PauseOnDepNotice)
         StopAutoLoad();
@@ -468,11 +465,8 @@ public static class LaunchPadConfig
   {
     if (changed == ManualLoadWindow.ChangeFlags.None)
       return;
-    var sortChanged = changed.HasFlag(ManualLoadWindow.ChangeFlags.AutoSort);
     var modsChanged = changed.HasFlag(ManualLoadWindow.ChangeFlags.Mods);
-    if (sortChanged)
-      Configs.AutoSortOnStart.Value = AutoSort = !AutoSort;
-    if (sortChanged || modsChanged)
+    if (modsChanged)
       NormalizeModList();
     var next = changed.HasFlag(ManualLoadWindow.ChangeFlags.NextStep);
     if (next)
@@ -569,8 +563,7 @@ public static class LaunchPadConfig
   {
     var depNotice = !modList.CheckDependencies();
     depNotice = modList.DisableDuplicates() || depNotice;
-    if (AutoSort)
-      depNotice = !modList.SortByDeps() || depNotice;
+    depNotice = !modList.SortCanonical() || depNotice;
     ModConfigUtil.SaveConfig(modList.ToModConfig());
     return depNotice;
   }

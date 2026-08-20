@@ -136,12 +136,15 @@ public class ProfileManager
     if (profile == null)
       return false;
 
-    var current = modList.EnabledMods.Select(GetIdentity);
+    var current = modList.EnabledMods
+      .Select(GetIdentity)
+      .ToHashSet(StringComparer.OrdinalIgnoreCase);
     var saved = profile.Mods
       .Select(entry => FindMod(entry, modIndex))
       .Where(mod => mod != null)
-      .Select(GetIdentity);
-    return !current.SequenceEqual(saved, StringComparer.OrdinalIgnoreCase);
+      .Select(GetIdentity)
+      .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    return !current.SetEquals(saved);
   }
 
   public List<ProfileModEntry> GetMissingMods(string profileName, ModList modList)

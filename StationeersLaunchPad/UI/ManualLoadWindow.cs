@@ -15,16 +15,13 @@ public static class ManualLoadWindow
   {
     None = 0,
     Mods = 1 << 0,
-    AutoSort = 1 << 1,
-    NextStep = 1 << 2,
+    NextStep = 1 << 1,
   }
 
   private static LoadStage lastStage;
   private static ModInfo selectedInfo = null;
   private static LoadedMod selectedMod = null;
   private static bool openInfo = false;
-  private static ModInfo draggingMod = null;
-  private static bool dragged = false;
   private static bool openProfiles = false;
 
   public static void OpenProfilesTab()
@@ -39,7 +36,7 @@ public static class ManualLoadWindow
     openInfo = true;
   }
 
-  public static ChangeFlags Draw(LoadStage stage, ModList modList, bool autoSort, ProfileManager profileManager)
+  public static ChangeFlags Draw(LoadStage stage, ModList modList, ProfileManager profileManager)
   {
     Platform.SetBackgroundEnabled(false);
     var changed = ChangeFlags.None;
@@ -81,12 +78,12 @@ public static class ManualLoadWindow
           ImGuiHelper.TextDisabled(
             "Vanilla profile active: choose another profile or Disable Profiles to edit mods.");
         ImGui.BeginDisabled(vanillaActive);
-        changed |= DrawModSelectOptions(modList, autoSort);
+        changed |= DrawModSelectOptions(modList);
         ImGui.EndDisabled();
         leftRect = leftRect.From(ImGui.GetCursorScreenPos());
         ImGui.BeginChild("##modselect", leftRect.Size);
         if (DrawModSelectTable(
-          modList, stage == LoadStage.Configuring && !vanillaActive, autoSort))
+          modList, stage == LoadStage.Configuring && !vanillaActive))
           changed |= ChangeFlags.Mods;
         ImGui.EndChild();
       }
@@ -199,18 +196,11 @@ public static class ManualLoadWindow
     return next;
   }
 
-  private static ChangeFlags DrawModSelectOptions(ModList modList, bool autoSort)
+  private static ChangeFlags DrawModSelectOptions(ModList modList)
   {
     var changed = ChangeFlags.None;
 
     ImGui.AlignTextToFramePadding();
-
-    if (ImGui.Checkbox("Auto-sort", ref autoSort))
-      changed |= ChangeFlags.AutoSort;
-
-    ImGui.SameLine();
-    ImGuiHelper.TextDisabled("|", true);
-    ImGui.SameLine();
     ImGuiHelper.Text("Enable mods:");
 
     const byte hasEnabled = 1;
@@ -286,27 +276,9 @@ public static class ManualLoadWindow
     return changed;
   }
 
-  private static bool DrawModSelectTable(
-    ModList modList, bool edit = false, bool autoSort = false)
+  private static bool DrawModSelectTable(ModList modList, bool edit = false)
   {
     var changed = false;
-    if (!ImGui.IsMouseDown(ImGuiMouseButton.Left))
-    {
-      if (draggingMod != null && !dragged)
-      {
-        selectedInfo = draggingMod;
-        if (selectedInfo != null && selectedInfo.Source == ModSourceType.Core)
-          selectedInfo = null;
-        openInfo = selectedInfo != null;
-      }
-      draggingMod = null;
-      dragged = false;
-    }
-
-    var hoveringIndex = -1;
-    var draggingIndex = -1;
-    if (draggingMod != null)
-      draggingIndex = modList.IndexOf(draggingMod);
 
     var rowHeight = ImGui.GetTextLineHeightWithSpacing();
     var spacing = ImGui.GetStyle().ItemSpacing.x * 2;
@@ -339,15 +311,10 @@ public static class ManualLoadWindow
       var c12 = row.ColumnsFrom(1);
       ImGui.SetCursorScreenPos(c12.Min);
       ImGui.SetNextItemWidth(c12.Size.x);
-      ImGui.Selectable($"##rowdrag", mod == draggingMod || (draggingMod == null && mod == selectedInfo));
-      if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenBlockedByActiveItem))
+      if (ImGui.Selectable("##rowselect", mod == selectedInfo))
       {
-        hoveringIndex = idx;
-        if (ImGui.IsMouseClicked(ImGuiMouseButton.Left) && draggingMod == null)
-        {
-          draggingIndex = idx;
-          draggingMod = mod;
-        }
+        selectedInfo = mod.Source == ModSourceType.Core ? null : mod;
+        openInfo = selectedInfo != null;
       }
 
       ImGuiHelper.TextCentered(row.Column(1), $"{mod.Source}");
@@ -360,12 +327,6 @@ public static class ManualLoadWindow
       if (isBeta)
         ImGuiHelper.ItemTooltip("This item is a beta version of an installed mod.");
 
-      if (draggingMod != null)
-        if (mod.SortBefore(draggingMod))
-          ImGuiHelper.DrawSameLine(() => ImGuiHelper.TextRightDisabled("Before"));
-        else if (draggingMod.SortBefore(mod))
-          ImGuiHelper.DrawSameLine(() => ImGuiHelper.TextRightDisabled("After"));
-
       ImGui.PopID();
 
       idx++;
@@ -374,12 +335,6 @@ public static class ManualLoadWindow
 
     ImGui.EndDisabled();
 
-    if (edit && draggingIndex != -1 && hoveringIndex != -1 && draggingIndex != hoveringIndex)
-    {
-      dragged = true;
-      if (modList.MoveModTo(draggingMod, hoveringIndex, autoSort))
-        changed = true;
-    }
     return changed;
   }
 
