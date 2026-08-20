@@ -150,46 +150,6 @@ public class ModList
       Logger.Global.LogDebug($"Profile '{profile.Name}' skipped {missing} missing mod(s)");
   }
 
-  // returns true if the mod was moved (even if it wasn't moved all the way to the target index)
-  public bool MoveModTo(ModInfo mod, int index, bool keepOrder)
-  {
-    var curIndex = mods.IndexOf(mod);
-    if (curIndex == -1)
-      throw new InvalidOperationException($"unknown mod {mod.Source} {mod.Name}");
-
-    if (curIndex == index)
-      return false;
-
-    var newMods = new List<ModInfo>(mods);
-
-    var graph = OrderGraph.Build(newMods);
-
-    var dir = index > curIndex ? 1 : -1;
-    var deps = index > curIndex ? graph.Afters[mod] : graph.Befores[mod];
-
-    bool shift(int idx)
-    {
-      var next = idx + dir;
-      if (next < 0 || next >= newMods.Count)
-        return false;
-      if (keepOrder && deps.Contains(newMods[next]) && !shift(next))
-        return false;
-      (newMods[idx], newMods[next]) = (newMods[next], newMods[idx]);
-      return true;
-    }
-
-    var anyMove = false;
-    while (curIndex != index)
-    {
-      if (!shift(curIndex))
-        break;
-      anyMove = true;
-      curIndex += dir;
-    }
-    mods = newMods;
-    return anyMove;
-  }
-
   // returns true if any mods were disabled
   public bool DisableDuplicates()
   {
@@ -294,61 +254,119 @@ public class ModList
   }
 
   // returns true if sort was successful
-  public bool SortByDeps()
+  public bool SortCanonical()
   {
     var graph = OrderGraph.Build(mods);
     if (graph.HasCircular)
+    {
+      SortCanonicalFallback();
       return false;
+    }
 
-    // loop through each mod, adding any who are disabled or have all dependencies met.
-    // if a mod is skipped, we move back to it as soon as another mod is added to limit how far mods get pushed forward
-    // this makes this an n^2 sort worst case. while we could likely do better on this complexity, this approach is simple and
-    // has a negligible runtime in up to hundreds of mods.
+    // Always start from the same base order. The previous implementation used
+    // the current config/UI order as its tie-breaker, so otherwise-identical
+    // clients and servers could produce different results.
+    var enabled = mods
+      .Where(mod => mod.Enabled && mod.Source != ModSourceType.Core)
+      .OrderBy(mod => mod, CanonicalComparer.Instance)
+      .ToList();
     var added = new HashSet<ModInfo>();
     var newOrder = new List<ModInfo>();
-    bool areDepsAdded(ModInfo mod)
+
+    var core = mods.FirstOrDefault(mod => mod.Source == ModSourceType.Core);
+    if (core != null)
     {
-      foreach (var mod2 in graph.Befores[mod])
-        if (!added.Contains(mod2))
-          return false;
-      return true;
+      newOrder.Add(core);
+      added.Add(core);
     }
 
-    var idx = 0;
-    var firstSkipped = -1;
-
-    while (idx < mods.Count)
+    void addWithPrerequisites(ModInfo mod)
     {
-      var mod = mods[idx];
-      if (added.Contains(mod))
-      {
-        idx++;
-        continue;
-      }
-      if (mod.Enabled && !areDepsAdded(mod))
-      {
-        if (firstSkipped == -1)
-          firstSkipped = idx;
-        idx++;
-        continue;
-      }
+      if (added.Contains(mod) || !mod.Enabled || mod.Source == ModSourceType.Core)
+        return;
 
+      foreach (var before in graph.Befores[mod]
+        .Where(before => before.Enabled && before.Source != ModSourceType.Core)
+        .OrderBy(before => before, ConstraintComparer.Instance))
+        addWithPrerequisites(before);
       newOrder.Add(mod);
       added.Add(mod);
-      if (firstSkipped != -1)
-      {
-        idx = firstSkipped;
-        firstSkipped = -1;
-      }
-      else
-        idx++;
     }
+
+    // Start with the end of each constraint chain so LoadBefore/LoadAfter
+    // entries stay stacked around their target instead of being emitted early
+    // merely because their name sorts first.
+    foreach (var mod in enabled.Where(mod => !graph.Afters[mod]
+      .Any(after => after.Enabled && after.Source != ModSourceType.Core)))
+      addWithPrerequisites(mod);
+    foreach (var mod in enabled)
+      addWithPrerequisites(mod);
+
+    newOrder.AddRange(mods
+      .Where(mod => !mod.Enabled && mod.Source != ModSourceType.Core)
+      .OrderBy(mod => mod, CanonicalComparer.Instance));
 
     if (newOrder.Count != mods.Count)
       throw new InvalidOperationException($"Sort did not add all mods: {newOrder.Count} != {mods.Count}");
 
     mods = newOrder;
     return true;
+  }
+
+  private void SortCanonicalFallback()
+  {
+    mods = [.. mods
+      .OrderBy(mod => mod.Source == ModSourceType.Core ? 0 : mod.Enabled ? 1 : 2)
+      .ThenBy(mod => mod, CanonicalComparer.Instance)];
+  }
+
+  private sealed class CanonicalComparer : IComparer<ModInfo>
+  {
+    public static readonly CanonicalComparer Instance = new();
+
+    public int Compare(ModInfo x, ModInfo y)
+    {
+      if (ReferenceEquals(x, y))
+        return 0;
+      var result = string.Compare(x?.Name, y?.Name, StringComparison.OrdinalIgnoreCase);
+      if (result != 0)
+        return result;
+      result = (x?.WorkshopHandle ?? 0).CompareTo(y?.WorkshopHandle ?? 0);
+      if (result != 0)
+        return result;
+      result = string.Compare(x?.ModID, y?.ModID, StringComparison.OrdinalIgnoreCase);
+      if (result != 0)
+        return result;
+      result = (x?.Source ?? default).CompareTo(y?.Source ?? default);
+      if (result != 0)
+        return result;
+      result = string.Compare(
+        x?.About?.Author, y?.About?.Author, StringComparison.OrdinalIgnoreCase);
+      if (result != 0)
+        return result;
+      return string.Compare(
+        Path.GetFileName(NormalizePath(x?.DirectoryPath).TrimEnd('/')),
+        Path.GetFileName(NormalizePath(y?.DirectoryPath).TrimEnd('/')),
+        StringComparison.OrdinalIgnoreCase);
+    }
+  }
+
+  private sealed class ConstraintComparer : IComparer<ModInfo>
+  {
+    public static readonly ConstraintComparer Instance = new();
+
+    public int Compare(ModInfo x, ModInfo y)
+    {
+      if (ReferenceEquals(x, y))
+        return 0;
+      if (x?.WorkshopHandle > 1 && y?.WorkshopHandle > 1)
+      {
+        var result = x.WorkshopHandle.CompareTo(y.WorkshopHandle);
+        if (result != 0)
+          return result;
+      }
+      return CanonicalComparer.Instance.Compare(x, y);
+    }
   }
 
   private static string NormalizePath(string path) =>

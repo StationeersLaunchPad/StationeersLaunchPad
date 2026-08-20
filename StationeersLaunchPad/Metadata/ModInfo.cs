@@ -57,15 +57,6 @@ public class ModInfo
       DirectoryPath, "*.assets", SearchOption.AllDirectories));
   }
 
-  public bool SortBefore(ModInfo other)
-  {
-    if (other.About?.DependsOn?.Any(Satisfies) ?? false)
-      return true;
-    if (other.About?.OrderAfter?.Any(Satisfies) ?? false)
-      return true;
-    return About?.OrderBefore?.Any(other.Satisfies) ?? false;
-  }
-
   public bool Satisfies(ModReference modRef)
   {
     if (modRef.WorkshopHandle != 0 && WorkshopHandle == modRef.WorkshopHandle)

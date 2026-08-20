@@ -267,7 +267,7 @@ public static class ProfilePanel
       isVanilla
         ? "Vanilla is built in and cannot be changed. Create a profile to save a custom mod list."
         : hasPendingChanges
-        ? $"Update {selected.Name} with the mod states and load order shown on the left."
+        ? $"Update {selected.Name} with the enabled mods shown on the left."
         : "The working mod list already matches this profile.",
       hoverFlags: ImGuiHoveredFlags.AllowWhenDisabled);
 
@@ -322,6 +322,8 @@ public static class ProfilePanel
   {
     var entries = profile?.Mods
       .Where(entry => !IsCore(entry))
+      .OrderBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase)
+      .ThenBy(entry => entry.WorkshopHandle)
       .ToList() ?? [];
     var savedCanCopy = entries.Count > 0 && entries.All(entry =>
       entry.Source == ModSourceType.Workshop && entry.WorkshopHandle > 1);
@@ -342,16 +344,16 @@ public static class ProfilePanel
 
     ImGuiHelper.Text("Shareable SLP1 codes");
     var shareDescription = savedCanCopy
-      ? "Copy this Workshop-only profile's mod IDs and load order."
+      ? "Copy this Workshop-only profile's mod IDs."
       : profile != null && entries.Count > 0
         ? "Only Workshop-only profiles can be copied. The selected profile does not meet this requirement. You can still load an SLP1 code below."
-        : "SLP1 codes share Workshop mod IDs and load order. Paste one below to load it.";
+        : "SLP1 codes share Workshop mod IDs. Paste one below to load it.";
     ImGui.PushStyleColor(ImGuiCol.Text, (Vector4)LaunchPadTheme.TextMuted);
     ImGuiHelper.TextWrapped(shareDescription);
     ImGui.PopStyleColor();
     if (showCopy && !canCopy)
       ImGuiHelper.TextWarning(copyRequirement);
-    ImGuiHelper.TextDisabled("They contain IDs and order, not mod files; missing Workshop items are downloaded.");
+    ImGuiHelper.TextDisabled("They contain IDs, not mod files; missing Workshop items are downloaded.");
     var import = ImGui.InputTextWithHint(
       "##packagecode", "Paste an SLP1 code", ref packageCode, 16384,
       ImGuiInputTextFlags.EnterReturnsTrue);
@@ -361,7 +363,8 @@ public static class ProfilePanel
       ImGui.BeginDisabled(!canCopy);
       if (ImGui.Button("Copy SLP1 Code"))
       {
-        packageCode = WorkshopPackageCode.Encode(entries.Select(entry => entry.WorkshopHandle));
+        packageCode = WorkshopPackageCode.Encode(
+          entries.Select(entry => entry.WorkshopHandle).OrderBy(id => id));
         GameManager.Clipboard = packageCode;
         SetMessage("Shareable SLP1 code copied", ProfileStatusKind.Saved);
       }

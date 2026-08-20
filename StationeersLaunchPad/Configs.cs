@@ -38,7 +38,6 @@ public static class Configs
   public static ConfigEntry<int> UpdateCheckTimeout;
   public static ConfigEntry<int> UpdateDownloadTimeout;
   public static ConfigEntry<bool> AutoLoadOnStart;
-  public static ConfigEntry<bool> AutoSortOnStart;
   public static ConfigEntry<int> AutoLoadWaitTime;
   public static ConfigEntry<bool> DedupeMods;
   public static ConfigEntry<int> DedupePriorityLocal;
@@ -129,13 +128,6 @@ public static class Configs
       new ConfigDescription(
         "How many seconds to wait before loading mods, then loading the game",
         new AcceptableValueRange<int>(0, 30)
-      )
-    );
-    AutoSortOnStart = config.Bind(
-      new ConfigDefinition("Startup", "AutoSort"),
-      true,
-      new ConfigDescription(
-        "Automatically sort based on dependencies and OrderBefore/OrderAfter tags in mod data"
       )
     );
     DisableSteamOnStart = config.Bind(

@@ -36,13 +36,15 @@ __StationeersLaunchPad and StationeersMods can't be installed together__. Both m
 
 - Install mods into `%HOME%/documents/my games/stationeers/mods` or download them from steam workshop.
 - Start game. Mods will automatically load
-- If you want to reorder or enable/disable mods, click the loading window at the bottom when the game first opens
+- If you want to enable or disable mods, click the loading window at the bottom when the game first opens
   - To resume loading and step through stages, click the highlighted stage upper-left of the loading window
 - Mod will auto be updated unless otherwise chosen in configuration.
 
 ## Mod Profiles
 
-Mod Profiles are optional saved lists of enabled mods and their load order. A profile can include Local, Workshop, and Repo mods, and the selected profile is applied automatically on startup.
+Mod Profiles are optional saved sets of enabled mods. A profile can include Local, Workshop, and Repo mods, and the selected profile is applied automatically on startup.
+
+SLP calculates one canonical load order on every startup. Core is always first, unconstrained mods are ordered by name, and dependency plus `OrderBefore`/`OrderAfter` metadata is applied deterministically. Manual load-order editing is intentionally not supported, so clients and servers with the same enabled mods and metadata produce the same order.
 
 <details>
 <summary><b>How to create and use a profile</b></summary>
@@ -65,9 +67,9 @@ Only profiles that exclusively contain mods from the workshop can be shared as c
 1. Save the profile, then open **SLP Window > Mod Profiles > Share Profile**.
 2. Select **Copy SLP1 Code** and send the code to another user.
 3. To import one, paste it into the same tab and select **Load SLP1 Code**.
-4. SLP downloads missing Workshop items and applies the shared load order. Enter a name to save the imported list as a profile.
+4. SLP downloads missing Workshop items and applies the canonical load order. Enter a name to save the imported list as a profile.
 
-SLP1 codes contain only Workshop IDs, load order, and an integrity checksum. They do not contain mod files, local or Repo mods, or mod configuration data.
+SLP1 codes contain only Workshop IDs and an integrity checksum. They do not contain mod files, local or Repo mods, or mod configuration data. Every SLP instance derives the same canonical load order from installed mod metadata.
 
 </details>
 
@@ -101,7 +103,7 @@ Profiles are stored as separate XML files under the LaunchPad save path - usuall
   - download latest server zip from [Releases](https://github.com/StationeersLaunchPad/StationeersLaunchPad/releases)
   - extract into `BepInEx/plugins` folder
 - In the game client, click the loading window at the bottom on startup to open configuration
-  - enable/disable and reorder mods to match what you want installed on the server
+  - enable/disable mods to match what you want installed on the server
   - on the Launchpad Configuration tab, click `Export Mod Package` to create a zip file containing the enabled mods and config file
   - extract the zip file into the dedicated server folder (should create `modconfig.xml` and `mods` folder in same folder as `rocketstation_DedicatedServer.exe`)
 
