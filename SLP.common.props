@@ -54,6 +54,7 @@
     <GameReference Include="UnityEngine" />
     <GameReference Include="UnityEngine.AssetBundleModule" />
     <GameReference Include="UnityEngine.CoreModule" />
+    <GameReference Include="UnityEngine.InputLegacyModule" />
     <GameReference Include="UnityEngine.UI" />
     <GameReference Include="UnityEngine.UnityWebRequestModule" />
     <GameReference Include="Unity.TextMeshPro" />

@@ -1,6 +1,7 @@
 
 using System;
 using ImGuiNET;
+using UnityEngine;
 
 namespace StationeersLaunchPad.UI;
 
@@ -9,12 +10,17 @@ public class AutoLoadWindow
   // returns true if the user clicked to stop autoloading
   public static bool Draw(LoadStage stage, StageWait wait)
   {
-    var stopAuto = false;
+    var openMenu = false;
+    var acceptsStartupInput = stage == LoadStage.Configuring || stage == LoadStage.Loaded;
 
-    if ((stage == LoadStage.Configuring || stage == LoadStage.Loaded)
-        && wait.Auto
-        && ImGui.IsKeyPressed(ImGuiKey.Escape, false))
+    if (acceptsStartupInput && ImGui.IsKeyPressed(ImGuiKey.Space, false))
       LaunchPadConfig.SkipAutoWaits();
+    else if (acceptsStartupInput && wait.Auto
+        && (ImGui.IsKeyPressed(ImGuiKey.Escape, false)
+          || Input.GetKeyDown(KeyCode.P)))
+      LaunchPadConfig.PauseAutoWait();
+    else if (acceptsStartupInput && Input.GetKeyDown(KeyCode.M))
+      openMenu = true;
 
     ImGuiHelper.Draw(() =>
     {
@@ -30,10 +36,11 @@ public class AutoLoadWindow
         LoadStage.Initializing => "Initializing",
         LoadStage.News => "Checking notices",
         LoadStage.Searching => "Finding Mods",
-        LoadStage.Configuring when !wait.Auto => "Mod loading paused",
-        LoadStage.Configuring => $"Loading Mods in {wait.SecondsRemaining:0.0}s (Esc to continue, Click to enter setup)",
+        LoadStage.Configuring when !wait.Auto => "Startup paused - Space to continue - M or click here to open the SLP Menu",
+        LoadStage.Configuring => $"Loading Mods in {wait.SecondsRemaining:0.0}s - Space to continue - Esc/P to stay here - M or click here to open the SLP Menu",
         LoadStage.Loading => "Loading Mods",
-        LoadStage.Loaded => $"Starting game in {wait.SecondsRemaining:0.0}s (Esc to continue)",
+        LoadStage.Loaded when !wait.Auto => "Startup paused - Space to continue - M or click here to open the SLP Menu",
+        LoadStage.Loaded => $"Starting game in {wait.SecondsRemaining:0.0}s - Space to continue - Esc/P to stay here - M or click here to open the SLP Menu",
         LoadStage.Running => "Game Running",
         LoadStage.Failed => "Loading Failed",
         _ => throw new ArgumentOutOfRangeException(),
@@ -48,14 +55,14 @@ public class AutoLoadWindow
 
       if (ImGui.IsWindowHovered() && stage != LoadStage.News)
       {
-        ImGuiHelper.TextTooltip("Click to pause loading.");
+        ImGuiHelper.TextTooltip("Click to open SLP.");
         if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
-          stopAuto = true;
+          openMenu = true;
       }
 
       ImGui.End();
     });
 
-    return stopAuto;
+    return openMenu;
   }
 }

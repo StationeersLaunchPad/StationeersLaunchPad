@@ -81,10 +81,16 @@ public static class LaunchPadConfig
 
   public static void SkipAutoWaits()
   {
-    if (!AutoLoad || !CurWait.Auto)
+    if (!AutoLoad)
       return;
     SkipNextAutoWaits = true;
     CurWait.Skip();
+  }
+
+  public static void PauseAutoWait()
+  {
+    if (AutoLoad)
+      CurWait.Auto = false;
   }
 
   private static StageWait NewAutoWait()

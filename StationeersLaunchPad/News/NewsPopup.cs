@@ -104,6 +104,7 @@ public static class NewsPopup
     else
       DrawDetailView();
 
+    HandleInfoKeyboard();
     CheckInfoAutoAdvance();
 
     ImGui.End();
@@ -119,6 +120,22 @@ public static class NewsPopup
     if ((DateTime.UtcNow - infoTimerStart.Value).TotalSeconds >= 10.0)
     {
       HandleHandled(detailIndex, persist: false);
+    }
+  }
+
+  private static void HandleInfoKeyboard()
+  {
+    if (showConfirm || detailIndex < 0 || detailIndex >= activeEntries.Count)
+      return;
+    if (activeEntries[detailIndex].Type != "info")
+      return;
+
+    if (ImGui.IsKeyPressed(ImGuiKey.Space, false))
+      HandleHandled(detailIndex, persist: false);
+    else if (infoTimerStart.HasValue && ImGui.IsKeyPressed(ImGuiKey.Escape, false))
+    {
+      infoTimerStart = null;
+      infoTimerPaused = true;
     }
   }
 
@@ -274,19 +291,13 @@ public static class NewsPopup
 
     if (entry.Type == "info" && infoTimerPaused)
     {
-      ImGuiHelper.TextDisabled("Auto-acknowledge paused. Use an action above when you are ready.");
+      ImGuiHelper.TextDisabled("Auto-acknowledge paused - Space to continue");
     }
     else if (entry.Type == "info" && infoTimerStart.HasValue)
     {
       var elapsed = (DateTime.UtcNow - infoTimerStart.Value).TotalSeconds;
       var rem = Math.Max(0, 10 - (int)elapsed);
-      if (ImGui.Button("Pause countdown", new Vector2(160, 0)))
-      {
-        infoTimerStart = null;
-        infoTimerPaused = true;
-      }
-      ImGui.SameLine();
-      ImGuiHelper.TextDisabled($"Auto-acknowledging in {rem}s");
+      ImGuiHelper.TextDisabled($"Auto-acknowledging in {rem}s - Space to continue - Esc to pause");
     }
   }
 
