@@ -125,7 +125,7 @@ public static class Configs
     );
     AutoLoadWaitTime = config.Bind(
       new ConfigDefinition("Startup", "AutoLoadWaitTime"),
-      5,
+      3,
       new ConfigDescription(
         "How many seconds to wait before loading mods, then loading the game",
         new AcceptableValueRange<int>(0, 30)
