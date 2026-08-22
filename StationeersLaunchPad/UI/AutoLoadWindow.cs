@@ -10,12 +10,12 @@ public class AutoLoadWindow
   public static bool Draw(LoadStage stage, StageWait wait)
   {
     var stopAuto = false;
-    
+
     if ((stage == LoadStage.Configuring || stage == LoadStage.Loaded)
         && wait.Auto
         && ImGui.IsKeyPressed(ImGuiKey.Escape, false))
       LaunchPadConfig.SkipAutoWaits();
-    
+
     ImGuiHelper.Draw(() =>
     {
       var windowRect = ImGuiHelper.ScreenRect().Shrink(25f);

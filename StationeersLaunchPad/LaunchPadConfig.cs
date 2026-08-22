@@ -78,22 +78,25 @@ public static class LaunchPadConfig
     AutoLoad = false;
     CurWait.Auto = false;
   }
+
   public static void SkipAutoWaits()
-    {
-      if (!AutoLoad || !CurWait.Auto)
-          return;
-      SkipNextAutoWaits = true;
-      CurWait.Skip();
-    }
+  {
+    if (!AutoLoad || !CurWait.Auto)
+      return;
+    SkipNextAutoWaits = true;
+    CurWait.Skip();
+  }
+
   private static StageWait NewAutoWait()
   {
     var wait = new StageWait(Configs.AutoLoadWaitTime.Value, AutoLoad);
-    
+
     if (AutoLoad && SkipNextAutoWaits)
       wait.Skip();
-    
+
     return wait;
   }
+
   public static void ReloadMods(bool preserveSelection = true)
   {
     if (Stage != LoadStage.Configuring)
