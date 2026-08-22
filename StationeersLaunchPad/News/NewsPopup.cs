@@ -16,6 +16,7 @@ public static class NewsPopup
   private static bool showConfirm;
   private static int confirmIndex = -1;
   private static DateTime? infoTimerStart;
+  private static bool infoTimerPaused;
   private static string actionStatus;
   private static bool isActionBusy;
 
@@ -37,6 +38,7 @@ public static class NewsPopup
     showConfirm = false;
     confirmIndex = -1;
     infoTimerStart = null;
+    infoTimerPaused = false;
     actionStatus = null;
     isActionBusy = false;
     actionCompleted = false;
@@ -270,11 +272,21 @@ public static class NewsPopup
       }
     }
 
-    if (entry.Type == "info" && infoTimerStart.HasValue)
+    if (entry.Type == "info" && infoTimerPaused)
+    {
+      ImGuiHelper.TextDisabled("Auto-acknowledge paused. Use an action above when you are ready.");
+    }
+    else if (entry.Type == "info" && infoTimerStart.HasValue)
     {
       var elapsed = (DateTime.UtcNow - infoTimerStart.Value).TotalSeconds;
       var rem = Math.Max(0, 10 - (int)elapsed);
-      ImGuiHelper.TextDisabled($"This notice will auto-acknowledge in {rem}s");
+      if (ImGui.Button("Pause countdown", new Vector2(160, 0)))
+      {
+        infoTimerStart = null;
+        infoTimerPaused = true;
+      }
+      ImGui.SameLine();
+      ImGuiHelper.TextDisabled($"Auto-acknowledging in {rem}s");
     }
   }
 
@@ -303,6 +315,7 @@ public static class NewsPopup
 
   private static void StartInfoTimerIfInfo(NewsEntry e)
   {
+    infoTimerPaused = false;
     infoTimerStart = (e.Type == "info") ? DateTime.UtcNow : null;
   }
 
@@ -467,6 +480,7 @@ public static class NewsPopup
     actionSucceeded = false;
     actionResultMessage = null;
     infoTimerStart = null;
+    infoTimerPaused = false;
     showConfirm = false;
     confirmIndex = -1;
     detailIndex = -1;
