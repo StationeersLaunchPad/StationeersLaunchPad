@@ -1,6 +1,8 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using StationeersLaunchPad.Sources;
 
 namespace StationeersLaunchPad.Metadata;
@@ -51,10 +53,36 @@ public class ModInfo
     foreach (var after in def.About.OrderAfter ?? [])
       OrderInvalid |= !after.IsValid;
 
-    Assemblies.AddRange(Directory.GetFiles(
-      DirectoryPath, "*.dll", SearchOption.AllDirectories));
+    foreach (var path in Directory.GetFiles(DirectoryPath, "*.dll", SearchOption.AllDirectories))
+    {
+      if (!LooksLikeManagedClrDll(path))
+        continue;
+      Assemblies.Add(path);
+    }
+
     AssetBundles.AddRange(Directory.GetFiles(
       DirectoryPath, "*.assets", SearchOption.AllDirectories));
+  }
+
+  private static bool LooksLikeManagedClrDll(string path)
+  {
+    try
+    {
+      _ = AssemblyName.GetAssemblyName(path);
+      return true;
+    }
+    catch (BadImageFormatException)
+    {
+      return false;
+    }
+    catch (FileNotFoundException)
+    {
+      return false;
+    }
+    catch (ArgumentException)
+    {
+      return false;
+    }
   }
 
   public bool SortBefore(ModInfo other)
