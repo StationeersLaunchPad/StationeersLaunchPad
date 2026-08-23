@@ -49,6 +49,7 @@
     <GameReference Include="Assembly-CSharp" />
 
     <GameReference Include="Facepunch.Steamworks.Win64" />
+    <GameReference Include="Mono.Cecil" />
     <GameReference Include="Newtonsoft.Json" />
     <GameReference Include="UniTask" />
     <GameReference Include="UnityEngine" />
