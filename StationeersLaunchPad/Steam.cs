@@ -27,8 +27,8 @@ public static class Steam
 
     while (true)
     {
-      var items = await FetchWorkshopPage(page);
-      if (items.Length == 0)
+      var (items, resultCount) = await FetchWorkshopPage(page);
+      if (resultCount == 0)
         break;
       allItems.AddRange(items);
       page++;
@@ -51,7 +51,7 @@ public static class Steam
   }
 
   // Helper to fetch a single workshop page
-  private static async UniTask<Item[]> FetchWorkshopPage(int page)
+  private static async UniTask<(Item[] Items, int ResultCount)> FetchWorkshopPage(int page)
   {
     const int maxAttempts = 3;
     for (var attempt = 1; attempt <= maxAttempts; attempt++)
@@ -62,9 +62,17 @@ public static class Steam
         using var result = await query.AllowCachedResponse(0)
           .WhereUserSubscribed().GetPageAsync(page);
 
-        return !result.HasValue || result.Value.ResultCount == 0
+        if (!result.HasValue)
+          throw new InvalidOperationException($"Workshop query page {page} returned no result");
+
+        var resultCount = result.Value.ResultCount;
+        var items = resultCount == 0
           ? []
-          : [.. result.Value.Entries.Where(item => item.Result != Result.FileNotFound)];
+          : result.Value.Entries
+            .Where(item => item.Result != Result.FileNotFound)
+            .ToArray();
+
+        return (items, resultCount);
       }
       catch (Exception ex)
       {
@@ -76,7 +84,7 @@ public static class Steam
         await UniTask.Yield();
       }
     }
-    return [];
+    throw new InvalidOperationException("Unreachable");
   }
 
   public static async UniTask<bool> SubscribeAndDownload(ulong workshopId, ulong? unsubscribeWorkshopId = null)
