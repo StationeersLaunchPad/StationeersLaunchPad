@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -21,11 +22,14 @@ public class LoadedMod
   public Logger Logger;
 
   public List<Assembly> Assemblies = [];
+  public List<AssetBundle> AssetBundles = [];
   public List<GameObject> Prefabs = [];
   public List<ExportSettings> Exports = [];
   public ContentHandler ContentHandler;
 
   public List<ModEntrypoint> Entrypoints = [];
+  private readonly List<ModEntrypoint> _initializedEntrypoints = [];
+  private GameObject _entryGameObject;
 
   public List<ConfigFile> ConfigFiles = [];
 
@@ -35,6 +39,10 @@ public class LoadedMod
   public bool LoadFinished;
   public bool LoadFailed;
 
+  public bool CanSafelyUnload =>
+    _initializedEntrypoints.Count == 0 ||
+    _initializedEntrypoints.All(entrypoint => entrypoint.SafeModeCompatible);
+  
   public LoadedMod(ModInfo info)
   {
     Logger = Logger.Global.CreateChild(info.Name);
@@ -69,6 +77,9 @@ public class LoadedMod
   private async UniTask LoadAssetsSingle(string path)
   {
     var bundle = await LoadAssetBundle(path);
+    lock (_lock)
+      AssetBundles.Add(bundle);
+    
     var prefabs = await LoadAssetBundleGameObjects(path, bundle);
     lock (_lock)
       Prefabs.AddRange(prefabs);
@@ -97,7 +108,10 @@ public class LoadedMod
       Logger.LogDebug("Finding Entrypoints");
 
       Entrypoints.AddRange(EntrypointSearch.FindEntrypoints(this, Assemblies, Exports));
-
+      
+      if (Configs.SafeMode.Value && Entrypoints.Count == 0)
+        throw new Exception("No Safe Mode compatible entrypoints found");
+      
       Logger.LogInfo($"Found {Entrypoints.Count} Entrypoints");
     });
   }
@@ -114,22 +128,26 @@ public class LoadedMod
   {
     Logger.LogDebug("Loading Entrypoints");
 
-    var gameObj = new GameObject { name = Info.Name };
-    Object.DontDestroyOnLoad(gameObj);
-
-    // instantiate all entrypoints
+    _entryGameObject  = new GameObject { name = Info.Name };
+    UnityEngine.Object.DontDestroyOnLoad(_entryGameObject);
+    
+    // Instantiate entry points
     foreach (var entrypoint in Entrypoints)
-      entrypoint.Instantiate(gameObj);
+      entrypoint.Instantiate(_entryGameObject);
 
-    // initialize all entrypoints
+    // Try initializing the entry points
     foreach (var entrypoint in Entrypoints)
     {
-      entrypoint.Initialize(this);
+      _initializedEntrypoints.Add(entrypoint);
+
+      if (!entrypoint.TryInitialize(this))
+        throw new Exception($"Entrypoint {entrypoint.DebugName()} failed to initialize");
+
       ConfigFiles.AddRange(entrypoint.Configs());
     }
 
     foreach (var config in ConfigFiles)
-      config.SettingChanged += (_, _) => DirtyConfig();
+      config.SettingChanged += OnConfigSettingChanged;
 
     ConfigFiles.Sort((a, b) => a.ConfigFilePath.CompareTo(b.ConfigFilePath));
 
@@ -156,6 +174,94 @@ public class LoadedMod
     return assets;
   }
 
+  private void OnConfigSettingChanged(object sender, SettingChangedEventArgs e)
+  {
+    DirtyConfig();
+  }
+  
+  public bool TryUnload()
+  {
+    if (!CanSafelyUnload)
+      return false;
+
+    foreach (var entrypoint in _initializedEntrypoints)
+    {
+      try
+      {
+        if (!entrypoint.CanUnload())
+        {
+          Logger.LogWarning(
+            $"Entrypoint {entrypoint.DebugName()} refused unload"
+          );
+
+          return false;
+        }
+      }
+      catch (Exception ex)
+      {
+        Logger.LogException(ex);
+        return false;
+      }
+    }
+
+    Unload();
+    return true;
+  }
+  
+  public void Unload()
+  {
+    for (var i = _initializedEntrypoints.Count - 1; i >= 0; i--)
+    {
+      try
+      {
+        _initializedEntrypoints[i].Unload();
+      }
+      catch (Exception ex)
+      {
+        Logger.LogException(ex);
+      }
+    }
+
+    _initializedEntrypoints.Clear();
+
+    if (_entryGameObject != null)
+    {
+      UnityEngine.Object.Destroy(_entryGameObject);
+      _entryGameObject = null;
+    }
+    
+    foreach (var assetBundle in AssetBundles)
+    {
+      try
+      {
+        assetBundle?.Unload(false);
+      }
+      catch (Exception ex)
+      {
+        Logger.LogException(ex);
+      }
+    }
+    AssetBundles.Clear();
+    
+    Prefabs.Clear();
+    Exports.Clear();
+    Entrypoints.Clear();
+    
+    foreach (var config in ConfigFiles)
+      config.SettingChanged -= OnConfigSettingChanged;
+    ConfigFiles.Clear();
+    
+    LoadedAssemblies = false; // Need to mark the assembly as unloaded in any case.
+    LoadedAssets = false;
+    LoadedEntryPoints = false;
+    LoadFinished = false;
+    
+    foreach (var assembly in Assemblies)
+      ModLoader.UnregisterAssembly(assembly);
+
+    Assemblies.Clear();
+  }
+  
   private UniTask<ExportSettings> LoadAssetBundleExportSettings(string path, AssetBundle bundle)
   {
     var name = Path.GetFileName(path);

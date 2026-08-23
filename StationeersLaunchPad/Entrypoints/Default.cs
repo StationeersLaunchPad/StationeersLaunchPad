@@ -14,20 +14,29 @@ namespace StationeersLaunchPad.Entrypoints;
 public class DefaultEntrypoint : BehaviourEntrypoint<MonoBehaviour>
 {
   private const string DEFAULT_METHOD_NAME = "OnLoaded";
+  private const string CAN_UNLOAD_METHOD_NAME = "CanUnload";
+  private const string UNLOAD_METHOD_NAME = "OnUnloaded";
 
   public readonly LoadedMod Mod;
   public readonly MethodInfo LoadMethod;
+  public readonly MethodInfo CanUnloadMethod;
+  public readonly MethodInfo UnloadMethod;
   public readonly List<EntrypointParam> Params;
 
   private DefaultEntrypoint(
     LoadedMod mod, Type type,
-    MethodInfo loadMethod, List<EntrypointParam> eparams) : base(type)
+    MethodInfo loadMethod, MethodInfo unloadMethod,  MethodInfo canUnloadMethod,
+    List<EntrypointParam> eparams) : base(type)
   {
     Mod = mod;
     LoadMethod = loadMethod;
+    UnloadMethod = unloadMethod;
+    CanUnloadMethod = canUnloadMethod;
     Params = eparams;
   }
 
+  public override bool SafeModeCompatible => LoadMethod.ReturnType == typeof(bool) && UnloadMethod != null;
+  
   public override string DebugName() => $"Default Entry {Type.FullName}";
 
   public override void Instantiate(GameObject parent) =>
@@ -40,7 +49,35 @@ public class DefaultEntrypoint : BehaviourEntrypoint<MonoBehaviour>
       eparams[i] = Params[i].GetParam(this);
     LoadMethod.Invoke(Instance, eparams);
   }
+  
+  public override bool TryInitialize(LoadedMod mod)
+  {
+    var eparams = new object[Params.Count];
 
+    for (var i = 0; i < eparams.Length; i++)
+      eparams[i] = Params[i].GetParam(this);
+
+    var result = LoadMethod.Invoke(Instance, eparams);
+
+    if (LoadMethod.ReturnType == typeof(bool))
+      return (bool)result;
+
+    return true;
+  }
+
+  public override bool CanUnload()
+  {
+    if (CanUnloadMethod == null)
+      return true;
+
+    return (bool)CanUnloadMethod.Invoke(Instance, null);
+  }
+  
+  public override void Unload()
+  {
+    UnloadMethod?.Invoke(Instance, null);
+  }
+  
   public override IEnumerable<ConfigFile> Configs()
   {
     foreach (var p in Params)
@@ -54,13 +91,37 @@ public class DefaultEntrypoint : BehaviourEntrypoint<MonoBehaviour>
   {
     if (loadMethod.Name != DEFAULT_METHOD_NAME)
       return null;
+    if (loadMethod.ReturnType != typeof(void) &&
+        loadMethod.ReturnType != typeof(bool))
+      return null;    
     var mparams = loadMethod.GetParameters();
     if (mparams.Length == 0)
       return null;
     var eparams = Parser.Parse(mparams);
     if (eparams == null)
       return null;
-    return new(mod, type, loadMethod, eparams);
+    
+    var unloadMethod = type.GetMethod(
+      UNLOAD_METHOD_NAME,
+      BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+      null,
+      System.Type.EmptyTypes,
+      null);
+    if (unloadMethod != null && unloadMethod.ReturnType != typeof(void))
+      unloadMethod = null;
+    
+    var canUnloadMethod = type.GetMethod(
+      CAN_UNLOAD_METHOD_NAME,
+      BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+      null,
+      System.Type.EmptyTypes,
+      null);
+
+    if (canUnloadMethod != null &&
+        canUnloadMethod.ReturnType != typeof(bool))
+      canUnloadMethod = null;
+    
+    return new (mod, type, loadMethod, unloadMethod, canUnloadMethod, eparams);
   }
 
   private static readonly ParamPatternMatch<EntrypointParam> Parser =

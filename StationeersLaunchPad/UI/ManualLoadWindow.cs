@@ -1,5 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
+using Cysharp.Threading.Tasks;
 using ImGuiNET;
 using StationeersLaunchPad.Loading;
 using StationeersLaunchPad.Metadata;
@@ -451,6 +451,20 @@ public static class ManualLoadWindow
     ImGuiHelper.ItemTooltip("Package enabled mods into a zip file for dedicated servers.");
   }
 
+  private static async UniTask ReloadUnloadedMods()
+  {
+    var (strategyType, strategyMode) = Configs.LoadStrategy;
+
+    LoadStrategy loadStrategy = (strategyType, strategyMode) switch
+    {
+      (LoadStrategyType.Linear, LoadStrategyMode.Serial) => new LoadStrategyLinearSerial(),
+      (LoadStrategyType.Linear, LoadStrategyMode.Parallel) => new LoadStrategyLinearParallel(),
+      _ => throw new Exception($"invalid load strategy ({strategyType}, {strategyMode})")
+    };
+
+    await loadStrategy.LoadMods();
+  }
+  
   private static void DrawModInfoTab(LoadStage stage)
   {
     var open = ImGui.BeginTabItem("Mod Info", openInfo ? ImGuiTabItemFlags.SetSelected : ImGuiTabItemFlags.None);
@@ -458,6 +472,40 @@ public static class ManualLoadWindow
     if (open)
     {
       ImGui.BeginChild("##modinfo", ImGuiWindowFlags.HorizontalScrollbar);
+      
+#if DEBUG
+      if (selectedMod != null &&
+          selectedMod.LoadFinished &&
+          selectedMod.CanSafelyUnload)
+      {
+        if (ImGui.Button("Unload"))
+          selectedMod.TryUnload();
+
+        ImGui.Spacing();
+      }
+      // To test round-trip of unloading/loading
+      if (selectedMod != null &&
+          !selectedMod.LoadFinished &&
+          !selectedMod.LoadFailed)
+      {
+        if (ImGui.Button("Load Mod"))
+        {
+          var (strategyType, strategyMode) = Configs.LoadStrategy;
+
+          LoadStrategy loadStrategy = (strategyType, strategyMode) switch
+          {
+            (LoadStrategyType.Linear, LoadStrategyMode.Serial) => new LoadStrategyLinearSerial(),
+            (LoadStrategyType.Linear, LoadStrategyMode.Parallel) => new LoadStrategyLinearParallel(),
+            _ => throw new Exception($"invalid load strategy ({strategyType}, {strategyMode})")
+          };
+
+          loadStrategy.LoadMod(selectedMod).Forget();
+        }
+
+        ImGui.Spacing();
+      }
+#endif
+      
       ModInfoPanel.Draw(selectedInfo);
       ImGui.EndChild();
       ImGui.EndTabItem();

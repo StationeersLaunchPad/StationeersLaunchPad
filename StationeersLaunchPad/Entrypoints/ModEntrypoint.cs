@@ -16,6 +16,16 @@ public abstract class ModEntrypoint
   public abstract void Instantiate(GameObject parent);
   public abstract void Initialize(LoadedMod mod);
   public abstract IEnumerable<ConfigFile> Configs();
+  public virtual bool CanUnload() => true;
+  public virtual void Unload()
+  {
+  }
+  public virtual bool TryInitialize(LoadedMod mod)
+  {
+    Initialize(mod);
+    return true;
+  }
+  public virtual bool SafeModeCompatible => false;
 }
 
 public abstract class BehaviourEntrypoint<T>(Type type) : ModEntrypoint where T : MonoBehaviour
@@ -56,10 +66,19 @@ public partial class EntrypointSearch
 
     var allEntries = new List<ModEntrypoint>();
 
-    allEntries.AddRange(FindStationeersModsEntrypoints());
-    allEntries.AddRange(FindPrefabEntrypoints());
-    allEntries.AddRange(FindBepInExEntrypoints());
-    allEntries.AddRange(FindDefaultEntrypoints());
+    if (Configs.SafeMode.Value)
+    {
+      allEntries.AddRange(
+        FindDefaultEntrypoints().Where(entry => entry.SafeModeCompatible)
+      );
+    }
+    else
+    {
+      allEntries.AddRange(FindStationeersModsEntrypoints());
+      allEntries.AddRange(FindPrefabEntrypoints());
+      allEntries.AddRange(FindBepInExEntrypoints());
+      allEntries.AddRange(FindDefaultEntrypoints());
+    }
 
     return allEntries;
   }

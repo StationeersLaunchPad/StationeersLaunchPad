@@ -46,6 +46,7 @@ public static class Configs
   public static ConfigEntry<int> DedupePriorityWorkshop;
   public static ConfigEntry<LoadStrategyType> LoadStrategyType;
   public static ConfigEntry<LoadStrategyMode> LoadStrategyMode;
+  public static ConfigEntry<bool> SafeMode;
   public static ConfigEntry<bool> DisableSteamOnStart;
   public static ConfigEntry<string> SavePathOnStart;
   public static ConfigEntry<bool> RetainWorkshopMods;
@@ -196,6 +197,13 @@ public static class Configs
         "Parallel mode loads faster for a large number of mods, but may fail in extremely rare cases. Switch to serial mode if running into loading issues."
       )
     );
+    SafeMode = config.Bind(
+      new ConfigDefinition("Mod Loading", "SafeMode"),
+      false,
+      new ConfigDescription(
+        "Only load mods that support safe initialization failure and unloading."
+      )
+    );    
     SavePathOnStart = config.Bind(
       new ConfigDefinition("Mod Loading", "SavePathOverride"),
       "",

@@ -22,6 +22,12 @@ public static class ModLoader
       AssemblyToMod[assembly] = mod;
     }
   }
+  
+  public static void UnregisterAssembly(Assembly assembly)
+  {
+    lock (AssembliesLock)
+      AssemblyToMod.Remove(assembly);
+  }
 
   public static bool TryGetExecutingMod(out LoadedMod mod)
   {
