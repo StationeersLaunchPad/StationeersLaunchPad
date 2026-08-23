@@ -16,6 +16,7 @@ public static class NewsPopup
   private static bool showConfirm;
   private static int confirmIndex = -1;
   private static DateTime? infoTimerStart;
+  private static bool infoTimerPaused;
   private static string actionStatus;
   private static bool isActionBusy;
 
@@ -37,6 +38,7 @@ public static class NewsPopup
     showConfirm = false;
     confirmIndex = -1;
     infoTimerStart = null;
+    infoTimerPaused = false;
     actionStatus = null;
     isActionBusy = false;
     actionCompleted = false;
@@ -102,6 +104,7 @@ public static class NewsPopup
     else
       DrawDetailView();
 
+    HandleInfoKeyboard();
     CheckInfoAutoAdvance();
 
     ImGui.End();
@@ -117,6 +120,22 @@ public static class NewsPopup
     if ((DateTime.UtcNow - infoTimerStart.Value).TotalSeconds >= 10.0)
     {
       HandleHandled(detailIndex, persist: false);
+    }
+  }
+
+  private static void HandleInfoKeyboard()
+  {
+    if (showConfirm || detailIndex < 0 || detailIndex >= activeEntries.Count)
+      return;
+    if (activeEntries[detailIndex].Type != "info")
+      return;
+
+    if (ImGui.IsKeyPressed(ImGuiKey.Space, false))
+      HandleHandled(detailIndex, persist: false);
+    else if (infoTimerStart.HasValue && ImGui.IsKeyPressed(ImGuiKey.Escape, false))
+    {
+      infoTimerStart = null;
+      infoTimerPaused = true;
     }
   }
 
@@ -270,11 +289,15 @@ public static class NewsPopup
       }
     }
 
-    if (entry.Type == "info" && infoTimerStart.HasValue)
+    if (entry.Type == "info" && infoTimerPaused)
+    {
+      ImGuiHelper.TextDisabled("Auto-acknowledge paused - Space to continue");
+    }
+    else if (entry.Type == "info" && infoTimerStart.HasValue)
     {
       var elapsed = (DateTime.UtcNow - infoTimerStart.Value).TotalSeconds;
       var rem = Math.Max(0, 10 - (int)elapsed);
-      ImGuiHelper.TextDisabled($"This notice will auto-acknowledge in {rem}s");
+      ImGuiHelper.TextDisabled($"Auto-acknowledging in {rem}s - Space to continue - Esc to pause");
     }
   }
 
@@ -303,6 +326,7 @@ public static class NewsPopup
 
   private static void StartInfoTimerIfInfo(NewsEntry e)
   {
+    infoTimerPaused = false;
     infoTimerStart = (e.Type == "info") ? DateTime.UtcNow : null;
   }
 
@@ -467,6 +491,7 @@ public static class NewsPopup
     actionSucceeded = false;
     actionResultMessage = null;
     infoTimerStart = null;
+    infoTimerPaused = false;
     showConfirm = false;
     confirmIndex = -1;
     detailIndex = -1;
