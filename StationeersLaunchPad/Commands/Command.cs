@@ -336,6 +336,7 @@ public class RootCommand : SubCommand
     new DebugPkgCommand(),
     new LoadToCommand(),
     new ExitCommand(),
+    new Slp2ProbeCommand(),
   ];
   private static readonly SubCommand[] InGameCommands =
   [

@@ -58,6 +58,7 @@ public static class LaunchPadConfig
   public static SplashBehaviour SplashBehaviour;
 
   private static ModList modList = ModList.NewEmpty();
+  public static ModList ModList => modList;
   private static readonly ProfileManager profileManager = new();
 
   private static LoadStage Stage = LoadStage.Initializing;
@@ -450,6 +451,16 @@ public static class LaunchPadConfig
   {
     if (Stage != LoadStage.Failed)
       Stage = LoadStage.Loaded;
+
+    try
+    {
+      Networking.Slp2Handshake.Initialize();
+    }
+    catch (Exception ex)
+    {
+      Logger.Global.LogWarning("Failed to initialize SLP2 server handshake");
+      Logger.Global.LogException(ex);
+    }
 
     await SLPCommand.MoveToStage(CommandStage.ModsLoaded);
 
