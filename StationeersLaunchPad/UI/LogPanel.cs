@@ -55,7 +55,14 @@ public static class LogPanel
     ImGui.SetNextItemWidth(200);
     ConfigPanel.DrawEnumEntry(Configs.LogSeverities, Configs.LogSeveritiesWrapper, false);
     ImGui.BeginChild("##logs", ImGuiWindowFlags.HorizontalScrollbar);
+    DrawLines(logger, wrap: false);
+    ImGui.EndChild();
+  }
 
+  public static void DrawLines(Logger logger, bool wrap)
+  {
+    if (wrap)
+      ImGui.PushTextWrapPos(0f);
     var shouldScroll = false;
     if (logger != lastLogger || logger.TotalCount != lastLineCount)
     {
@@ -90,7 +97,8 @@ public static class LogPanel
       }
     }
 
-    ImGui.EndChild();
+    if (wrap)
+      ImGui.PopTextWrapPos();
   }
 
   public static void DrawConsoleLine(LogLine line, bool force = false)

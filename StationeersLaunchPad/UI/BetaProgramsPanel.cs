@@ -3,6 +3,7 @@ using System.Linq;
 using Cysharp.Threading.Tasks;
 using ImGuiNET;
 using StationeersLaunchPad.Metadata;
+using UnityEngine;
 
 namespace StationeersLaunchPad.UI;
 
@@ -16,9 +17,6 @@ public static class BetaProgramsPanel
   public static bool Draw(LoadStage stage, ModList modList)
   {
     var changed = false;
-    if (!ImGui.BeginTabItem("Betas"))
-      return changed;
-
     var stableMods = modList.AllMods
       .Where(mod => mod.HasBetaProgram)
       .GroupBy(mod => mod.BetaWorkshopHandle)
@@ -26,9 +24,9 @@ public static class BetaProgramsPanel
       .ToList();
     var betaMods = modList.AllMods.Where(modList.IsBetaMod).ToList();
 
-    ImGuiHelper.TextDisabled("Switch installed mods between their stable and beta Workshop versions.");
+    Widgets.PageHeader("Betas", "Switch installed mods between their stable and beta Workshop versions.");
     ImGui.BeginDisabled(stage != LoadStage.Configuring || Busy);
-    if (ImGui.Button("Refresh Subscribed Betas"))
+    if (ImGui.Button("Refresh subscribed betas"))
       LaunchPadConfig.ReloadMods();
     ImGui.EndDisabled();
     ImGuiHelper.ItemTooltip(stage == LoadStage.Configuring
@@ -41,7 +39,10 @@ public static class BetaProgramsPanel
       ImGui.Spacing();
       ImGuiHelper.TextDisabled("No installed mods advertise a beta program.");
     }
+    else
+      Widgets.SectionHeader("Mods with a beta program");
 
+    var lineHeight = ImGui.GetTextLineHeightWithSpacing();
     foreach (var stable in stableMods)
     {
       var beta = modList.AllMods.FirstOrDefault(mod =>
@@ -49,17 +50,36 @@ public static class BetaProgramsPanel
       var busy = operations.Contains(stable.BetaWorkshopHandle);
 
       ImGui.PushID($"beta-{stable.BetaWorkshopHandle}");
-      ImGui.Spacing();
+
+      // 16:9 preview on the left, details and actions on the right
+      var start = ImGui.GetCursorScreenPos();
+      var imageHeight = lineHeight * 4f;
+      var imageMax = start + new Vector2(imageHeight * 16f / 9f, imageHeight);
+      ModImages.DrawFill(ImGui.GetWindowDrawList(), stable, start, imageMax);
+      ImGui.SetCursorScreenPos(new Vector2(imageMax.x + ImGui.GetStyle().ItemSpacing.x * 2f, start.y));
+      ImGui.BeginGroup();
+
       ImGuiHelper.Text(stable.Name);
-      ImGuiHelper.TextDisabled($"Stable: {stable.About?.Version ?? "Unknown"} ({stable.WorkshopHandle})");
-      ImGuiHelper.TextDisabled(beta == null
-        ? $"Beta: not subscribed ({stable.BetaWorkshopHandle})"
-        : $"Beta: {beta.About?.Version ?? "Unknown"} ({beta.WorkshopHandle})");
+      ImGui.SameLine();
+      if (beta?.Enabled == true && stable.Enabled)
+        Widgets.Chip("stable and beta both enabled", LaunchPadTheme.Err);
+      else if (beta?.Enabled == true)
+        Widgets.Chip("beta active", LaunchPadTheme.Warn);
+      else if (stable.Enabled)
+        Widgets.Chip("stable active", LaunchPadTheme.Ok);
+      else
+        Widgets.Chip("disabled", LaunchPadTheme.TextMuted);
+
+      ImGuiHelper.TextColored(
+        $"Stable  v{stable.About?.Version ?? "?"}  ({stable.WorkshopHandle})", LaunchPadTheme.TextSub);
+      ImGuiHelper.TextColored(beta == null
+        ? $"Beta    not subscribed  ({stable.BetaWorkshopHandle})"
+        : $"Beta    v{beta.About?.Version ?? "?"}  ({beta.WorkshopHandle})", LaunchPadTheme.TextSub);
 
       if (beta == null)
       {
         ImGui.BeginDisabled(stage != LoadStage.Configuring || busy);
-        if (ImGui.Button(busy ? "Downloading..." : "Subscribe to Beta"))
+        if (ImGui.Button(busy ? "Downloading..." : "Subscribe to beta"))
           SubscribeToBeta(stable, modList).Forget();
         ImGui.EndDisabled();
       }
@@ -67,35 +87,26 @@ public static class BetaProgramsPanel
       {
         var useBeta = beta.Enabled;
         ImGui.BeginDisabled(stage != LoadStage.Configuring || busy);
-        if (ImGui.Checkbox("Use Beta Version", ref useBeta))
+        if (ImGui.Checkbox("Use beta version", ref useBeta))
           changed = SetBetaEnabled(stable, beta, modList, useBeta);
         ImGui.EndDisabled();
       }
-
       ImGui.SameLine();
-      if (ImGui.Button("Open Beta Workshop Page"))
+      if (ImGui.Button("Beta workshop page"))
         Steam.OpenWorkshopPage(stable.BetaWorkshopHandle);
       if (stable.WorkshopHandle > 1)
       {
         ImGui.SameLine();
-        if (ImGui.Button("Open Stable Workshop Page"))
+        if (ImGui.Button("Stable workshop page"))
           Steam.OpenWorkshopPage(stable.WorkshopHandle);
       }
-
-      if (beta?.Enabled == true && stable.Enabled)
-        ImGuiHelper.TextWarning("Stable and beta are both enabled.");
-      else if (beta?.Enabled == true)
-        ImGuiHelper.TextWarning("Beta is active.");
-      else if (stable.Enabled)
-        ImGuiHelper.TextDisabled("Stable is active.");
-      else if (beta != null)
-        ImGuiHelper.TextDisabled("Both versions are disabled.");
-      else
-        ImGuiHelper.TextDisabled("Stable is disabled.");
-
       if (statuses.TryGetValue(stable.BetaWorkshopHandle, out var status))
         ImGuiHelper.TextDisabled(status);
-      ImGui.Separator();
+
+      ImGui.EndGroup();
+      var bottom = System.Math.Max(imageMax.y, ImGui.GetItemRectMax().y);
+      ImGui.SetCursorScreenPos(new Vector2(start.x, bottom));
+      ImGui.Dummy(new Vector2(0f, ImGui.GetStyle().ItemSpacing.y * 2f));
       ImGui.PopID();
     }
 
@@ -103,13 +114,16 @@ public static class BetaProgramsPanel
     var unlinkedBetas = betaMods.Where(mod => !linkedBetaHandles.Contains(mod.WorkshopHandle)).ToList();
     if (unlinkedBetas.Count > 0)
     {
-      ImGui.Spacing();
-      ImGuiHelper.Text("Other beta program mods");
+      Widgets.SectionHeader("Other beta program mods");
       foreach (var beta in unlinkedBetas)
-        ImGuiHelper.TextDisabled($"{beta.Name} {beta.About?.Version} ({(beta.Enabled ? "Active" : "Disabled")})");
+      {
+        ImGuiHelper.Text(beta.Name);
+        ImGui.SameLine();
+        ImGuiHelper.TextColored($"v{beta.About?.Version}    {(beta.Enabled ? "active" : "disabled")}",
+          LaunchPadTheme.TextMuted);
+      }
     }
 
-    ImGui.EndTabItem();
     return changed;
   }
 

@@ -135,6 +135,20 @@ public static class LaunchPadTheme
 
   private static uint U32(Color c) => ImGui.ColorConvertFloat4ToU32((Vector4)c);
 
+  // the game renders translucent fills much stronger than their alpha,
+  // so mix them over the window background instead
+  public static Color Over(Color color, float amount)
+  {
+    var bg = StyleColor(ImGuiCol.WindowBg);
+    return new(
+      Mathf.Lerp(bg.r, color.r, amount),
+      Mathf.Lerp(bg.g, color.g, amount),
+      Mathf.Lerp(bg.b, color.b, amount),
+      1f);
+  }
+
+  public static uint OverU32(Color color, float amount) => U32(Over(color, amount));
+
   private static Color AccentColor() => Configs.UiAccent?.Value switch
   {
     UiAccentColor.Orange => Hex(0xF47A2A),
