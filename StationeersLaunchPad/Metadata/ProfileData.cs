@@ -14,6 +14,11 @@ public class ProfileData
   [XmlAttribute("Description")]
   public string Description = "";
 
+  // set for server packs
+  [XmlAttribute("ServerName")]
+  [DefaultValue("")]
+  public string ServerName = "";
+
   [XmlElement("Mod")]
   public List<ProfileModEntry> Mods = [];
 }

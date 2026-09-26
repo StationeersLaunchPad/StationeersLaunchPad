@@ -122,10 +122,17 @@ public class ModList
   public void ApplyProfile(ProfileData profile)
   {
     foreach (var mod in mods)
-      mod.Enabled = false;
+      // core is always enabled, packs don't list it
+      mod.Enabled = mod.Source == ModSourceType.Core;
 
     var ordered = new List<ModInfo>();
     var matched = new HashSet<ModInfo>();
+    var core = mods.FirstOrDefault(mod => mod.Source == ModSourceType.Core);
+    if (core != null)
+    {
+      ordered.Add(core);
+      matched.Add(core);
+    }
     var missing = 0;
     foreach (var entry in profile.Mods)
     {
@@ -148,6 +155,29 @@ public class ModList
     mods = ordered;
     if (missing > 0)
       Logger.Global.LogDebug($"Profile '{profile.Name}' skipped {missing} missing mod(s)");
+  }
+
+  // applies the pack, then enables the always-on mods on top
+  public void ApplyProfiles(ProfileData pack, ProfileData alwaysOn)
+  {
+    ApplyProfile(pack);
+    if (alwaysOn == null)
+      return;
+
+    var missing = 0;
+    foreach (var entry in alwaysOn.Mods)
+    {
+      var mod = ProfileManager.FindMod(entry, mods);
+      if (mod == null)
+      {
+        missing++;
+        continue;
+      }
+      mod.Enabled = true;
+    }
+    if (missing > 0)
+      Logger.Global.LogDebug($"{alwaysOn.Name} skipped {missing} missing mod(s)");
+    SortCanonical();
   }
 
   // returns true if any mods were disabled

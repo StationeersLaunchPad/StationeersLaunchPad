@@ -314,7 +314,7 @@ public static class Configs
       new ConfigDefinition("Internal", "ModProfile"),
       "",
       new ConfigDescription(
-        "The active mod profile. Leave empty to use the normal mod configuration."
+        "The active mod pack. Managed by the Mod Packs page."
       )
     );
     LinuxPathPatch = config.Bind(
@@ -335,7 +335,7 @@ public static class Configs
       new ConfigDefinition("Appearance", "AccentColor"),
       UiAccentColor.Classic,
       new ConfigDescription(
-        "Accent color for LaunchPad controls. Classic uses the existing SLP theme."
+        "Accent color for LaunchPad controls."
       )
     );
     Sorted = new SortedConfigFile(config);
@@ -398,9 +398,13 @@ public class ConfigEntryWrapper
   public ConfigDefinition Definition => Entry.Definition;
   public ConfigDescription Description => Entry.Description;
 
+  // "DedupePriorityLocal" -> "Dedupe Priority Local", for entries without a DisplayName tag
+  private static readonly System.Text.RegularExpressions.Regex WordBoundary =
+    new(@"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])");
+
   public ConfigEntryWrapper(ConfigEntryBase entry)
   {
-    DisplayName = entry.Definition.Key;
+    DisplayName = WordBoundary.Replace(entry.Definition.Key.Replace('_', ' '), " ");
     Entry = entry;
     foreach (var tag in entry.Description.Tags)
     {

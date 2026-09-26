@@ -60,6 +60,7 @@ public static class LaunchPadConfig
   private static ModList modList = ModList.NewEmpty();
   public static ModList ModList => modList;
   private static readonly ProfileManager profileManager = new();
+  public static ProfileManager ProfileManager => profileManager;
 
   private static LoadStage Stage = LoadStage.Initializing;
   public static bool ModsLoaded => Stage > LoadStage.Configuring;
@@ -118,37 +119,22 @@ public static class LaunchPadConfig
   {
     if (AutoLoad)
     {
-      var profileAction = ProfileLaunchWindow.Draw(
-        Stage, profileManager, modList, quickProfileOpen, out var profileChanged);
+      var profileAction = ProfileLaunchWindow.Draw(Stage, profileManager, modList, out var profileChanged);
       if (profileChanged)
       {
         NormalizeModList();
-        ProfilePanel.SelectActive();
-      }
-
-      if (profileAction == ProfileLaunchAction.OpenSelector)
-      {
-        quickProfileOpen = true;
-        CurWait.Auto = false;
-      }
-      else if (profileAction == ProfileLaunchAction.Continue)
-      {
-        var activeProfile = profileManager.ActiveProfile;
-        var missingMods = activeProfile == null
-          ? []
-          : profileManager.GetMissingMods(activeProfile.Name, modList);
-        if (missingMods.Count > 0)
+        // a pack with missing mods can't load, so wait for the player
+        if (profileManager.GetMissingMods(profileManager.ActiveProfileName, modList).Count > 0)
         {
           quickProfileOpen = true;
           CurWait.Auto = false;
-          Logger.Global.LogWarning(
-            $"Profile '{activeProfile.Name}' has {missingMods.Count} missing required mod(s)");
         }
-        else
-        {
-          quickProfileOpen = false;
-          CurWait.Skip();
-        }
+      }
+
+      if (profileAction == ProfileLaunchAction.Continue)
+      {
+        quickProfileOpen = false;
+        SkipAutoWaits();
       }
       else if (profileAction == ProfileLaunchAction.OpenMenu)
       {
@@ -344,7 +330,7 @@ public static class LaunchPadConfig
       ModConfigUtil.SaveConfig(modList.ToModConfig());
 
       var depNotice = !modList.CheckDependencies();
-      depNotice = modList.DisableDuplicates() || depNotice;
+      depNotice = (DedupeApplies && modList.DisableDuplicates()) || depNotice;
       depNotice = !modList.SortCanonical() || depNotice;
 
       if (depNotice && Platform.PauseOnDepNotice)
@@ -482,17 +468,10 @@ public static class LaunchPadConfig
     var next = changed.HasFlag(ManualLoadWindow.ChangeFlags.NextStep);
     if (next)
     {
-      var vanillaDiverged = ProfileManager.IsVanillaProfile(profileManager.ActiveProfileName)
-        && profileManager.HasDiverged(profileManager.ActiveProfileName, modList);
       var missingMods = profileManager.ActiveProfile == null
         ? []
         : profileManager.GetMissingMods(profileManager.ActiveProfileName, modList);
-      if (vanillaDiverged)
-      {
-        Logger.Global.LogWarning("Vanilla profile cannot load with mods enabled");
-        ManualLoadWindow.OpenProfilesTab();
-      }
-      else if (missingMods.Count > 0)
+      if (missingMods.Count > 0)
       {
         Logger.Global.LogWarning(
           $"Profile '{profileManager.ActiveProfileName}' has {missingMods.Count} missing required mod(s)");
@@ -506,20 +485,11 @@ public static class LaunchPadConfig
 
   private static void PrepareProfileStartup(bool firstLoad, bool preserveSelection)
   {
-    if (string.IsNullOrEmpty(Configs.ModProfile.Value))
-      return;
-
-    var profileName = Configs.ModProfile.Value;
-    var wasInitialized = profileManager.IsInitialized;
-    profileManager.Initialize();
-    var profile = profileManager.FindProfile(profileName);
+    // dedicated servers only use a pack when one is configured
+    profileManager.EnsureActivePack(modList);
+    var profile = profileManager.ActiveProfile;
     if (profile == null)
-    {
-      if (wasInitialized)
-        Logger.Global.LogWarning($"Configured mod profile '{profileName}' was not found");
-      profileManager.DisableProfiles();
       return;
-    }
 
     if (!firstLoad && preserveSelection)
     {
@@ -570,10 +540,13 @@ public static class LaunchPadConfig
 
   }
 
+  // packs pick which copy of a mod loads themselves
+  private static bool DedupeApplies => string.IsNullOrEmpty(Configs.ModProfile.Value);
+
   private static bool NormalizeModList()
   {
     var depNotice = !modList.CheckDependencies();
-    depNotice = modList.DisableDuplicates() || depNotice;
+    depNotice = (DedupeApplies && modList.DisableDuplicates()) || depNotice;
     depNotice = !modList.SortCanonical() || depNotice;
     ModConfigUtil.SaveConfig(modList.ToModConfig());
     return depNotice;
