@@ -119,8 +119,13 @@ static class LaunchPadPatches
   private static void RunCustomSavePathPatches() =>
     harmony.CreateClassProcessor(typeof(CustomSavePathPatches), true).Patch();
 
-  private static void RunNetworkPatches() =>
+  private static void RunNetworkPatches()
+  {
     harmony.CreateClassProcessor(typeof(Networking.Slp2Channel), true).Patch();
+    harmony.CreateClassProcessor(typeof(Networking.Slp2JoinPiggyback), true).Patch();
+    harmony.CreateClassProcessor(typeof(Networking.Slp2JoinFailureOffer), true).Patch();
+    harmony.CreateClassProcessor(typeof(Networking.Slp2SaveFlow), true).Patch();
+  }
 
   public static void RunLinuxPathPatch() =>
     harmony.CreateClassProcessor(typeof(LinuxPathPatch), true).Patch();

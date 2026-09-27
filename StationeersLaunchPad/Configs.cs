@@ -65,6 +65,8 @@ public static class Configs
   public static ConfigEntry<bool> RepoModValidateDigest;
   public static ConfigEntry<bool> RepoModValidateVersion;
   public static ConfigEntry<string> ModProfile;
+  public static ConfigEntry<bool> ServerProfilesEnabled;
+  public static ConfigEntry<bool> ServerProfilesAutoJoin;
 
   public static ConfigEntry<bool> NewsCheckOnStart;
   public static ConfigEntry<string> NewsFeedUrl;
@@ -315,6 +317,20 @@ public static class Configs
       "",
       new ConfigDescription(
         "The active mod pack. Managed by the Mod Packs page."
+      )
+    );
+    ServerProfilesEnabled = config.Bind(
+      new ConfigDefinition("Server Profiles", "Enabled"),
+      true,
+      new ConfigDescription(
+        "Enable SLP2 server profiles. When disabled, SLP does not offer, verify or auto-join server profiles, and a server does not share its mod list."
+      )
+    );
+    ServerProfilesAutoJoin = config.Bind(
+      new ConfigDefinition("Server Profiles", "AutoJoin"),
+      true,
+      new ConfigDescription(
+        "Automatically join the server after its server profile is verified on startup."
       )
     );
     LinuxPathPatch = config.Bind(

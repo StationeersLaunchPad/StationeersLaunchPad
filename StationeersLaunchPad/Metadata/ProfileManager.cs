@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Assets.Scripts.Networking.Transports;
 using Assets.Scripts.Serialization;
 using StationeersLaunchPad.Sources;
 
@@ -351,6 +352,89 @@ public class ProfileManager
       return true;
     Logger.Global.LogError($"Failed to save alwaysOn mods to {AlwaysOnPath}");
     return false;
+  }
+
+  public ProfileData FindProfileByServerName(string serverName)
+  {
+    if (string.IsNullOrEmpty(serverName))
+      return null;
+    return profiles.FirstOrDefault(profile =>
+      profile.ServerName.Equals(serverName, StringComparison.OrdinalIgnoreCase));
+  }
+
+  // local and repo entries are matched by ModID
+  public bool SaveServerProfileFromCode(
+    string serverName, string serverCode, IEnumerable<Slp2PackageCode.Entry> entries,
+    string address, ushort port) =>
+    SaveServerProfileMods(serverName, serverCode, BuildEntriesFromCode(entries), address, port);
+
+  private static List<ProfileModEntry> BuildEntriesFromCode(IEnumerable<Slp2PackageCode.Entry> entries)
+  {
+    var workshopBase = SteamTransport.WorkshopType.Mod.GetLocalDirInfo().FullName;
+    return entries.Select(entry => new ProfileModEntry
+    {
+      Name = entry.Name,
+      ModID = entry.ModID,
+      WorkshopHandle = entry.WorkshopHandle,
+      Source = entry.WorkshopHandle > 1 ? ModSourceType.Workshop : ModSourceType.Local,
+      DirectoryPath = entry.WorkshopHandle > 1
+        ? Path.Combine(workshopBase, entry.WorkshopHandle.ToString())
+        : "",
+    }).ToList();
+  }
+
+  private bool SaveServerProfileMods(
+    string serverName, string serverCode, List<ProfileModEntry> mods, string address, ushort port)
+  {
+    if (string.IsNullOrEmpty(serverName))
+      return false;
+
+    var existing = FindProfileByServerName(serverName);
+    var profile = existing ?? new ProfileData
+    {
+      Name = MakeServerProfileName(serverName),
+      ServerName = serverName,
+    };
+    var previousCode = profile.ServerCode;
+    var previousMods = profile.Mods;
+    var previousAddress = profile.LastAddress;
+    var previousPort = profile.LastPort;
+    profile.ServerCode = serverCode ?? "";
+    profile.Mods = mods;
+    profile.LastAddress = address ?? "";
+    profile.LastPort = string.IsNullOrEmpty(address) ? (ushort)0 : port;
+
+    if (!ProfileStorage.Save(profile))
+    {
+      profile.ServerCode = previousCode;
+      profile.Mods = previousMods;
+      profile.LastAddress = previousAddress;
+      profile.LastPort = previousPort;
+      return false;
+    }
+
+    if (existing == null)
+    {
+      profiles.Add(profile);
+      SortProfiles();
+    }
+
+    // takes effect on the next start
+    Configs.ModProfile.Value = profile.Name;
+    return true;
+  }
+
+  private string MakeServerProfileName(string serverName)
+  {
+    // server names can contain characters that aren't valid in file names
+    var baseName = Platform.MakeValidFileName($"Server: {serverName}".Trim());
+    if (string.IsNullOrWhiteSpace(baseName))
+      baseName = "Server";
+    var name = baseName;
+    var suffix = 2;
+    while ((!ProfileStorage.IsValidName(name) || IsReservedName(name) || FindProfile(name) != null) && suffix < 1000)
+      name = $"{baseName} ({suffix++})";
+    return name;
   }
 
   public List<ProfileModEntry> GetMissingMods(string profileName, ModList modList) =>

@@ -21,7 +21,8 @@ public static class Slp2PackageCode
   private const int MaxItems = 1000;
   private const byte ServerCodeFlag = 1;
 
-  public static string Encode(IEnumerable<Entry> mods, bool serverCode)
+  // the server name is embedded since LAN and direct connects aren't in the server list
+  public static string Encode(IEnumerable<Entry> mods, bool serverCode, string serverName = null)
   {
     var list = new List<Entry>(mods);
     if (list.Count > MaxItems)
@@ -29,6 +30,7 @@ public static class Slp2PackageCode
 
     using var stream = new MemoryStream();
     stream.WriteByte(serverCode ? ServerCodeFlag : (byte)0);
+    WriteVarString(stream, serverName ?? "");
     WriteVarUInt(stream, (ulong)list.Count);
     foreach (var mod in list)
     {
@@ -50,10 +52,11 @@ public static class Slp2PackageCode
       .Replace('/', '_');
   }
 
-  public static bool TryDecode(string code, out List<Entry> mods, out bool serverCode)
+  public static bool TryDecode(string code, out List<Entry> mods, out bool serverCode, out string serverName)
   {
     mods = [];
     serverCode = false;
+    serverName = "";
     if (string.IsNullOrWhiteSpace(code))
       return false;
 
@@ -91,8 +94,11 @@ public static class Slp2PackageCode
       return false;
     serverCode = (bytes[offset++] & ServerCodeFlag) != 0;
 
+    if (!TryReadVarString(bytes, ref offset, payloadLength, out serverName))
+      return false;
+
     if (!TryReadVarUInt(bytes, ref offset, payloadLength, out var count)
-      || count == 0 || count > MaxItems)
+      || count > MaxItems)
       return false;
 
     for (ulong i = 0; i < count; i++)
@@ -146,9 +152,9 @@ public static class Slp2PackageCode
     value = null;
     if (!TryReadVarUInt(bytes, ref offset, end, out var length))
       return false;
-    var len = (int)length;
-    if (len < 0 || offset + len > end)
+    if (offset < 0 || offset > end || length > (ulong)(end - offset))
       return false;
+    var len = (int)length;
     value = Encoding.UTF8.GetString(bytes, offset, len);
     offset += len;
     return true;

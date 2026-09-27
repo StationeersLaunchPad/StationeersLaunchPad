@@ -1,5 +1,6 @@
 
 using System;
+using System.Threading;
 using Assets.Scripts.Networking;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
@@ -9,9 +10,15 @@ namespace StationeersLaunchPad.Networking;
 public static class Slp2ProbeClient
 {
   public static async UniTask<string> RequestServerCode(
-    string address, ushort port, float timeoutSeconds = 10f)
+    string address, ushort port, float timeoutSeconds = 10f,
+    CancellationToken cancellationToken = default)
   {
-    if (NetworkManager.NetworkState != NetworkState.Offline)
+    if (!Configs.ServerProfilesEnabled.Value)
+    {
+      Logger.Global.LogInfo("SLP2 probe skipped: server profiles are disabled");
+      return null;
+    }
+    if (Slp2Channel.ProbePending || NetworkManager.NetworkState != NetworkState.Offline)
     {
       Logger.Global.LogWarning("SLP2 probe refused: a network connection is already active");
       return null;
@@ -19,6 +26,7 @@ public static class Slp2ProbeClient
 
     LaunchPadConfig.PauseAutoWait();
     Slp2Channel.EnsureNetworkManagerExists();
+    Slp2Channel.ResetResponse();
 
     string result = null;
     var responded = false;
@@ -52,7 +60,8 @@ public static class Slp2ProbeClient
       var lastLoggedState = NetworkManager.NetworkState;
       var deadline = Time.realtimeSinceStartup + timeoutSeconds;
       Logger.Global.LogInfo($"SLP2 probe: connecting, initial state {lastLoggedState}");
-      while (!responded && Time.realtimeSinceStartup < deadline)
+      while (!responded && !cancellationToken.IsCancellationRequested
+        && Time.realtimeSinceStartup < deadline)
       {
         Slp2Channel.PumpUpdate();
         if (NetworkManager.NetworkState != lastLoggedState)
@@ -65,7 +74,11 @@ public static class Slp2ProbeClient
           connected = true;
           var hostId = Slp2Channel.GetHostId();
           Logger.Global.LogInfo($"SLP2 probe: connected (hostId={hostId}), sending request on channel {(int)Slp2Channel.Channel}");
-          Slp2Channel.SendRequest(hostId);
+          if (!Slp2Channel.SendRequest(hostId))
+          {
+            Logger.Global.LogWarning("SLP2 probe request could not be sent");
+            break;
+          }
         }
         if (NetworkManager.NetworkState == NetworkState.Offline)
         {
@@ -75,17 +88,35 @@ public static class Slp2ProbeClient
         await UniTask.Yield();
       }
 
-      if (!responded)
+      if (!responded && !cancellationToken.IsCancellationRequested)
         Logger.Global.LogWarning($"SLP2 probe: timed out (connected={connected}, finalState={NetworkManager.NetworkState})");
 
-      return result;
+      return cancellationToken.IsCancellationRequested ? null : result;
     }
     finally
     {
-      Slp2Channel.ProbePending = false;
-      Slp2Channel.OnResponseReceived = null;
-      if (NetworkManager.NetworkState != NetworkState.Offline)
-        NetworkManager.EndConnection();
+      // keep ProbePending set so EndConnection hooks can ignore probes
+      try
+      {
+        if (NetworkManager.NetworkState != NetworkState.Offline)
+          NetworkManager.EndConnection();
+      }
+      finally
+      {
+        try
+        {
+          // Destroy is deferred, wait for OnDestroy before the real manager connects
+          if (Slp2Channel.ReleaseBootstrapManager())
+            await UniTask.Yield();
+        }
+        finally
+        {
+          // a dropped probe can be offline without EndConnection running
+          Slp2JoinPiggyback.TakeReceivedCode();
+          Slp2Channel.ResetResponse();
+          Slp2Channel.ProbePending = false;
+        }
+      }
     }
   }
 }

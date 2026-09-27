@@ -158,6 +158,8 @@ public static class LaunchPadConfig
 
     AlertPopup.Draw();
     NewsPopup.Draw();
+    Networking.Slp2ProfileSync.DrawWarningIfVisible();
+    Networking.Slp2ProfileSync.DrawStatusIfActive();
   }
 
   public static async void Run()
@@ -186,9 +188,12 @@ public static class LaunchPadConfig
       firstLoad = false;
     }
     while (Stage == LoadStage.Searching);
+    Networking.Slp2ProfileSync.TryStartVerify(profileManager);
     await StageLoading();
     await StageFinal();
 
+    await Networking.Slp2ProfileSync.WaitForGate();
+    Networking.Slp2AutoConnect.ArmIfVerified();
     StartGame();
     await SLPCommand.MoveToStage(CommandStage.GameRunning);
   }
@@ -441,6 +446,8 @@ public static class LaunchPadConfig
     try
     {
       Networking.Slp2Handshake.Initialize();
+      Networking.Slp2JoinFailureOffer.Initialize();
+      Networking.Slp2ProfileSync.Initialize();
     }
     catch (Exception ex)
     {

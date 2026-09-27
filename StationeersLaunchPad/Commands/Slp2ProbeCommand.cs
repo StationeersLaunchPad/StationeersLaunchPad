@@ -52,13 +52,13 @@ public class Slp2ProbeCommand : SubCommand
     }
 
     Logger.Global.LogInfo($"SLP2 probe of {address}:{port} received: {code}");
-    if (!Slp2PackageCode.TryDecode(code, out var mods, out var serverCode))
+    if (!Slp2PackageCode.TryDecode(code, out var mods, out var serverCode, out var serverName))
     {
       Logger.Global.LogWarning("  failed to decode received SLP2 code");
       return;
     }
 
-    Logger.Global.LogInfo($"  decoded {mods.Count} mod(s), serverCode={serverCode}:");
+    Logger.Global.LogInfo($"  decoded {mods.Count} mod(s), serverCode={serverCode}, serverName='{serverName}':");
     foreach (var mod in mods)
       Logger.Global.LogInfo($"    - {mod.Name} (ModID={mod.ModID}, workshop={mod.WorkshopHandle}, v{mod.Version})");
   }
