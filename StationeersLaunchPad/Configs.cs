@@ -43,8 +43,6 @@ public static class Configs
   public static ConfigEntry<int> DedupePriorityLocal;
   public static ConfigEntry<int> DedupePriorityRepo;
   public static ConfigEntry<int> DedupePriorityWorkshop;
-  public static ConfigEntry<LoadStrategyType> LoadStrategyType;
-  public static ConfigEntry<LoadStrategyMode> LoadStrategyMode;
   public static ConfigEntry<bool> DisableSteamOnStart;
   public static ConfigEntry<string> SavePathOnStart;
   public static ConfigEntry<bool> RetainWorkshopMods;
@@ -82,7 +80,6 @@ public static class Configs
 
   public static bool RunPostUpdateCleanup => CheckForUpdate.Value && PostUpdateCleanup.Value;
   public static bool RunOneTimeBoosterInstall => CheckForUpdate.Value && OneTimeBoosterInstall.Value;
-  public static (LoadStrategyType, LoadStrategyMode) LoadStrategy => (LoadStrategyType.Value, LoadStrategyMode.Value);
 
   public static void Initialize(ConfigFile config)
   {
@@ -174,20 +171,6 @@ public static class Configs
       dedupeDefault[3],
       new ConfigDescription(
         "Priority of Repo mods when deduping, lower priority gets disabled"
-      )
-    );
-    LoadStrategyType = config.Bind(
-      new ConfigDefinition("Mod Loading", "LoadStrategyType"),
-      Loading.LoadStrategyType.Linear,
-      new ConfigDescription(
-        "Linear type loads mods one by one in sequential order. More types of mod loading will be added later."
-      )
-    );
-    LoadStrategyMode = config.Bind(
-      new ConfigDefinition("Mod Loading", "LoadStrategyMode"),
-      Loading.LoadStrategyMode.Serial,
-      new ConfigDescription(
-        "Parallel mode loads faster for a large number of mods, but may fail in extremely rare cases. Switch to serial mode if running into loading issues."
       )
     );
     SavePathOnStart = config.Bind(

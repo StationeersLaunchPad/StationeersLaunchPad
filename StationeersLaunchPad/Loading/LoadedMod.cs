@@ -14,8 +14,6 @@ namespace StationeersLaunchPad.Loading;
 
 public class LoadedMod
 {
-  private readonly object _lock = new();
-
   public ModInfo Info;
 
   public Logger Logger;
@@ -52,42 +50,27 @@ public class LoadedMod
     return assembly;
   });
 
-  public async UniTask LoadAssembliesSerial()
+  public async UniTask LoadAssemblies()
   {
     foreach (var path in Info.Assemblies)
       Assemblies.Add(await LoadAssemblySingle(path));
-  }
-
-  public async UniTask LoadAssembliesParallel()
-  {
-    var assemblies = await UniTask.WhenAll(
-      Info.Assemblies.Select(LoadAssemblySingle)
-    );
-    Assemblies.AddRange(assemblies);
   }
 
   private async UniTask LoadAssetsSingle(string path)
   {
     var bundle = await LoadAssetBundle(path);
     var prefabs = await LoadAssetBundleGameObjects(path, bundle);
-    lock (_lock)
-      Prefabs.AddRange(prefabs);
+    Prefabs.AddRange(prefabs);
 
     var exportSettings = await LoadAssetBundleExportSettings(path, bundle);
     if (exportSettings != null)
-      lock (_lock)
-        Exports.Add(exportSettings);
+      Exports.Add(exportSettings);
   }
 
-  public async UniTask LoadAssetsSerial()
+  public async UniTask LoadAssets()
   {
     foreach (var path in Info.AssetBundles)
       await LoadAssetsSingle(path);
-  }
-
-  public async UniTask LoadAssetsParallel()
-  {
-    await UniTask.WhenAll(Info.AssetBundles.Select(LoadAssetsSingle));
   }
 
   public UniTask FindEntrypoints()

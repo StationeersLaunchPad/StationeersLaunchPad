@@ -1,33 +1,16 @@
-﻿using System;
+using System;
 using System.Diagnostics;
-using System.Linq;
 using Cysharp.Threading.Tasks;
 
 namespace StationeersLaunchPad.Loading;
 
-public enum LoadStrategyType
-{
-  // loads in 3 steps:
-  // - load all assemblies in order
-  // - load asset bundles
-  // - find and load entry points
-  // each step is done in the order the mods are configured
-  // if a mod fails to load, the following steps will be skipped for that mod
-  Linear,
-
-  //DependencyFirst,
-}
-
-public enum LoadStrategyMode
-{
-  // load each mod in serial
-  Serial,
-
-  // load each mod in parallel
-  Parallel,
-}
-
-public abstract class LoadStrategy
+// loads in 3 steps:
+// - load all assemblies in order
+// - load asset bundles
+// - find and load entry points
+// each step loads one mod at a time in the canonical load order
+// if a mod fails to load, the following steps will be skipped for that mod
+public class LoadStrategy
 {
   private bool failed = false;
 
@@ -55,7 +38,7 @@ public abstract class LoadStrategy
     return !failed;
   }
 
-  public void LoadFailed(LoadedMod mod, Exception ex)
+  private void LoadFailed(LoadedMod mod, Exception ex)
   {
     mod.Logger.LogException(ex);
     mod.LoadFailed = true;
@@ -64,14 +47,7 @@ public abstract class LoadStrategy
     failed = true;
   }
 
-  public abstract UniTask LoadAssemblies();
-  public abstract UniTask LoadAssets();
-  public abstract UniTask LoadEntryPoints();
-}
-
-public class LoadStrategyLinearSerial : LoadStrategy
-{
-  public override async UniTask LoadAssemblies()
+  private async UniTask LoadAssemblies()
   {
     foreach (var mod in ModLoader.LoadedMods)
     {
@@ -80,7 +56,7 @@ public class LoadStrategyLinearSerial : LoadStrategy
 
       try
       {
-        await mod.LoadAssembliesSerial();
+        await mod.LoadAssemblies();
         mod.LoadedAssemblies = true;
       }
       catch (Exception ex)
@@ -90,7 +66,7 @@ public class LoadStrategyLinearSerial : LoadStrategy
     }
   }
 
-  public async override UniTask LoadAssets()
+  private async UniTask LoadAssets()
   {
     foreach (var mod in ModLoader.LoadedMods)
     {
@@ -99,7 +75,7 @@ public class LoadStrategyLinearSerial : LoadStrategy
 
       try
       {
-        await mod.LoadAssetsSerial();
+        await mod.LoadAssets();
         mod.LoadedAssets = true;
       }
       catch (Exception ex)
@@ -109,7 +85,7 @@ public class LoadStrategyLinearSerial : LoadStrategy
     }
   }
 
-  public async override UniTask LoadEntryPoints()
+  private async UniTask LoadEntryPoints()
   {
     foreach (var mod in ModLoader.LoadedMods)
     {
@@ -128,70 +104,5 @@ public class LoadStrategyLinearSerial : LoadStrategy
         LoadFailed(mod, ex);
       }
     }
-  }
-}
-
-public class LoadStrategyLinearParallel : LoadStrategy
-{
-  public override async UniTask LoadAssemblies()
-  {
-    await UniTask.WhenAll(ModLoader.LoadedMods.Select(async (mod) =>
-    {
-      if (mod.LoadedAssemblies || mod.LoadFailed || mod.LoadFinished)
-        return;
-
-      if (!ModLoader.LoadedMods.Contains(mod))
-        ModLoader.LoadedMods.Add(mod);
-
-      try
-      {
-        await mod.LoadAssembliesParallel();
-        mod.LoadedAssemblies = true;
-      }
-      catch (Exception ex)
-      {
-        LoadFailed(mod, ex);
-      }
-    }));
-  }
-
-  public async override UniTask LoadAssets()
-  {
-    await UniTask.WhenAll(ModLoader.LoadedMods.Select(async (mod) =>
-    {
-      if (mod == null || mod.LoadedAssets || mod.LoadFailed || mod.LoadFinished)
-        return;
-
-      try
-      {
-        await mod.LoadAssetsSerial();
-        mod.LoadedAssets = true;
-      }
-      catch (Exception ex)
-      {
-        LoadFailed(mod, ex);
-      }
-    }));
-  }
-
-  public async override UniTask LoadEntryPoints()
-  {
-    await UniTask.WhenAll(ModLoader.LoadedMods.Select(async (mod) =>
-    {
-      if (mod == null || mod.LoadedEntryPoints || mod.LoadFailed || mod.LoadFinished)
-        return;
-
-      try
-      {
-        await mod.FindEntrypoints();
-        mod.PrintEntrypoints();
-        mod.LoadEntrypoints();
-        mod.LoadedEntryPoints = true;
-      }
-      catch (Exception ex)
-      {
-        LoadFailed(mod, ex);
-      }
-    }));
   }
 }

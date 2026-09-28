@@ -421,15 +421,7 @@ public static class LaunchPadConfig
       if (mod.Source is not ModSourceType.Core)
         ModLoader.LoadedMods.Add(new(mod));
 
-    var (strategyType, strategyMode) = Configs.LoadStrategy;
-
-    LoadStrategy loadStrategy = (strategyType, strategyMode) switch
-    {
-      (LoadStrategyType.Linear, LoadStrategyMode.Serial) => new LoadStrategyLinearSerial(),
-      (LoadStrategyType.Linear, LoadStrategyMode.Parallel) => new LoadStrategyLinearParallel(),
-      _ => throw new Exception($"invalid load strategy ({strategyType}, {strategyMode})")
-    };
-    if (!await loadStrategy.LoadMods())
+    if (!await new LoadStrategy().LoadMods())
       StopAutoLoad();
 
     stopwatch.Stop();
