@@ -2,7 +2,6 @@
   <PropertyGroup>
     <AssemblyName>StationeersLaunchPad</AssemblyName>
     <RootNamespace>$(AssemblyName)</RootNamespace>
-    <IsServer>False</IsServer>
   </PropertyGroup>
 
   <Import Project="$(SolutionDir)SLP.common.props" />
@@ -12,12 +11,8 @@
     <ProjectReference Include="$(SolutionDir)\Compatibility\StationeersMods.Shared\StationeersMods.Shared.csproj" />
   </ItemGroup>
 
-  <!-- ImGui DLL's -->
-  <ItemGroup Condition="'$(IsServer)' == 'True'">
-    <ProjectReference Include="$(SolutionDir)\Compatibility\RG.ImGui\RG.ImGui.csproj" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(IsServer)' != 'True'">
+  <!-- the server zip ships the stub from Compatibility/RG.ImGui instead -->
+  <ItemGroup>
     <Reference Include="RG.ImGui">
       <HintPath>$(StationeersManagedDirectory)\RG.ImGui.dll</HintPath>
       <Private>False</Private>
