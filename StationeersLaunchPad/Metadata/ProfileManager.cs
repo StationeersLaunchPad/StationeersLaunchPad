@@ -62,7 +62,7 @@ public class ProfileManager
   public bool EnsureActivePack(ModList modList)
   {
     Initialize();
-    if (Platform.IsServer || ActiveProfile != null)
+    if (ActiveProfile != null)
       return false;
 
     var configured = ActiveProfileName;
@@ -450,6 +450,14 @@ public class ProfileManager
       .Where(entry => entry.Source != ModSourceType.Core
         && FindMod(entry, modIndex) == null)
       .ToList();
+  }
+
+  // core and the installed mods of the active pack, always-on mods are client-side
+  public List<ModInfo> ServerPackageMods(ModList modList)
+  {
+    var active = ActiveProfile;
+    return [.. modList.AllMods.Where(mod => mod.Source == ModSourceType.Core
+      || (active != null && IsInPack(mod, active) && !IsAlwaysOn(mod)))];
   }
 
   public static int ModCount(ProfileData profile) =>

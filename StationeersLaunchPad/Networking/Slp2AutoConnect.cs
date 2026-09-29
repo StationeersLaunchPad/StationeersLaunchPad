@@ -14,8 +14,8 @@ internal static class Slp2AutoConnect
   // called right before StartGame() while the verify result is still fresh
   internal static void ArmIfVerified()
   {
-    if (!Slp2ProfileSync.WasVerified || !Configs.ServerProfilesEnabled.Value
-      || !Configs.ServerProfilesAutoJoin.Value)
+    if (!Slp2ProfileSync.WasVerified || !Configs.ServerPacksEnabled.Value
+      || !Configs.ServerPacksAutoJoin.Value)
       return;
 
     armed = true;

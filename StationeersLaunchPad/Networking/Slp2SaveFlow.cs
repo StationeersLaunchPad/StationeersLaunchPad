@@ -18,7 +18,7 @@ internal static class Slp2SaveFlow
 
   private static async UniTask OfferDuringJoin()
   {
-    if (!Configs.ServerProfilesEnabled.Value || !NetworkManager.IsClient
+    if (!Configs.ServerPacksEnabled.Value || !NetworkManager.IsClient
       || NetworkClient.ConnectionMethod != ConnectionMethod.RocketNet)
       return;
 
@@ -45,6 +45,6 @@ internal static class Slp2SaveFlow
       return;
 
     if (!profileManager.SaveServerProfileFromCode(serverName, code, entries, address, port))
-      Logger.Global.LogWarning($"Failed to save server profile for '{serverName}'");
+      Logger.Global.LogWarning($"Failed to save server pack for '{serverName}'");
   }
 }

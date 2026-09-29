@@ -37,9 +37,9 @@ internal static class Slp2ProfileSync
   {
     VerifyState.Pending => ("Checking server for auto-connect...", ProfileStatusKind.Info),
     VerifyState.Verified => (
-      Configs.ServerProfilesAutoJoin.Value
-        ? "Server profile verified: server is reachable and profile matches server, auto-connecting after load"
-        : "Server profile verified: server is reachable and profile matches server",
+      Configs.ServerPacksAutoJoin.Value
+        ? "Server pack checked: the server matches, joining after load"
+        : "Server pack checked: the server matches",
       ProfileStatusKind.Saved),
     VerifyState.Failed when isConfirmedMismatch => ("Server mods changed - see warning before loading finishes", ProfileStatusKind.Unsaved),
     VerifyState.Failed => ("Could not verify - won't auto-connect", ProfileStatusKind.Error),
@@ -60,7 +60,7 @@ internal static class Slp2ProfileSync
     mismatchCode = null;
     mismatchProfile = null;
     var profile = profileManager.ActiveProfile;
-    if (Platform.IsServer || !Configs.ServerProfilesEnabled.Value
+    if (Platform.IsServer || !Configs.ServerPacksEnabled.Value
       || profile == null || string.IsNullOrEmpty(profile.ServerName)
       || !Slp2PackageCode.TryDecode(profile.ServerCode, out _, out var isServerCode, out var savedName)
       || !isServerCode || string.IsNullOrEmpty(savedName))
@@ -129,7 +129,7 @@ internal static class Slp2ProfileSync
         mismatchProfile = profile;
         mismatchAddress = address;
         mismatchPort = port;
-        Fail($"'{profile.ServerName}' no longer matches this saved server profile", confirmedMismatch: true);
+        Fail($"'{profile.ServerName}' no longer matches its server pack", confirmedMismatch: true);
         return;
       }
 
@@ -210,17 +210,17 @@ internal static class Slp2ProfileSync
 
     ImGuiHelper.Draw(() =>
     {
-      const string modalName = "Server Profile Changed##Slp2Verify";
+      const string modalName = "Server Mods Changed##Slp2Verify";
       ImGui.OpenPopup(modalName);
       ImGui.BeginPopupModal(modalName, ImGuiWindowFlags.NoSavedSettings | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.AlwaysAutoResize);
 
       ImGuiHelper.Text(failReason ?? "unknown reason");
-      ImGuiHelper.Text("The server's SLP2 code differs. Update the profile for next time,");
+      ImGuiHelper.Text("The server's mods changed. Update the pack for next time,");
       ImGuiHelper.Text("or continue anyway with what's currently loaded.");
       ImGui.Separator();
 
       var width = ImGui.GetContentRegionAvail().x / 2 - 4;
-      if (ImGui.Button("Update Profile", new(width, ImGui.GetTextLineHeightWithSpacing())))
+      if (ImGui.Button("Update Pack", new(width, ImGui.GetTextLineHeightWithSpacing())))
       {
         ApplyMismatchUpdate();
         warningVisible = false;
@@ -241,6 +241,6 @@ internal static class Slp2ProfileSync
 
     if (!LaunchPadConfig.ProfileManager.SaveServerProfileFromCode(
       mismatchProfile.ServerName, mismatchCode, entries, mismatchAddress, mismatchPort))
-      Logger.Global.LogWarning($"Failed to update server profile for '{mismatchProfile.ServerName}'");
+      Logger.Global.LogWarning($"Failed to update server pack for '{mismatchProfile.ServerName}'");
   }
 }

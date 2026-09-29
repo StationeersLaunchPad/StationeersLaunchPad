@@ -63,8 +63,9 @@ public static class Configs
   public static ConfigEntry<bool> RepoModValidateDigest;
   public static ConfigEntry<bool> RepoModValidateVersion;
   public static ConfigEntry<string> ModProfile;
-  public static ConfigEntry<bool> ServerProfilesEnabled;
-  public static ConfigEntry<bool> ServerProfilesAutoJoin;
+  public static ConfigEntry<bool> ServerPacksEnabled;
+  public static ConfigEntry<bool> ServerPacksAutoJoin;
+  public static ConfigEntry<bool> ShareModList;
 
   public static ConfigEntry<bool> NewsCheckOnStart;
   public static ConfigEntry<string> NewsFeedUrl;
@@ -302,18 +303,25 @@ public static class Configs
         "The active mod pack. Managed by the Mod Packs page."
       )
     );
-    ServerProfilesEnabled = config.Bind(
-      new ConfigDefinition("Server Profiles", "Enabled"),
+    ServerPacksEnabled = config.Bind(
+      new ConfigDefinition("Server Packs", "Enabled"),
       true,
       new ConfigDescription(
-        "Enable SLP2 server profiles. When disabled, SLP does not offer, verify or auto-join server profiles, and a server does not share its mod list."
+        "Offer to save a server's mods as a pack when you join it, and check server packs against their server before loading."
       )
     );
-    ServerProfilesAutoJoin = config.Bind(
-      new ConfigDefinition("Server Profiles", "AutoJoin"),
+    ServerPacksAutoJoin = config.Bind(
+      new ConfigDefinition("Server Packs", "AutoJoin"),
       true,
       new ConfigDescription(
-        "Automatically join the server after its server profile is verified on startup."
+        "Join the server right away once its pack has been checked on startup."
+      )
+    );
+    ShareModList = config.Bind(
+      new ConfigDefinition("Hosting", "ShareModList"),
+      true,
+      new ConfigDescription(
+        "When hosting or running a dedicated server, send the mod list to joining SLP players so they can save it as a pack."
       )
     );
     LinuxPathPatch = config.Bind(

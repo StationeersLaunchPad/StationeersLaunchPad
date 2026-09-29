@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
@@ -473,7 +474,7 @@ public static class LaunchPadConfig
       if (missingMods.Count > 0)
       {
         Logger.Global.LogWarning(
-          $"Profile '{profileManager.ActiveProfileName}' has {missingMods.Count} missing required mod(s)");
+          $"Pack '{profileManager.ActiveProfileName}' has {missingMods.Count} missing required mod(s)");
         ProfilePanel.ShowLoadBlocked(profileManager.ActiveProfileName, missingMods.Count);
         ManualLoadWindow.OpenProfilesTab();
       }
@@ -484,7 +485,10 @@ public static class LaunchPadConfig
 
   private static void PrepareProfileStartup(bool firstLoad, bool preserveSelection)
   {
-    // dedicated servers only use a pack when one is configured
+    // servers don't use packs, they load modconfig.xml as it is
+    if (Platform.IsServer)
+      return;
+
     profileManager.EnsureActivePack(modList);
     var profile = profileManager.ActiveProfile;
     if (profile == null)
@@ -498,19 +502,17 @@ public static class LaunchPadConfig
     }
     if (!profileManager.ApplyProfile(profile.Name, modList))
     {
-      Logger.Global.LogError($"Could not apply mod profile '{profile.Name}'");
+      Logger.Global.LogError($"Could not apply mod pack '{profile.Name}'");
       StopAutoLoad();
       return;
     }
     var depNotice = NormalizeModList();
-    if (Platform.IsServer)
-      return;
 
     var missingMods = profileManager.GetMissingMods(profile.Name, modList);
     if (missingMods.Count > 0)
     {
       Logger.Global.LogWarning(
-        $"Profile '{profile.Name}' has {missingMods.Count} missing required mod(s)");
+        $"Pack '{profile.Name}' has {missingMods.Count} missing required mod(s)");
       if (AutoLoad)
       {
         quickProfileOpen = true;
@@ -540,7 +542,7 @@ public static class LaunchPadConfig
   }
 
   // packs pick which copy of a mod loads themselves
-  private static bool DedupeApplies => string.IsNullOrEmpty(Configs.ModProfile.Value);
+  private static bool DedupeApplies => Platform.IsServer || string.IsNullOrEmpty(Configs.ModProfile.Value);
 
   private static bool NormalizeModList()
   {
@@ -569,55 +571,50 @@ public static class LaunchPadConfig
     await SLPCommand.MoveToStage(CommandStage.GameDataLoaded);
   }
 
-  public static string ExportModPackage(string pkgpath = null)
-  {
-    try
-    {
-      if (string.IsNullOrEmpty(pkgpath))
-        pkgpath = Path.Combine(
-          LaunchPadPaths.SavePath,
-          $"modpkg_{DateTime.Now:yyyy-MM-dd_HH-mm-ss-fff}.zip");
-      else
-      {
-        if (!Path.IsPathRooted(pkgpath))
-          pkgpath = Path.Combine(LaunchPadPaths.SavePath, pkgpath);
-        if (!pkgpath.ToLower().EndsWith(".zip"))
-          pkgpath += ".zip";
-      }
-      using (var archive = ZipFile.Open(pkgpath, ZipArchiveMode.Create))
-      {
-        var config = new ModConfig();
-        foreach (var mod in modList.EnabledMods)
-        {
-          if (mod.Source == ModSourceType.Core)
-          {
-            config.Mods.Add(new CoreModData());
-            continue;
-          }
+  // servers package what they load, clients the active pack
+  public static List<ModInfo> ServerPackageMods() =>
+    Platform.IsServer ? [.. modList.EnabledMods] : profileManager.ServerPackageMods(modList);
 
-          var dirName = $"{mod.Source}_{mod.DirectoryName}";
-          var root = mod.DirectoryPath;
-          foreach (var file in Directory.GetFiles(root, "*", SearchOption.AllDirectories))
-          {
-            var entryPath = Path.Combine("mods", dirName, file[(root.Length + 1)..]).Replace('\\', '/');
-            archive.CreateEntryFromFile(file, entryPath);
-          }
-          config.Mods.Add(new LocalModData(dirName, true));
+  // returns the path of the written zip
+  public static string ExportModPackage(IReadOnlyList<ModInfo> mods, string pkgpath = null)
+  {
+    if (string.IsNullOrEmpty(pkgpath))
+      pkgpath = Path.Combine(
+        LaunchPadPaths.SavePath,
+        $"modpkg_{DateTime.Now:yyyy-MM-dd_HH-mm-ss-fff}.zip");
+    else
+    {
+      if (!Path.IsPathRooted(pkgpath))
+        pkgpath = Path.Combine(LaunchPadPaths.SavePath, pkgpath);
+      if (!pkgpath.ToLower().EndsWith(".zip"))
+        pkgpath += ".zip";
+    }
+    using (var archive = ZipFile.Open(pkgpath, ZipArchiveMode.Create))
+    {
+      var config = new ModConfig();
+      foreach (var mod in mods)
+      {
+        if (mod.Source == ModSourceType.Core)
+        {
+          config.Mods.Add(new CoreModData());
+          continue;
         }
 
-        var configEntry = archive.CreateEntry("modconfig.xml");
-        using var stream = configEntry.Open();
-        var serializer = new XmlSerializer(typeof(ModConfig));
-        serializer.Serialize(stream, config);
+        var dirName = $"{mod.Source}_{mod.DirectoryName}";
+        var root = mod.DirectoryPath;
+        foreach (var file in Directory.GetFiles(root, "*", SearchOption.AllDirectories))
+        {
+          var entryPath = Path.Combine("mods", dirName, file[(root.Length + 1)..]).Replace('\\', '/');
+          archive.CreateEntryFromFile(file, entryPath);
+        }
+        config.Mods.Add(new LocalModData(dirName, true));
       }
-      if (!Platform.IsServer)
-        ProcessUtil.OpenExplorerSelectFile(pkgpath);
-      return $"exported {pkgpath}";
+
+      var configEntry = archive.CreateEntry("modconfig.xml");
+      using var stream = configEntry.Open();
+      var serializer = new XmlSerializer(typeof(ModConfig));
+      serializer.Serialize(stream, config);
     }
-    catch (Exception ex)
-    {
-      Logger.Global.LogException(ex);
-      return ex.ToString();
-    }
+    return pkgpath;
   }
 }

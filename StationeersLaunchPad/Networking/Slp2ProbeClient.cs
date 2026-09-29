@@ -13,9 +13,9 @@ public static class Slp2ProbeClient
     string address, ushort port, float timeoutSeconds = 10f,
     CancellationToken cancellationToken = default)
   {
-    if (!Configs.ServerProfilesEnabled.Value)
+    if (!Configs.ServerPacksEnabled.Value)
     {
-      Logger.Global.LogInfo("SLP2 probe skipped: server profiles are disabled");
+      Logger.Global.LogInfo("SLP2 probe skipped: server packs are disabled");
       return null;
     }
     if (Slp2Channel.ProbePending || NetworkManager.NetworkState != NetworkState.Offline)

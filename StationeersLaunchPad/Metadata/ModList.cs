@@ -154,7 +154,7 @@ public class ModList
 
     mods = ordered;
     if (missing > 0)
-      Logger.Global.LogDebug($"Profile '{profile.Name}' skipped {missing} missing mod(s)");
+      Logger.Global.LogDebug($"Pack '{profile.Name}' skipped {missing} missing mod(s)");
   }
 
   // applies the pack, then enables the always-on mods on top

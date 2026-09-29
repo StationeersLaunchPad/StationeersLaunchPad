@@ -92,7 +92,7 @@ internal static class Slp2JoinPiggyback
     {
       // always consume the string so Booster reads its header at the right offset
       var code = reader.ReadString();
-      if (!Configs.ServerProfilesEnabled.Value)
+      if (!Configs.ServerPacksEnabled.Value)
         return;
       if (code == FetchMarker)
       {

@@ -384,7 +384,15 @@ public class ModPkgCommand : SubCommand
       result = null;
       return false;
     }
-    result = LaunchPadConfig.ExportModPackage(pkgpath);
+    try
+    {
+      result = $"exported {LaunchPadConfig.ExportModPackage(LaunchPadConfig.ServerPackageMods(), pkgpath)}";
+    }
+    catch (Exception ex)
+    {
+      Logger.Global.LogException(ex);
+      result = ex.ToString();
+    }
     return true;
   }
 }

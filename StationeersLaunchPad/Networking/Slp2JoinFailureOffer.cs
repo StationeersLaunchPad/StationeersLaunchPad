@@ -38,7 +38,7 @@ internal static class Slp2JoinFailureOffer
     if (Slp2Channel.ProbePending)
       return;
 
-    if (!Configs.ServerProfilesEnabled.Value || code == null || reachedGame || offered
+    if (!Configs.ServerPacksEnabled.Value || code == null || reachedGame || offered
       || NetworkClient.ConnectionMethod != ConnectionMethod.RocketNet)
       return;
     offered = true;
@@ -61,6 +61,6 @@ internal static class Slp2JoinFailureOffer
       return;
 
     if (!profileManager.SaveServerProfileFromCode(serverName, code, entries, address, portNum))
-      Logger.Global.LogWarning($"Failed to save server profile for '{serverName}'");
+      Logger.Global.LogWarning($"Failed to save server pack for '{serverName}'");
   }
 }

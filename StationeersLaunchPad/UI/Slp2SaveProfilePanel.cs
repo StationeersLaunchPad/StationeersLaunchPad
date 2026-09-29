@@ -57,7 +57,7 @@ public static class Slp2SaveProfilePanel
     }
     catch (Exception ex)
     {
-      Logger.Global.LogWarning("SLP2 save-profile popup could not be installed");
+      Logger.Global.LogWarning("SLP2 save-pack popup could not be installed");
       Logger.Global.LogException(ex);
       return false;
     }
@@ -129,17 +129,17 @@ public static class Slp2SaveProfilePanel
     var bottomInset = Math.Max(90f, display.y * 0.13f);
     ImGui.SetNextWindowPos(new(display.x * 0.5f, display.y - bottomInset), ImGuiCond.Always, new(0.5f, 1f));
     ImGui.SetNextWindowSize(new(width, 0f), ImGuiCond.Always);
-    ImGui.Begin("SLP | Server profile##Slp2Offer",
+    ImGui.Begin("SLP | Server pack##Slp2Offer",
       ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoMove
       | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoSavedSettings);
     ImGui.SetWindowFontScale(1.2f);
     ImGuiHelper.Text($"Save {offer.Name}'s mod list?");
     ImGui.TextWrapped(offer.Mismatch
-      ? "The join ended before you got in. SLP can use this profile on your next attempt."
-      : "SLP will use this profile the next time you start the game. Your current join will continue.");
+      ? "The join ended before you got in. SLP can load these mods as a pack on your next attempt."
+      : "SLP will load this pack the next time you start the game. Your current join continues.");
     ImGui.Separator();
     var buttonWidth = ImGui.GetContentRegionAvail().x / 2f - 4f;
-    if (ImGui.Button("Save profile",
+    if (ImGui.Button("Save as pack",
       new(buttonWidth, ImGui.GetTextLineHeightWithSpacing() * 1.35f)))
       Complete(offer, true);
     ImGui.SameLine();

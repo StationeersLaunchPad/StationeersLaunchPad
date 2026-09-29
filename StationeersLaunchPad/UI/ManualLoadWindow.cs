@@ -19,7 +19,7 @@ public static class ManualLoadWindow
     NextStep = 1 << 1,
   }
 
-  private enum Page { ModInfo, ModSettings, Profiles, Betas, Settings }
+  private enum Page { ModInfo, ModSettings, Profiles, Betas, ServerPackage, Settings }
 
   private static LoadStage lastStage;
   private static ModInfo selectedInfo = null;
@@ -90,7 +90,14 @@ public static class ManualLoadWindow
       // mod list
       ImGui.SetCursorScreenPos(listRect.Min);
       ImGui.BeginChild("##left", listRect.Size);
-      if (stage is LoadStage.Searching or LoadStage.Configuring)
+      if (page == Page.ServerPackage)
+      {
+        Widgets.SectionHeader("In the server package");
+        ImGui.BeginChild("##packagelist");
+        DrawPackageList(profileManager, modList);
+        ImGui.EndChild();
+      }
+      else if (stage is LoadStage.Searching or LoadStage.Configuring)
       {
         DrawPackSummary(profileManager, modList);
         DrawModSelectOptions(modList);
@@ -179,6 +186,7 @@ public static class ManualLoadWindow
         Tooltip = profilesDisabled ? "Packs can only be changed before mods load" : "Your mod packs, always-on mods and share codes",
       },
       new() { Label = "Betas", Tooltip = "Switch mods between stable and beta versions" },
+      new() { Label = "Server Package", Tooltip = "Export a pack's mods for a dedicated server" },
       new() { Label = "LaunchPad Settings" },
     };
     var clicked = Widgets.NavBar("##pages", nav, (int)shown);
@@ -210,6 +218,9 @@ public static class ManualLoadWindow
           profileManager.AbsorbEnabledChanges(modList);
           changed |= ChangeFlags.Mods;
         }
+        break;
+      case Page.ServerPackage:
+        ServerPackagePanel.Draw(profileManager, modList);
         break;
       case Page.Settings:
         // If we changed launchpad config and haven't loaded mods yet, mark mods changed to apply disable/sort behaviour
@@ -768,6 +779,45 @@ public static class ManualLoadWindow
     return string.Join(ModInfoPanel.MetaSeparator, parts);
   }
 
+  private static void DrawPackageList(ProfileManager profileManager, ModList modList)
+  {
+    var mods = profileManager.ServerPackageMods(modList)
+      .Where(mod => mod.Source != ModSourceType.Core)
+      .OrderBy(mod => mod.Name, StringComparer.OrdinalIgnoreCase)
+      .ToList();
+    if (mods.Count == 0)
+    {
+      ImGuiHelper.TextColored("Nothing to export from this pack.", LaunchPadTheme.TextMuted);
+      return;
+    }
+
+    var lineHeight = ImGui.GetTextLineHeight();
+    var (rowHeight, rowPadding, thumbHeight, thumbWidth) = RowMetrics();
+    var spacing = ImGui.GetStyle().ItemSpacing.x * 2;
+    var available = ImGuiHelper.AvailableRect();
+    var row = available.TableRow(rowHeight, stackalloc[] { thumbWidth + spacing });
+    var drawList = ImGui.GetWindowDrawList();
+
+    var idx = 0;
+    foreach (var mod in mods)
+    {
+      var rowRect = row.Rect;
+      if (idx % 2 == 1)
+        drawList.AddRectFilled(rowRect.Min, rowRect.Max, LaunchPadTheme.OverU32(Color.white, 0.025f));
+
+      DrawThumb(drawList, mod, row.Column(0), rowPadding, thumbWidth, thumbHeight, dim: false);
+      var textCol = row.Column(1);
+      ImGui.SetCursorScreenPos(new Vector2(textCol.Min.x, textCol.Min.y + rowPadding));
+      ImGuiHelper.Text(mod.Name ?? "");
+      ImGui.SetCursorScreenPos(new Vector2(
+        textCol.Min.x, textCol.Min.y + rowPadding + lineHeight + ImGui.GetStyle().ItemSpacing.y));
+      ImGuiHelper.TextColored(ModMetaLine(mod, 0), LaunchPadTheme.TextMuted);
+
+      idx++;
+      row.NextRow();
+    }
+  }
+
   private static void DrawLoadTable(ModList modList)
   {
     var lineHeight = ImGui.GetTextLineHeight();
@@ -851,11 +901,6 @@ public static class ManualLoadWindow
     Widgets.PageHeader("LaunchPad Settings", "Options for StationeersLaunchPad itself.");
 
     Widgets.SectionHeader("Tools");
-    if (ImGui.Button("Export server package"))
-      LaunchPadConfig.ExportModPackage();
-    ImGui.SameLine();
-    ImGuiHelper.TextColored("Package enabled mods into a zip file for dedicated servers.", LaunchPadTheme.TextMuted);
-
     var canReload = stage == LoadStage.Configuring && !ProfilePanel.Busy
       && !BetaProgramsPanel.Busy;
     ImGui.BeginDisabled(!canReload);
