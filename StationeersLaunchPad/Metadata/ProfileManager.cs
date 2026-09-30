@@ -13,7 +13,7 @@ namespace StationeersLaunchPad.Metadata;
 // load order is not part of a pack
 public class ProfileManager
 {
-  public const string DefaultPackName = "Default";
+  public const string DefaultPackName = "My Mods";
   public const string VanillaName = "Vanilla";
   public const string VanillaPlusName = "Vanilla+";
 
@@ -24,6 +24,9 @@ public class ProfileManager
 
   public IReadOnlyList<ProfileData> AllProfiles => profiles;
   public IEnumerable<ProfileData> BuiltInPacks => [vanilla, vanillaPlus];
+  // Vanilla+ only means something once there are always-on mods
+  public IEnumerable<ProfileData> ShownBuiltInPacks =>
+    alwaysOn.Mods.Count > 0 || ActiveProfile == vanillaPlus ? [vanilla, vanillaPlus] : [vanilla];
   public IEnumerable<ProfileData> UserPacks => profiles.Where(profile => !IsServerPack(profile));
   public IEnumerable<ProfileData> ServerPacks => profiles.Where(IsServerPack);
   public ProfileData AlwaysOn => alwaysOn;
@@ -57,7 +60,7 @@ public class ProfileManager
     VanillaName.Equals(name, StringComparison.OrdinalIgnoreCase)
     || VanillaPlusName.Equals(name, StringComparison.OrdinalIgnoreCase);
 
-  // without an active pack the current mod list becomes the Default pack.
+  // without an active pack the current mod list becomes the "My Mods" pack.
   // returns true if the active pack changed
   public bool EnsureActivePack(ModList modList)
   {

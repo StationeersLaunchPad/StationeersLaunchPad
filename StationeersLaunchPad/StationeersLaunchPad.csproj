@@ -11,6 +11,10 @@
     <ProjectReference Include="$(SolutionDir)\Compatibility\StationeersMods.Shared\StationeersMods.Shared.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Images\*.jpg" LogicalName="StationeersLaunchPad.Images.%(Filename)%(Extension)" />
+  </ItemGroup>
+
   <!-- the server zip ships the stub from Compatibility/RG.ImGui instead -->
   <ItemGroup>
     <Reference Include="RG.ImGui">

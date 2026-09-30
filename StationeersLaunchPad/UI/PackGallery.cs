@@ -66,7 +66,7 @@ public static class PackGallery
       ImGui.SameLine();
     }
 
-    foreach (var pack in manager.BuiltInPacks)
+    foreach (var pack in manager.ShownBuiltInPacks)
     {
       Gap(false);
       if (DrawCard(manager, modList, pack, active, cardWidth, cardHeight))
@@ -120,8 +120,13 @@ public static class PackGallery
     var mods = manager.IsVanilla(pack) ? []
       : pack.Name == ProfileManager.VanillaPlusName ? ProfileManager.InstalledMods(manager.AlwaysOn, modIndex)
       : ProfileManager.InstalledMods(pack, modIndex);
-    DrawMosaic(drawList, mods, min + new Vector2(1f, 1f), new Vector2(max.x - 1f, min.y + imageHeight),
-      manager.IsVanilla(pack) ? "No mods" : "Empty");
+    var imageMin = min + new Vector2(1f, 1f);
+    var imageMax = new Vector2(max.x - 1f, min.y + imageHeight);
+    var builtInImage = manager.IsVanilla(pack) ? ModImages.VanillaImage
+      : pack.Name == ProfileManager.VanillaPlusName ? ModImages.VanillaPlusImage
+      : null;
+    if (builtInImage == null || !ModImages.DrawBuiltIn(drawList, builtInImage, imageMin, imageMax))
+      DrawMosaic(drawList, mods, imageMin, imageMax, manager.IsVanilla(pack) ? "No mods" : "Empty");
     if (isActive)
       drawList.AddRect(min, max, ImGui.ColorConvertFloat4ToU32((Vector4)LaunchPadTheme.Accent), 4f, ImDrawFlags.None, 2f);
     else
