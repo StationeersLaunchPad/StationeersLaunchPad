@@ -663,6 +663,8 @@ public static class ManualLoadWindow
 
       idx++;
       row.NextRow();
+      if (isCore)
+        DrawSystemRows(ref row, modList, ref idx);
     }
 
     ImGui.EndDisabled();
@@ -678,6 +680,64 @@ public static class ManualLoadWindow
         changed = true;
     }
     return changed;
+  }
+
+  // SLP and Booster aren't mods, but they load with the game too
+  private static void DrawSystemRows(ref TableRow row, ModList modList, ref int idx)
+  {
+    var users = modList.EnabledMods.Count(BoosterInfo.UsedBy);
+    DrawSystemRow(ref row, idx++, ModImages.SlpImage, "StationeersLaunchPad", true,
+      $"SLP{ModInfoPanel.MetaSeparator}v{LaunchPadInfo.VERSION}{ModInfoPanel.MetaSeparator}always loads",
+      "Loads your mods and packs. Always on.");
+    DrawSystemRow(ref row, idx++, ModImages.BoosterImage, "LaunchPadBooster", users > 0,
+      $"Booster{ModInfoPanel.MetaSeparator}v{BoosterInfo.Version}{ModInfoPanel.MetaSeparator}"
+        + (users > 0 ? $"used by {users} mod{(users == 1 ? "" : "s")}" : "not used by these mods"),
+      "A library many mods build on. When a loaded mod uses it, it also checks that you and the server run "
+        + "the same mods. Servers whose mods use it turn players away who don't have it running.");
+  }
+
+  private static void DrawSystemRow(ref TableRow row, int idx, string image, string name, bool on, string meta, string tooltip)
+  {
+    var drawList = ImGui.GetWindowDrawList();
+    var lineHeight = ImGui.GetTextLineHeight();
+    var (rowHeight, rowPadding, thumbHeight, thumbWidth) = RowMetrics();
+    var checkboxSize = ImGui.GetFrameHeight();
+    var rowRect = row.Rect;
+    if (idx % 2 == 1)
+      drawList.AddRectFilled(rowRect.Min, rowRect.Max, LaunchPadTheme.OverU32(Color.white, 0.025f));
+
+    ImGui.PushID(name);
+    ImGui.SetCursorScreenPos(rowRect.Min);
+    ImGui.InvisibleButton("##system", rowRect.Size);
+    ImGuiHelper.ItemTooltip(tooltip, 420f, ImGuiHoveredFlags.AllowWhenDisabled);
+
+    var checkboxCol = row.Column(0);
+    ImGui.SetCursorScreenPos(new Vector2(
+      checkboxCol.Min.x + (checkboxCol.Size.x - checkboxSize) / 2f,
+      checkboxCol.Min.y + (rowHeight - checkboxSize) / 2f));
+    ImGui.BeginDisabled();
+    ImGui.Checkbox("##on", ref on);
+    ImGui.EndDisabled();
+
+    var thumbCol = row.Column(1);
+    var min = new Vector2(thumbCol.Min.x, thumbCol.Min.y + rowPadding);
+    var max = min + new Vector2(thumbWidth, thumbHeight);
+    if (!ModImages.DrawBuiltIn(drawList, image, min, max))
+    {
+      drawList.AddRectFilled(min, max, ImGui.ColorConvertFloat4ToU32((Vector4)LaunchPadTheme.Panel));
+      var label = image.ToUpperInvariant();
+      drawList.AddText(min + (max - min - ImGui.CalcTextSize(label)) / 2f,
+        ImGui.ColorConvertFloat4ToU32((Vector4)LaunchPadTheme.TextMuted), label);
+    }
+
+    var textCol = row.Column(2);
+    ImGui.SetCursorScreenPos(new Vector2(textCol.Min.x, textCol.Min.y + rowPadding));
+    ImGuiHelper.TextColored(name, on ? LaunchPadTheme.Text : LaunchPadTheme.TextSub);
+    ImGui.SetCursorScreenPos(new Vector2(
+      textCol.Min.x, textCol.Min.y + rowPadding + lineHeight + ImGui.GetStyle().ItemSpacing.y));
+    ImGuiHelper.TextColored(meta, LaunchPadTheme.TextMuted);
+    ImGui.PopID();
+    row.NextRow();
   }
 
   private static ModInfo confirmAlwaysOn;
