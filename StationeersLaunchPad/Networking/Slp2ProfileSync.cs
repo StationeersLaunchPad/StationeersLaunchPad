@@ -240,7 +240,7 @@ internal static class Slp2ProfileSync
       return;
 
     if (!LaunchPadConfig.ProfileManager.SaveServerProfileFromCode(
-      mismatchProfile.ServerName, mismatchCode, entries, mismatchAddress, mismatchPort))
+      mismatchProfile.ServerName, mismatchCode, entries, mismatchAddress, mismatchPort, activate: true))
       Logger.Global.LogWarning($"Failed to update server pack for '{mismatchProfile.ServerName}'");
   }
 }

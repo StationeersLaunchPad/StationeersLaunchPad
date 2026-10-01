@@ -124,27 +124,31 @@ public static class Slp2SaveProfilePanel
     var offer = currentOffer;
     if (offer == null)
       return;
+    // sits under the loading screen's progress bar, in its style
     var display = ImGui.GetIO().DisplaySize;
-    var width = Math.Min(720f, display.x - 48f);
-    var bottomInset = Math.Max(90f, display.y * 0.13f);
-    ImGui.SetNextWindowPos(new(display.x * 0.5f, display.y - bottomInset), ImGuiCond.Always, new(0.5f, 1f));
+    var width = Math.Min(560f, display.x - 48f);
+    ImGui.SetNextWindowPos(new(display.x * 0.5f, display.y * 0.5f + 60f), ImGuiCond.Always, new(0.5f, 0f));
     ImGui.SetNextWindowSize(new(width, 0f), ImGuiCond.Always);
-    ImGui.Begin("SLP | Server pack##Slp2Offer",
-      ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoMove
-      | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoSavedSettings);
-    ImGui.SetWindowFontScale(1.2f);
-    ImGuiHelper.Text($"Save {offer.Name}'s mod list?");
-    ImGui.TextWrapped(offer.Mismatch
-      ? "The join ended before you got in. SLP can load these mods as a pack on your next attempt."
-      : "SLP will load this pack the next time you start the game. Your current join continues.");
-    ImGui.Separator();
-    var buttonWidth = ImGui.GetContentRegionAvail().x / 2f - 4f;
-    if (ImGui.Button("Save as pack",
-      new(buttonWidth, ImGui.GetTextLineHeightWithSpacing() * 1.35f)))
+    ImGui.Begin("##Slp2Offer", ImGuiWindowFlags.NoDecoration | ImGuiWindowFlags.NoBackground
+      | ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoSavedSettings | ImGuiWindowFlags.AlwaysAutoResize);
+    CenteredText($"{offer.Name} runs these mods.", LaunchPadTheme.Text);
+    CenteredText("Save them as a pack to join with one click next time.", LaunchPadTheme.TextSub);
+    ImGui.Spacing();
+    var style = ImGui.GetStyle();
+    var buttonWidth = 170f;
+    var buttonHeight = ImGui.GetFrameHeight() * 1.3f;
+    ImGui.SetCursorPosX((ImGui.GetWindowWidth() - buttonWidth * 2f - style.ItemSpacing.x) / 2f);
+    if (Widgets.PrimaryButton("Save as pack##slp2save", new(buttonWidth, buttonHeight), true, 1f))
       Complete(offer, true);
     ImGui.SameLine();
-    if (ImGui.Button("Not now", new(buttonWidth, ImGui.GetTextLineHeightWithSpacing() * 1.35f)))
+    if (ImGui.Button("No thanks##slp2skip", new(buttonWidth, buttonHeight)))
       Complete(offer, false);
     ImGui.End();
+  }
+
+  private static void CenteredText(string text, Color color)
+  {
+    ImGui.SetCursorPosX((ImGui.GetWindowWidth() - ImGui.CalcTextSize(text).x) / 2f);
+    ImGuiHelper.TextColored(text, color);
   }
 }

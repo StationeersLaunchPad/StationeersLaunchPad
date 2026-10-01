@@ -365,29 +365,23 @@ public class ProfileManager
       profile.ServerName.Equals(serverName, StringComparison.OrdinalIgnoreCase));
   }
 
-  // local and repo entries are matched by ModID
   public bool SaveServerProfileFromCode(
     string serverName, string serverCode, IEnumerable<Slp2PackageCode.Entry> entries,
-    string address, ushort port) =>
-    SaveServerProfileMods(serverName, serverCode, BuildEntriesFromCode(entries), address, port);
+    string address, ushort port, bool activate) =>
+    SaveServerProfileMods(serverName, serverCode, BuildEntriesFromCode(entries), address, port, activate);
 
-  private static List<ProfileModEntry> BuildEntriesFromCode(IEnumerable<Slp2PackageCode.Entry> entries)
-  {
-    var workshopBase = SteamTransport.WorkshopType.Mod.GetLocalDirInfo().FullName;
-    return entries.Select(entry => new ProfileModEntry
+  // servers only share their mods when all of them are on the workshop
+  private static List<ProfileModEntry> BuildEntriesFromCode(IEnumerable<Slp2PackageCode.Entry> entries) =>
+    [.. entries.Where(entry => entry.WorkshopHandle > 1).Select(entry => new ProfileModEntry
     {
       Name = entry.Name,
       ModID = entry.ModID,
       WorkshopHandle = entry.WorkshopHandle,
-      Source = entry.WorkshopHandle > 1 ? ModSourceType.Workshop : ModSourceType.Local,
-      DirectoryPath = entry.WorkshopHandle > 1
-        ? Path.Combine(workshopBase, entry.WorkshopHandle.ToString())
-        : "",
-    }).ToList();
-  }
+      Source = ModSourceType.Workshop,
+    })];
 
   private bool SaveServerProfileMods(
-    string serverName, string serverCode, List<ProfileModEntry> mods, string address, ushort port)
+    string serverName, string serverCode, List<ProfileModEntry> mods, string address, ushort port, bool activate)
   {
     if (string.IsNullOrEmpty(serverName))
       return false;
@@ -423,14 +417,15 @@ public class ProfileManager
     }
 
     // takes effect on the next start
-    Configs.ModProfile.Value = profile.Name;
+    if (activate)
+      Configs.ModProfile.Value = profile.Name;
     return true;
   }
 
   private string MakeServerProfileName(string serverName)
   {
     // server names can contain characters that aren't valid in file names
-    var baseName = Platform.MakeValidFileName($"Server: {serverName}".Trim());
+    var baseName = Platform.MakeValidFileName(serverName.Trim());
     if (string.IsNullOrWhiteSpace(baseName))
       baseName = "Server";
     var name = baseName;
@@ -485,19 +480,8 @@ public class ProfileManager
       profile.Name.Equals(profileName, StringComparison.OrdinalIgnoreCase));
   }
 
-  internal static ModInfo FindMod(ProfileModEntry entry, IEnumerable<ModInfo> mods)
-  {
-    if (IsPathlessMod(entry))
-    {
-      if (string.IsNullOrWhiteSpace(entry.ModID))
-        return null;
-      var matches = mods.Where(mod => mod.Source != ModSourceType.Core
-        && entry.ModID.Equals(mod.ModID, StringComparison.OrdinalIgnoreCase))
-        .Take(2).ToList();
-      return matches.Count == 1 ? matches[0] : null;
-    }
-    return mods.FirstOrDefault(mod => Matches(entry, mod));
-  }
+  internal static ModInfo FindMod(ProfileModEntry entry, IEnumerable<ModInfo> mods) =>
+    mods.FirstOrDefault(mod => Matches(entry, mod));
 
   internal static ModInfo FindMod(
     ProfileModEntry entry, IReadOnlyDictionary<string, ModInfo> modIndex) =>
@@ -509,11 +493,6 @@ public class ProfileManager
     var modList = mods.ToList();
     foreach (var mod in modList)
       index.TryAdd(GetIdentity(mod), mod);
-    foreach (var group in modList
-      .Where(mod => mod.Source != ModSourceType.Core && !string.IsNullOrWhiteSpace(mod.ModID))
-      .GroupBy(mod => mod.ModID, StringComparer.OrdinalIgnoreCase)
-      .Where(group => group.Count() == 1))
-      index.TryAdd(GetModIdIdentity(group.Key), group.First());
     return index;
   }
 
@@ -541,10 +520,6 @@ public class ProfileManager
   private static bool Matches(ProfileModEntry entry, ModInfo mod) =>
     GetIdentity(entry).Equals(GetIdentity(mod), StringComparison.OrdinalIgnoreCase);
 
-  private static bool IsPathlessMod(ProfileModEntry entry) =>
-    entry.Source != ModSourceType.Core && string.IsNullOrEmpty(entry.DirectoryPath);
-
-  private static string GetModIdIdentity(string modId) => $"SLP2-ModID:{modId}";
   private static string GetWorkshopIdentity(ulong handle) => $"Workshop:{handle}";
 
   // workshop items are identified by their handle, everything else by its folder.
@@ -552,7 +527,6 @@ public class ProfileManager
   private static string GetIdentity(ProfileModEntry entry) =>
     entry.Source == ModSourceType.Core ? "Core"
     : entry.Source == ModSourceType.Workshop && entry.WorkshopHandle > 1 ? GetWorkshopIdentity(entry.WorkshopHandle)
-    : IsPathlessMod(entry) ? GetModIdIdentity(entry.ModID ?? "")
     : NormalizePath(entry.DirectoryPath);
 
   private static string GetIdentity(ModInfo mod) =>

@@ -44,7 +44,7 @@ internal static class Slp2SaveFlow
     if (!await Slp2SaveProfilePanel.Offer(serverName))
       return;
 
-    if (!profileManager.SaveServerProfileFromCode(serverName, code, entries, address, port))
+    if (!profileManager.SaveServerProfileFromCode(serverName, code, entries, address, port, activate: false))
       Logger.Global.LogWarning($"Failed to save server pack for '{serverName}'");
   }
 }
