@@ -111,18 +111,19 @@ public class ModInfoPanel
       badges.Add(("BETA", LaunchPadTheme.Warn));
     if (mod.HasBetaProgram)
       badges.Add(("Beta available", LaunchPadTheme.Info));
-    if (about?.ModSide is { } side && side != default)
-      badges.Add(($"{side}", LaunchPadTheme.TextMuted));
-    if (badges.Count > 0)
+    ImGui.Spacing();
+    foreach (var (label, color) in badges)
     {
-      ImGui.Spacing();
-      foreach (var (label, color) in badges)
-      {
-        Widgets.Chip(label, color);
-        ImGui.SameLine();
-      }
-      ImGui.NewLine();
+      Widgets.Chip(label, color);
+      ImGui.SameLine();
     }
+    if (mod.Source != ModSourceType.Core)
+    {
+      var (_, label, guess, reason) = Loading.ModScan.Side(mod);
+      Widgets.Chip(label, guess ? LaunchPadTheme.TextMuted : LaunchPadTheme.TextSub);
+      ImGuiHelper.ItemTooltip(guess ? $"SLP's guess. {reason}" : reason, 400f);
+    }
+    ImGui.NewLine();
 
     ImGui.Spacing();
     if (ImGui.Button("Open folder"))

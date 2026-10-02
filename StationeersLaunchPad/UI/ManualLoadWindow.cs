@@ -687,7 +687,7 @@ public static class ManualLoadWindow
   // SLP and Booster aren't mods, but they load with the game too
   private static void DrawSystemRows(ref TableRow row, ModList modList, ref int idx)
   {
-    var users = modList.EnabledMods.Count(BoosterInfo.UsedBy);
+    var users = modList.EnabledMods.Count(ModScan.UsesBooster);
     DrawSystemRow(ref row, idx++, ModImages.SlpImage, "StationeersLaunchPad", true,
       $"SLP{ModInfoPanel.MetaSeparator}v{LaunchPadInfo.VERSION}{ModInfoPanel.MetaSeparator}always loads",
       "Loads your mods and packs.");
@@ -826,18 +826,22 @@ public static class ManualLoadWindow
     var gap = ImGui.GetTextLineHeight() * 0.6f;
     ImGui.PushTextWrapPos(0f);
     ImGuiHelper.TextColored($"Make {mod.Name} a clientside mod?", LaunchPadTheme.Text);
+    var (side, label, guess, reason) = ModScan.Side(mod);
+    var needsServer = side is ModSide.Both or ModSide.Server;
+    ImGuiHelper.TextColored($"{label}{(guess ? " (SLP's guess)" : "")}. {reason}",
+      needsServer ? LaunchPadTheme.Err : LaunchPadTheme.TextSub);
+    if (needsServer)
+      ImGuiHelper.TextColored("Don't add it unless you know what you're doing.", LaunchPadTheme.Err);
     ImGui.Dummy(new Vector2(0f, gap));
     ImGuiHelper.TextColored(
       "Just want to enable it? Tick the box at the start of its row instead.",
-      LaunchPadTheme.Info);
+      LaunchPadTheme.Text);
     ImGui.Dummy(new Vector2(0f, gap));
-    ImGuiHelper.TextColored(
-      "Clientside mods load in every pack except Vanilla, also on servers that don't have them.",
-      LaunchPadTheme.TextSub);
-    ImGui.Dummy(new Vector2(0f, gap));
-    ImGuiHelper.TextColored(
-      "Only for mods that run purely on your side, like UI tweaks or some QOL mods. A mod the server needs too can get you kicked or desync the game. Not sure? Check its description.",
-      LaunchPadTheme.Warn);
+    ImGuiHelper.TextColored(needsServer
+      ? "Clientside mods load in every pack except Vanilla, also on servers that don't have them."
+      : "Clientside mods load in every pack except Vanilla, also on servers that don't have them. "
+        + "Only for mods that run purely on your side, like UI tweaks or some QOL mods. Not sure? Check its description.",
+      LaunchPadTheme.TextMuted);
     ImGui.PopTextWrapPos();
     ImGui.Dummy(new Vector2(0f, gap * 1.5f));
     var buttonSize = new Vector2(120f, ImGui.GetFrameHeight() * 1.3f);
