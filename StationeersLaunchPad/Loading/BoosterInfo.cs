@@ -1,9 +1,7 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Text;
 using StationeersLaunchPad.Metadata;
 
@@ -21,20 +19,6 @@ public static class BoosterInfo
 
   // a mod uses Booster when one of its assemblies references it
   public static bool UsedBy(ModInfo mod) => mod.Assemblies.Any(ReferencesBooster);
-
-  // mods registered with Booster after loading, or -1 when Booster isn't loaded
-  public static int RegisteredMods
-  {
-    get
-    {
-      var assembly = AppDomain.CurrentDomain.GetAssemblies()
-        .FirstOrDefault(assembly => assembly.GetName().Name == AssemblyName);
-      var mods = assembly?.GetType("LaunchPadBooster.Mod")
-        ?.GetField("AllMods", BindingFlags.Public | BindingFlags.Static)
-        ?.GetValue(null) as ICollection;
-      return mods?.Count ?? -1;
-    }
-  }
 
   private static bool ReferencesBooster(string path)
   {

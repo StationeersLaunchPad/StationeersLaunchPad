@@ -38,7 +38,6 @@ public static class ManualLoadWindow
   public static void OpenProfilesTab()
   {
     openProfiles = true;
-    ProfilePanel.SelectActive();
   }
 
   private static ModListView viewBeforePackage = ModListView.Alphabetical;
@@ -302,7 +301,7 @@ public static class ManualLoadWindow
       LoadStage.Configuring when ProfilePanel.Busy => (false, ProfilePanel.BusyText),
       LoadStage.Configuring when BetaProgramsPanel.Busy => (false, "Updating Betas..."),
       LoadStage.Configuring when workshopMissing.Count > 0 =>
-        (true, $"Download {workshopMissing.Count} mod{(workshopMissing.Count == 1 ? "" : "s")}"),
+        (Steam.Running, Steam.Running ? $"Download {workshopMissing.Count} mod{(workshopMissing.Count == 1 ? "" : "s")}" : "Steam isn't running"),
       LoadStage.Configuring when missing.Count > 0 => (false, "Load Mods"),
       LoadStage.Configuring => (true, "Load Mods"),
       LoadStage.Loading => (false, "Loading Mods..."),
@@ -334,7 +333,9 @@ public static class ManualLoadWindow
         next = true;
     }
     if (workshopMissing.Count > 0)
-      ImGuiHelper.ItemTooltip("Subscribe to the missing Workshop mods. Loading continues once everything is installed.");
+      ImGuiHelper.ItemTooltip(Steam.Running
+        ? "Downloads the missing Workshop mods. Loading continues once everything is installed."
+        : Steam.NotRunningText, hoverFlags: ImGuiHoveredFlags.AllowWhenDisabled);
     else if (nextEnabled)
       ImGuiHelper.ItemTooltip("Space also continues.");
     return (next, modsChanged);
@@ -662,7 +663,10 @@ public static class ManualLoadWindow
       idx++;
       row.NextRow();
       if (isCore)
+      {
         DrawSystemRows(ref row, modList, ref idx);
+        DrawMissingRows(ref row, profileManager, modList, ref idx);
+      }
     }
 
     ImGui.EndDisabled();
@@ -692,6 +696,65 @@ public static class ManualLoadWindow
         + (users > 0 ? $"used by {users} mod{(users == 1 ? "" : "s")}" : "not used by these mods"),
       "A library many mods build on. When a loaded mod uses it, it also checks that you and the server run "
         + "the same mods. Servers whose mods use it turn players away who don't have it running.");
+  }
+
+  // the active pack's mods that aren't installed
+  private static void DrawMissingRows(ref TableRow row, ProfileManager profileManager, ModList modList, ref int idx)
+  {
+    var active = profileManager.ActiveProfile;
+    if (active == null)
+      return;
+    var drawList = ImGui.GetWindowDrawList();
+    var lineHeight = ImGui.GetTextLineHeight();
+    var (rowHeight, rowPadding, thumbHeight, thumbWidth) = RowMetrics();
+    var checkboxSize = ImGui.GetFrameHeight();
+    foreach (var entry in ProfileManager.GetMissingMods(active, modList))
+    {
+      var rowRect = row.Rect;
+      drawList.AddRectFilled(rowRect.Min, rowRect.Max, LaunchPadTheme.OverU32(LaunchPadTheme.Warn, idx++ % 2 == 1 ? 0.07f : 0.05f));
+      ImGui.PushID($"missing-{entry.WorkshopHandle}-{entry.Name}");
+
+      var checkboxCol = row.Column(0);
+      ImGui.SetCursorScreenPos(new Vector2(
+        checkboxCol.Min.x + (checkboxCol.Size.x - checkboxSize) / 2f,
+        checkboxCol.Min.y + (rowHeight - checkboxSize) / 2f));
+      var inPack = true;
+      ImGui.BeginDisabled();
+      ImGui.Checkbox("##inpack", ref inPack);
+      ImGui.EndDisabled();
+
+      var thumbCol = row.Column(1);
+      var min = new Vector2(thumbCol.Min.x, thumbCol.Min.y + rowPadding);
+      var max = min + new Vector2(thumbWidth, thumbHeight);
+      if (!ModImages.DrawBuiltIn(drawList, ModImages.NoPreviewImage, min, max))
+        drawList.AddRectFilled(min, max, ImGui.ColorConvertFloat4ToU32((Vector4)LaunchPadTheme.Panel));
+      drawList.AddRectFilled(min, max, ImGui.ColorConvertFloat4ToU32(new Vector4(0f, 0f, 0f, 0.3f)));
+
+      var isWorkshop = entry.WorkshopHandle > 1;
+      var textCol = row.Column(2);
+      ImGui.SetCursorScreenPos(new Vector2(textCol.Min.x, textCol.Min.y + rowPadding));
+      ImGuiHelper.TextColored(ProfilePanel.GetFallbackName(entry), LaunchPadTheme.TextSub);
+      ImGui.SetCursorScreenPos(new Vector2(
+        textCol.Min.x, textCol.Min.y + rowPadding + lineHeight + ImGui.GetStyle().ItemSpacing.y));
+      ImGuiHelper.TextColored(isWorkshop ? $"Workshop{ModInfoPanel.MetaSeparator}not installed"
+        : $"{entry.Source}{ModInfoPanel.MetaSeparator}not installed, add it to your mods folder", LaunchPadTheme.Warn);
+
+      if (isWorkshop)
+      {
+        var label = ProfilePanel.Busy ? ProfilePanel.BusyText : "Download";
+        var width = ImGui.CalcTextSize(label).x + ImGui.GetStyle().FramePadding.x * 2f;
+        ImGui.SetCursorScreenPos(new Vector2(rowRect.Max.x - width - ImGui.GetStyle().ItemSpacing.x,
+          rowRect.Min.y + (rowHeight - ImGui.GetFrameHeight()) / 2f));
+        ImGui.BeginDisabled(!Steam.Running || ProfilePanel.Busy);
+        if (ImGui.Button(label))
+          ProfilePanel.Download([entry]);
+        ImGui.EndDisabled();
+        ImGuiHelper.ItemTooltip(Steam.Running ? $"Subscribes to Workshop item {entry.WorkshopHandle} and downloads it."
+          : Steam.NotRunningText, hoverFlags: ImGuiHoveredFlags.AllowWhenDisabled);
+      }
+      ImGui.PopID();
+      row.NextRow();
+    }
   }
 
   private static void DrawSystemRow(ref TableRow row, int idx, string image, string name, bool on, string meta, string tooltip)
@@ -794,7 +857,7 @@ public static class ManualLoadWindow
     return changed;
   }
 
-  // a plus, like Vanilla+. filled when the mod is clientside, faint until hovered otherwise
+  // filled when the mod is clientside
   private static bool DrawClientsideButton(bool on, Vector2 size)
   {
     var min = ImGui.GetCursorScreenPos();

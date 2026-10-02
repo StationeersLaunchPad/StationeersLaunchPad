@@ -332,10 +332,6 @@ public class ProfileManager
   private static ProfileData LoadClientside()
   {
     var empty = new ProfileData { Name = "Clientside mods" };
-    // earlier dev builds called them always-on mods
-    var oldPath = Path.Join(LaunchPadPaths.SavePath, "always-on-mods.xml");
-    if (!File.Exists(ClientsidePath) && File.Exists(oldPath))
-      File.Move(oldPath, ClientsidePath);
     if (!File.Exists(ClientsidePath))
       return empty;
     try
@@ -454,7 +450,7 @@ public class ProfileManager
       .ToList();
   }
 
-  // core and the installed mods of the active pack, clientside mods are client-side
+  // core and the active pack's installed mods, without clientside mods
   public List<ModInfo> ServerPackageMods(ModList modList)
   {
     var active = ActiveProfile;

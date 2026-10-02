@@ -39,7 +39,7 @@ internal static class Slp2JoinFailureOffer
   [HarmonyPatch(typeof(NetworkManager), nameof(NetworkManager.EndConnection)), HarmonyPostfix]
   private static void PostfixEndConnection()
   {
-    Slp2SaveFlow.CancelPending();
+    UI.Slp2SaveProfilePanel.CancelOffer();
     Slp2JoinPiggyback.TakeReceivedCode();
   }
 

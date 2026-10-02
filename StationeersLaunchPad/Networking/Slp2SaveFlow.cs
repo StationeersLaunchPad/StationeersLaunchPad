@@ -14,8 +14,6 @@ internal static class Slp2SaveFlow
   [HarmonyPatch(typeof(NetworkClient), "ProcessJoinData"), HarmonyPrefix]
   private static void PrefixJoinData() => OfferDuringJoin().Forget();
 
-  internal static void CancelPending() => Slp2SaveProfilePanel.CancelSuccessOffer();
-
   private static async UniTask OfferDuringJoin()
   {
     if (!Configs.ServerPacksEnabled.Value || !NetworkManager.IsClient

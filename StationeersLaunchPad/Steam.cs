@@ -20,6 +20,10 @@ public static class Steam
   public const int MOD_CHANGELOG_SIZE_LIMIT = 8000;
   public const int MOD_THUMBNAIL_SIZE_LIMIT = 1024 * 1024;
 
+  // the workshop only works when Steam was running when the game started
+  public static bool Running => SteamClient.IsValid;
+  public const string NotRunningText = "Steam isn't running. Start Steam and restart the game to download mods.";
+
   public static async UniTask<List<Item>> LoadWorkshopItems()
   {
     var allItems = new List<Item>();
@@ -45,6 +49,13 @@ public static class Steam
       await UniTask.SwitchToMainThread();
 
       await UniTask.WhenAll(needsUpdate.Select(item => item.DownloadAsync().AsUniTask()));
+
+      // steam reports a download as done before all its files are in place
+      var deadline = Time.realtimeSinceStartup + 5f;
+      while (Time.realtimeSinceStartup < deadline
+        && needsUpdate.Any(item => !File.Exists(Path.Combine(item.Directory ?? "", "About", "About.xml"))))
+        await UniTask.Delay(100);
+      await UniTask.Delay(250);
     }
 
     return allItems;

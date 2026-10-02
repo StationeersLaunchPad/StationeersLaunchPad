@@ -12,10 +12,9 @@ namespace StationeersLaunchPad.UI;
 
 public static class Slp2SaveProfilePanel
 {
-  private sealed class OfferState(string name, bool mismatch, float completedAt)
+  private sealed class OfferState(string name, float completedAt)
   {
     internal readonly string Name = name;
-    internal readonly bool Mismatch = mismatch;
     internal float CompletedAt = completedAt;
     internal bool Completed;
     internal bool Result;
@@ -25,11 +24,11 @@ public static class Slp2SaveProfilePanel
   private static OfferState currentOffer;
   private static float joinCompletedAt = -1f;
 
-  // the offer stays up while loading and for ten seconds after, failed joins keep it until dismissed
+  // the offer stays up while loading and for ten seconds after
   public static void OnJoinFinished()
   {
     joinCompletedAt = Time.realtimeSinceStartup;
-    if (currentOffer is { Mismatch: false } offer)
+    if (currentOffer is { } offer)
       offer.CompletedAt = joinCompletedAt;
   }
 
@@ -64,16 +63,21 @@ public static class Slp2SaveProfilePanel
   }
 
   // returns true if the user chose to save
-  public static async UniTask<bool> Offer(string forServerName) =>
-    await OfferInternal(forServerName, mismatch: false);
-
-  public static async UniTask<bool> OfferMismatch(string forServerName) =>
-    await OfferInternal(forServerName, mismatch: true);
-
-  public static void CancelSuccessOffer()
+  public static async UniTask<bool> Offer(string forServerName)
   {
-    if (currentOffer is { Mismatch: false } offer)
-      Complete(offer, false);
+    if (Platform.IsServer || currentOffer != null || !EnsurePatch())
+      return false;
+    if (joinCompletedAt >= 0f && Time.realtimeSinceStartup - joinCompletedAt >= 10f)
+      return false;
+    var offer = new OfferState(forServerName, joinCompletedAt);
+    currentOffer = offer;
+    while (!offer.Completed)
+    {
+      if (offer.CompletedAt >= 0f && Time.realtimeSinceStartup - offer.CompletedAt >= 10f)
+        Complete(offer, false);
+      await UniTask.Yield();
+    }
+    return offer.Result;
   }
 
   public static void CancelOffer()
@@ -91,25 +95,6 @@ public static class Slp2SaveProfilePanel
     offer.Completed = true;
     if (ReferenceEquals(currentOffer, offer))
       currentOffer = null;
-  }
-
-  private static async UniTask<bool> OfferInternal(string forServerName, bool mismatch)
-  {
-    if (Platform.IsServer || currentOffer != null || !EnsurePatch())
-      return false;
-    if (!mismatch && joinCompletedAt >= 0f
-      && Time.realtimeSinceStartup - joinCompletedAt >= 10f)
-      return false;
-    var offer = new OfferState(forServerName, mismatch, mismatch ? -1f : joinCompletedAt);
-    currentOffer = offer;
-    while (!offer.Completed)
-    {
-      if (!offer.Mismatch && offer.CompletedAt >= 0f
-        && Time.realtimeSinceStartup - offer.CompletedAt >= 10f)
-        Complete(offer, false);
-      await UniTask.Yield();
-    }
-    return offer.Result;
   }
 
   public static void Draw()

@@ -29,14 +29,12 @@ public static class ProfilePanel
   private static IReadOnlyDictionary<string, ModInfo> modIndex;
 
   public static bool Busy => subscriptions.Count > 0 || importingPackage;
-  public static string BusyText => importingPackage ? "Importing..." : "Subscribing...";
-
-  public static void SelectActive() { }
+  public static string BusyText => importingPackage ? "Importing..." : "Downloading...";
 
   public static void ShowLoadBlocked(string profileName, int missingModCount)
   {
     SetMessage(
-      $"Loading paused. Subscribe to or remove {missingModCount} missing mod{(missingModCount == 1 ? "" : "s")} from {profileName}.",
+      $"Loading paused. Download or remove {missingModCount} missing mod{(missingModCount == 1 ? "" : "s")} from {profileName}.",
       ProfileStatusKind.Error);
   }
 
@@ -188,11 +186,11 @@ public static class ProfilePanel
     ImGui.PopTextWrapPos();
 
     var workshop = missing.Where(entry => entry.WorkshopHandle > 1).ToList();
-    var canSubscribe = stage == LoadStage.Configuring && !Busy;
+    var canSubscribe = stage == LoadStage.Configuring && !Busy && Steam.Running;
     if (workshop.Count > 1)
     {
       ImGui.BeginDisabled(!canSubscribe);
-      if (ImGui.Button($"Subscribe to all {workshop.Count}"))
+      if (ImGui.Button($"Download all {workshop.Count}"))
         SubscribeAll(workshop).Forget();
       ImGui.EndDisabled();
     }
@@ -209,10 +207,10 @@ public static class ProfilePanel
         ImGui.SameLine();
         var busy = subscriptions.Contains(entry.WorkshopHandle);
         ImGui.BeginDisabled(!canSubscribe);
-        if (ImGui.Button(busy ? "Subscribing..." : "Subscribe"))
+        if (ImGui.Button(busy ? "Downloading..." : "Download"))
           SubscribeAll([entry]).Forget();
         ImGui.EndDisabled();
-        ImGuiHelper.ItemTooltip($"Subscribe to Workshop item {entry.WorkshopHandle}",
+        ImGuiHelper.ItemTooltip(Steam.Running ? $"Subscribes to Workshop item {entry.WorkshopHandle} and downloads it" : Steam.NotRunningText,
           hoverFlags: ImGuiHoveredFlags.AllowWhenDisabled);
       }
       if (manager.IsEditable(pack))
@@ -374,6 +372,11 @@ public static class ProfilePanel
 
   private static async UniTask SubscribeAll(List<ProfileModEntry> entries)
   {
+    if (!Steam.Running)
+    {
+      SetMessage(Steam.NotRunningText, ProfileStatusKind.Error);
+      return;
+    }
     var handles = entries.Select(entry => entry.WorkshopHandle).Where(subscriptions.Add).ToList();
     if (handles.Count == 0)
       return;
@@ -382,16 +385,16 @@ public static class ProfilePanel
       var done = 0;
       foreach (var handle in handles)
       {
-        SetMessage($"Subscribing to Workshop item {handle}...", ProfileStatusKind.Info);
+        SetMessage($"Downloading Workshop item {handle}...", ProfileStatusKind.Info);
         if (!await Steam.SubscribeAndDownload(handle))
         {
-          SetMessage($"Could not subscribe to Workshop item {handle}", ProfileStatusKind.Error);
+          SetMessage($"Could not download Workshop item {handle}", ProfileStatusKind.Error);
           break;
         }
         done++;
       }
       if (done == handles.Count)
-        SetMessage($"Subscribed to {done} Workshop item{(done == 1 ? "" : "s")}", ProfileStatusKind.Saved);
+        SetMessage($"Downloaded {done} Workshop item{(done == 1 ? "" : "s")}", ProfileStatusKind.Saved);
       if (done > 0)
         // the active pack is applied again to the new mod list
         LaunchPadConfig.ReloadMods(preserveSelection: false);
