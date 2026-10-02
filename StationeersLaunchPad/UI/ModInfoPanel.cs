@@ -12,18 +12,18 @@ public class ModInfoPanel
 {
   internal const string MetaSeparator = "    ";
 
-  public static void Draw(ModInfo mod)
+  public static bool Draw(ModInfo mod, LoadStage stage, ModList modList)
   {
     if (mod == null)
     {
       ImGuiHelper.TextDisabled("Select a mod on the left to view its details.");
-      return;
+      return false;
     }
 
     var about = mod.About;
     var rdef = mod.Def as RepoModDefinition;
 
-    DrawHeader(mod, about, rdef);
+    var changed = DrawHeader(mod, about, rdef, stage, modList);
 
     if (about == null)
     {
@@ -31,7 +31,7 @@ public class ModInfoPanel
       ImGuiHelper.TextWarning("This mod has no About/About.xml.");
       Widgets.SectionHeader("Details");
       DrawDetails(mod, rdef);
-      return;
+      return changed;
     }
 
     Widgets.SectionHeader("Details");
@@ -70,9 +70,10 @@ public class ModInfoPanel
     else
       foreach (var assembly in mod.Assemblies)
         ImGuiHelper.TextDisabled(assembly.Trim());
+    return changed;
   }
 
-  private static void DrawHeader(ModInfo mod, ModAboutEx about, RepoModDefinition rdef)
+  private static bool DrawHeader(ModInfo mod, ModAboutEx about, RepoModDefinition rdef, LoadStage stage, ModList modList)
   {
     var lineHeight = ImGui.GetTextLineHeightWithSpacing();
     var imageHeight = Mathf.Clamp(lineHeight * 5f, 84f, 140f);
@@ -144,12 +145,14 @@ public class ModInfoPanel
       if (ImGui.Button("Repo"))
         Application.OpenURL($"https://{rdef.Mod.RepoID}");
     }
+    var changed = BetaProgramsPanel.DrawModControls(stage, modList, mod);
 
     ImGui.EndGroup();
 
     var bottom = Math.Max(imageMax.y, ImGui.GetItemRectMax().y);
     ImGui.SetCursorScreenPos(new Vector2(start.x, bottom));
     ImGui.Dummy(new Vector2(0f, ImGui.GetStyle().ItemSpacing.y));
+    return changed;
   }
 
   private static void DrawDetails(ModInfo mod, RepoModDefinition rdef)

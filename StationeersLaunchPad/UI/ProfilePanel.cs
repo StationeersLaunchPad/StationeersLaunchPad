@@ -62,12 +62,11 @@ public static class ProfilePanel
     var active = manager.ActiveProfile;
     if (active != null)
       changed |= DrawActivePack(stage, manager, modList, active);
-
-    changed |= DrawAlwaysOn(manager, modList);
-
-    if (Widgets.CollapsibleSection("packs/share", "Share", defaultOpen: false))
-      DrawShare(stage, manager, modList, active);
-
+    changed |= DrawClientside(manager, modList);
+    Widgets.SectionHeader("Share code");
+    DrawShare(stage, manager, modList, active);
+    Widgets.SectionHeader("Server package");
+    ServerPackagePanel.Draw(manager, modList);
     return changed;
   }
 
@@ -88,12 +87,12 @@ public static class ProfilePanel
     ImGui.PushTextWrapPos(0f);
     if (isServer)
       ImGuiHelper.TextColored(
-        $"Made when you joined {active.ServerName} and kept in sync with it. Its mods change when the server's do; your always-on mods load on top. Duplicate it to make your own version.",
+        $"Made when you joined {active.ServerName} and kept in sync with it. Its mods change when the server's do; your clientside mods load on top. Duplicate it to make your own version.",
         LaunchPadTheme.Info);
     else if (manager.IsVanilla(active))
-      ImGuiHelper.TextColored("Built in: the game without any mods, not even always-on ones.", LaunchPadTheme.TextSub);
+      ImGuiHelper.TextColored("Built in: the game without any mods, not even clientside ones.", LaunchPadTheme.TextSub);
     else if (manager.IsBuiltIn(active))
-      ImGuiHelper.TextColored("Built in: the game with only your always-on mods.", LaunchPadTheme.TextSub);
+      ImGuiHelper.TextColored("Built in: the game with only your clientside mods.", LaunchPadTheme.TextSub);
     ImGui.PopTextWrapPos();
 
     // built-in packs can't be renamed, copied or deleted
@@ -231,23 +230,22 @@ public static class ProfilePanel
     }
   }
 
-  private static bool DrawAlwaysOn(ProfileManager manager, ModList modList)
+  private static bool DrawClientside(ProfileManager manager, ModList modList)
   {
     var changed = false;
-    Widgets.SectionHeader("Always-on mods");
+    Widgets.SectionHeader("Clientside mods");
     ImGui.PushTextWrapPos(0f);
     ImGuiHelper.TextColored(
-      "These load in every pack except Vanilla, server packs included. Turn a mod on with the power button at the end of its row in the mod list.",
+      "Mods that only run on your side load in every pack except Vanilla, server packs included. "
+        + "Add one with the + at the end of its row in the mod list. A mod the server needs too doesn't belong here, "
+        + "it can break joining or desync the game.",
       LaunchPadTheme.TextMuted);
-    ImGuiHelper.TextColored(
-      "Only for mods that work purely on your side. A mod that the server needs too can break the game or desync when you join a server without it.",
-      LaunchPadTheme.Warn);
     ImGui.PopTextWrapPos();
 
-    var entries = manager.AlwaysOn.Mods.Where(entry => entry.Source != ModSourceType.Core).ToList();
+    var entries = manager.Clientside.Mods.Where(entry => entry.Source != ModSourceType.Core).ToList();
     if (entries.Count == 0)
     {
-      ImGuiHelper.TextColored("No always-on mods.", LaunchPadTheme.TextSub);
+      ImGuiHelper.TextColored("No clientside mods.", LaunchPadTheme.TextSub);
       return false;
     }
     var index = 0;
@@ -263,8 +261,8 @@ public static class ProfilePanel
         ImGuiHelper.TextColored("not installed", LaunchPadTheme.TextMuted);
       }
       ImGui.SameLine();
-      if (ImGui.SmallButton("Turn off"))
-        changed |= manager.RemoveAlwaysOn(entry, modList);
+      if (ImGui.SmallButton("Remove"))
+        changed |= manager.RemoveClientside(entry, modList);
       ImGui.PopID();
     }
     return changed;

@@ -8,7 +8,7 @@ using StationeersLaunchPad.Sources;
 
 namespace StationeersLaunchPad.Metadata;
 
-// one pack is always active and the mod list edits it directly. always-on mods load with
+// one pack is always active and the mod list edits it directly. clientside mods load with
 // every pack except Vanilla, server packs are only changed by their server.
 // load order is not part of a pack
 public class ProfileManager
@@ -18,18 +18,18 @@ public class ProfileManager
   public const string VanillaPlusName = "Vanilla+";
 
   private List<ProfileData> profiles = [];
-  private ProfileData alwaysOn = new() { Name = "Always on" };
+  private ProfileData clientside = new() { Name = "Clientside mods" };
   private readonly ProfileData vanilla = new() { Name = VanillaName, Description = "The game without mods." };
-  private readonly ProfileData vanillaPlus = new() { Name = VanillaPlusName, Description = "The game with only your always-on mods." };
+  private readonly ProfileData vanillaPlus = new() { Name = VanillaPlusName, Description = "The game with only your clientside mods." };
 
   public IReadOnlyList<ProfileData> AllProfiles => profiles;
   public IEnumerable<ProfileData> BuiltInPacks => [vanilla, vanillaPlus];
-  // Vanilla+ only means something once there are always-on mods
+  // Vanilla+ only means something once there are clientside mods
   public IEnumerable<ProfileData> ShownBuiltInPacks =>
-    alwaysOn.Mods.Count > 0 || ActiveProfile == vanillaPlus ? [vanilla, vanillaPlus] : [vanilla];
+    clientside.Mods.Count > 0 || ActiveProfile == vanillaPlus ? [vanilla, vanillaPlus] : [vanilla];
   public IEnumerable<ProfileData> UserPacks => profiles.Where(profile => !IsServerPack(profile));
   public IEnumerable<ProfileData> ServerPacks => profiles.Where(IsServerPack);
-  public ProfileData AlwaysOn => alwaysOn;
+  public ProfileData Clientside => clientside;
   public bool IsInitialized { get; private set; }
   public string ActiveProfileName => Configs.ModProfile.Value;
   public ProfileData ActiveProfile => FindProfile(ActiveProfileName);
@@ -39,9 +39,9 @@ public class ProfileManager
   public static bool IsServerPack(ProfileData profile) => !string.IsNullOrEmpty(profile?.ServerName);
   public bool IsEditable(ProfileData profile) => profile != null && !IsServerPack(profile) && !IsBuiltIn(profile);
   public bool ActiveEditable => IsEditable(ActiveProfile);
-  public bool AlwaysOnActive => ActiveProfile != null && !IsVanilla(ActiveProfile);
+  public bool ClientsideActive => ActiveProfile != null && !IsVanilla(ActiveProfile);
 
-  private static string AlwaysOnPath => Path.Join(LaunchPadPaths.SavePath, "always-on-mods.xml");
+  private static string ClientsidePath => Path.Join(LaunchPadPaths.SavePath, "clientside-mods.xml");
 
   public void Initialize()
   {
@@ -52,7 +52,7 @@ public class ProfileManager
     // the built-in names belong to the built-in packs
     profiles.RemoveAll(profile => IsReservedName(profile.Name));
     SortProfiles();
-    alwaysOn = LoadAlwaysOn();
+    clientside = LoadClientside();
     IsInitialized = true;
   }
 
@@ -77,7 +77,7 @@ public class ProfileManager
       fallback = new ProfileData
       {
         Name = DefaultPackName,
-        Mods = [.. modList.EnabledMods.Where(mod => mod.Source != ModSourceType.Core && !IsAlwaysOn(mod)).Select(CaptureMod)],
+        Mods = [.. modList.EnabledMods.Where(mod => mod.Source != ModSourceType.Core && !IsClientside(mod)).Select(CaptureMod)],
       };
       if (!AddPack(fallback))
         return false;
@@ -180,7 +180,7 @@ public class ProfileManager
   {
     if (ActiveProfile is not { } active)
       return;
-    modList.ApplyProfiles(active, IsVanilla(active) ? null : alwaysOn);
+    modList.ApplyProfiles(active, IsVanilla(active) ? null : clientside);
     ModConfigUtil.SaveConfig(modList.ToModConfig());
   }
 
@@ -195,8 +195,8 @@ public class ProfileManager
     return profile.Mods.Any(entry => GetIdentity(entry).Equals(identity, StringComparison.OrdinalIgnoreCase));
   }
 
-  public bool IsAlwaysOn(ModInfo mod) =>
-    mod.Source != ModSourceType.Core && IsInPack(mod, alwaysOn);
+  public bool IsClientside(ModInfo mod) =>
+    mod.Source != ModSourceType.Core && IsInPack(mod, clientside);
 
   public bool SetInPack(ModInfo mod, bool include, ModList modList)
   {
@@ -209,11 +209,11 @@ public class ProfileManager
     return true;
   }
 
-  public bool SetAlwaysOn(ModInfo mod, bool on, ModList modList)
+  public bool SetClientside(ModInfo mod, bool on, ModList modList)
   {
-    if (mod.Source == ModSourceType.Core || IsAlwaysOn(mod) == on)
+    if (mod.Source == ModSourceType.Core || IsClientside(mod) == on)
       return false;
-    if (!SetMembership(alwaysOn, mod, on, modList, SaveAlwaysOn))
+    if (!SetMembership(clientside, mod, on, modList, SaveClientside))
       return false;
     Apply(modList);
     return true;
@@ -246,9 +246,9 @@ public class ProfileManager
 
     var modIndex = BuildModIndex(modList.AllMods);
     var lists = new List<(ProfileData list, Func<ProfileData, bool> save)>();
-    // under Vanilla the always-on mods are off without being removed
-    if (AlwaysOnActive)
-      lists.Add((alwaysOn, SaveAlwaysOn));
+    // under Vanilla the clientside mods are off without being removed
+    if (ClientsideActive)
+      lists.Add((clientside, SaveClientside));
     if (IsEditable(active))
       lists.Insert(0, (active, ProfileStorage.Save));
 
@@ -261,7 +261,7 @@ public class ProfileManager
     var added = new List<(ModInfo mod, ProfileData list)>();
     foreach (var mod in modList.EnabledMods)
     {
-      if (mod.Source == ModSourceType.Core || IsInPack(mod, active) || IsAlwaysOn(mod))
+      if (mod.Source == ModSourceType.Core || IsInPack(mod, active) || IsClientside(mod))
         continue;
       var counterpart = BetaCounterpart(mod, modList);
       if (counterpart != null && dropped.TryGetValue(counterpart, out var list))
@@ -316,44 +316,48 @@ public class ProfileManager
     return false;
   }
 
-  public bool RemoveAlwaysOn(ProfileModEntry entry, ModList modList)
+  public bool RemoveClientside(ProfileModEntry entry, ModList modList)
   {
-    var previous = alwaysOn.Mods;
-    alwaysOn.Mods = alwaysOn.Mods.Where(pin => pin != entry).ToList();
-    if (!SaveAlwaysOn(alwaysOn))
+    var previous = clientside.Mods;
+    clientside.Mods = clientside.Mods.Where(pin => pin != entry).ToList();
+    if (!SaveClientside(clientside))
     {
-      alwaysOn.Mods = previous;
+      clientside.Mods = previous;
       return false;
     }
     Apply(modList);
     return true;
   }
 
-  private static ProfileData LoadAlwaysOn()
+  private static ProfileData LoadClientside()
   {
-    var empty = new ProfileData { Name = "Always on" };
-    if (!File.Exists(AlwaysOnPath))
+    var empty = new ProfileData { Name = "Clientside mods" };
+    // earlier dev builds called them always-on mods
+    var oldPath = Path.Join(LaunchPadPaths.SavePath, "always-on-mods.xml");
+    if (!File.Exists(ClientsidePath) && File.Exists(oldPath))
+      File.Move(oldPath, ClientsidePath);
+    if (!File.Exists(ClientsidePath))
       return empty;
     try
     {
-      var data = XmlSerialization.Deserialize<ProfileData>(AlwaysOnPath);
+      var data = XmlSerialization.Deserialize<ProfileData>(ClientsidePath);
       if (data == null)
         return empty;
-      data.Name = "Always on";
+      data.Name = "Clientside mods";
       return data;
     }
     catch (Exception ex)
     {
-      Logger.Global.LogWarning($"Could not read alwaysOn mods: {ex.Message}");
+      Logger.Global.LogWarning($"Could not read clientside mods: {ex.Message}");
       return empty;
     }
   }
 
-  private static bool SaveAlwaysOn(ProfileData data)
+  private static bool SaveClientside(ProfileData data)
   {
-    if (data.SaveXml(AlwaysOnPath))
+    if (data.SaveXml(ClientsidePath))
       return true;
-    Logger.Global.LogError($"Failed to save alwaysOn mods to {AlwaysOnPath}");
+    Logger.Global.LogError($"Failed to save clientside mods to {ClientsidePath}");
     return false;
   }
 
@@ -450,12 +454,12 @@ public class ProfileManager
       .ToList();
   }
 
-  // core and the installed mods of the active pack, always-on mods are client-side
+  // core and the installed mods of the active pack, clientside mods are client-side
   public List<ModInfo> ServerPackageMods(ModList modList)
   {
     var active = ActiveProfile;
     return [.. modList.AllMods.Where(mod => mod.Source == ModSourceType.Core
-      || (active != null && IsInPack(mod, active) && !IsAlwaysOn(mod)))];
+      || (active != null && IsInPack(mod, active) && !IsClientside(mod)))];
   }
 
   public static int ModCount(ProfileData profile) =>

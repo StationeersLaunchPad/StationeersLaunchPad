@@ -19,7 +19,7 @@ public static class ManualLoadWindow
     NextStep = 1 << 1,
   }
 
-  private enum Page { ModInfo, ModSettings, Profiles, Betas, ServerPackage, Settings }
+  private enum Page { ModInfo, ModSettings, Profiles, Settings }
 
   private static LoadStage lastStage;
   private static ModInfo selectedInfo = null;
@@ -28,8 +28,10 @@ public static class ManualLoadWindow
   private static bool openInfo = false;
   private static bool openProfiles = false;
   private static bool logExpanded = false;
-  private enum ModListView { Alphabetical, Workshop, Local, LoadOrder }
+  private enum ModListView { Alphabetical, Workshop, Local, LoadOrder, ServerPackage }
   private static readonly string[] ListViewLabels = ["A-Z", "Workshop", "Local", "Load order"];
+  // the server package view only shows up while its preview is open
+  private static readonly string[] PackageViewLabels = [.. ListViewLabels, "Server package"];
   private static ModListView listView = ModListView.Alphabetical;
   private static string modSearch = "";
 
@@ -37,6 +39,20 @@ public static class ManualLoadWindow
   {
     openProfiles = true;
     ProfilePanel.SelectActive();
+  }
+
+  private static ModListView viewBeforePackage = ModListView.Alphabetical;
+  public static bool ShowingServerPackageList => listView == ModListView.ServerPackage;
+
+  public static void ToggleServerPackageList()
+  {
+    if (ShowingServerPackageList)
+      listView = viewBeforePackage;
+    else
+    {
+      viewBeforePackage = listView;
+      listView = ModListView.ServerPackage;
+    }
   }
 
   public static void OpenModInfoTab()
@@ -90,19 +106,14 @@ public static class ManualLoadWindow
       // mod list
       ImGui.SetCursorScreenPos(listRect.Min);
       ImGui.BeginChild("##left", listRect.Size);
-      if (page == Page.ServerPackage)
-      {
-        Widgets.SectionHeader("In the server package");
-        ImGui.BeginChild("##packagelist");
-        DrawPackageList(profileManager, modList);
-        ImGui.EndChild();
-      }
-      else if (stage is LoadStage.Searching or LoadStage.Configuring)
+      if (stage is LoadStage.Searching or LoadStage.Configuring)
       {
         DrawPackSummary(profileManager, modList);
         DrawModSelectOptions(modList);
         ImGui.BeginChild("##modlist");
-        if (DrawModSelectTable(modList, profileManager, stage == LoadStage.Configuring))
+        if (listView == ModListView.ServerPackage)
+          DrawPackageList(profileManager, modList);
+        else if (DrawModSelectTable(modList, profileManager, stage == LoadStage.Configuring))
           changed |= ChangeFlags.Mods;
         ImGui.EndChild();
       }
@@ -183,10 +194,8 @@ public static class ManualLoadWindow
       new()
       {
         Label = "Mod Packs", Disabled = profilesDisabled,
-        Tooltip = profilesDisabled ? "Packs can only be changed before mods load" : "Your mod packs, always-on mods and share codes",
+        Tooltip = profilesDisabled ? "Packs can only be changed before mods load" : "Your packs, clientside mods, share codes and server packages",
       },
-      new() { Label = "Betas", Tooltip = "Switch mods between stable and beta versions" },
-      new() { Label = "Server Package", Tooltip = "Export a pack's mods for a dedicated server" },
       new() { Label = "LaunchPad Settings" },
     };
     var clicked = Widgets.NavBar("##pages", nav, (int)shown);
@@ -199,7 +208,12 @@ public static class ManualLoadWindow
     switch (shown)
     {
       case Page.ModInfo:
-        ModInfoPanel.Draw(selectedInfo);
+        if (ModInfoPanel.Draw(selectedInfo, stage, modList))
+        {
+          // switching stable/beta flips enabled flags; carry that into the packs
+          profileManager.AbsorbEnabledChanges(modList);
+          changed |= ChangeFlags.Mods;
+        }
         break;
       case Page.ModSettings:
         if (selectedInfo != null)
@@ -210,17 +224,6 @@ public static class ManualLoadWindow
         Widgets.PageHeader("Mod Packs", "A pack is a set of mods you can switch to before loading. Changes in the mod list save to the active pack.");
         if (ProfilePanel.Draw(stage, profileManager, modList))
           changed |= ChangeFlags.Mods;
-        break;
-      case Page.Betas:
-        if (BetaProgramsPanel.Draw(stage, modList))
-        {
-          // switching stable/beta flips enabled flags; carry that into the packs
-          profileManager.AbsorbEnabledChanges(modList);
-          changed |= ChangeFlags.Mods;
-        }
-        break;
-      case Page.ServerPackage:
-        ServerPackagePanel.Draw(profileManager, modList);
         break;
       case Page.Settings:
         // If we changed launchpad config and haven't loaded mods yet, mark mods changed to apply disable/sort behaviour
@@ -348,16 +351,10 @@ public static class ManualLoadWindow
     ConfigPanel.DrawEnumEntry(Configs.LogSeverities, Configs.LogSeveritiesWrapper, false);
 
     var expandText = logExpanded ? "Collapse" : "Expand";
-    var popText = "Open window";
-    var spacing = ImGui.GetStyle().ItemSpacing.x;
-    var buttonsWidth = ImGui.CalcTextSize(expandText).x + ImGui.CalcTextSize(popText).x
-      + ImGui.GetStyle().FramePadding.x * 4f + spacing;
-    ImGui.SameLine(ImGui.GetWindowContentRegionMax().x - buttonsWidth);
+    var buttonWidth = ImGui.CalcTextSize(expandText).x + ImGui.GetStyle().FramePadding.x * 2f;
+    ImGui.SameLine(ImGui.GetWindowContentRegionMax().x - buttonWidth);
     if (ImGui.Button(expandText))
       logExpanded = !logExpanded;
-    ImGui.SameLine();
-    if (ImGui.Button(popText))
-      LogPanel.OpenStandaloneLogs();
 
     var consoleHeight = ImGui.GetFrameHeightWithSpacing();
     var linesSize = ImGui.GetContentRegionAvail() - new Vector2(0f, consoleHeight);
@@ -375,7 +372,8 @@ public static class ManualLoadWindow
   {
     ImGui.SetNextItemWidth(-float.Epsilon);
     ImGui.InputTextWithHint("##modsearch", "Search mods...", ref modSearch, 256);
-    listView = (ModListView)Widgets.Segmented("##listview", ListViewLabels, (int)listView);
+    listView = (ModListView)Widgets.Segmented("##listview",
+      ShowingServerPackageList ? PackageViewLabels : ListViewLabels, (int)listView);
     ImGuiHelper.ItemTooltip("Local includes repository mods.");
     var total = modList.AllMods.Count(mod => mod.Source != ModSourceType.Core);
     var enabled = modList.AllMods.Count(mod => mod.Enabled && mod.Source != ModSourceType.Core);
@@ -408,18 +406,18 @@ public static class ManualLoadWindow
     if (active == null)
       return;
     var count = ProfileManager.ModCount(active);
-    var alwaysOn = profileManager.AlwaysOnActive ? ProfileManager.ModCount(profileManager.AlwaysOn) : 0;
+    var clientside = profileManager.ClientsideActive ? ProfileManager.ModCount(profileManager.Clientside) : 0;
     ImGuiHelper.TextColored(active.Name, LaunchPadTheme.Accent);
     ImGui.SameLine();
-    var summary = profileManager.IsVanilla(active) ? "no mods, not even always-on ones"
-      : profileManager.IsBuiltIn(active) ? $"only your {alwaysOn} always-on mod{(alwaysOn == 1 ? "" : "s")}"
-      : $"{count} mod{(count == 1 ? "" : "s")}{(alwaysOn > 0 ? $", plus {alwaysOn} always on" : "")}";
+    var summary = profileManager.IsVanilla(active) ? "no mods, not even clientside ones"
+      : profileManager.IsBuiltIn(active) ? $"only your {clientside} clientside mod{(clientside == 1 ? "" : "s")}"
+      : $"{count} mod{(count == 1 ? "" : "s")}{(clientside > 0 ? $", plus {clientside} clientside" : "")}";
     ImGuiHelper.TextColored(summary, LaunchPadTheme.TextMuted);
     if (ProfileManager.IsServerPack(active))
     {
       ImGui.PushTextWrapPos(0f);
       ImGuiHelper.TextColored(
-        $"Kept in sync with {active.ServerName}, so its mods can't be changed here. Your always-on mods load on top.",
+        $"Kept in sync with {active.ServerName}, so its mods can't be changed here. Your clientside mods load on top.",
         LaunchPadTheme.Info);
       ImGui.PopTextWrapPos();
     }
@@ -493,7 +491,7 @@ public static class ManualLoadWindow
 
     ImGui.BeginDisabled(!valid);
     var empty = ImGui.Button(emptyText, new Vector2(buttonWidth, ImGui.GetFrameHeight() * 1.4f)) || (enter && valid);
-    ImGuiHelper.ItemTooltip("Start with no mods. Always-on mods still load.");
+    ImGuiHelper.ItemTooltip("Start with no mods. Clientside mods still load.");
     var copy = false;
     if (current != null)
     {
@@ -564,7 +562,7 @@ public static class ManualLoadWindow
       ImGui.BeginDisabled(!matchesFilter);
       var isBeta = modList.IsBetaMod(mod);
       var isCore = mod.Source is ModSourceType.Core;
-      var isAlwaysOn = packsOn && profileManager.IsAlwaysOn(mod);
+      var isClientside = packsOn && profileManager.IsClientside(mod);
 
       var rowRect = row.Rect;
       var isSelected = mod == selectedInfo;
@@ -572,7 +570,7 @@ public static class ManualLoadWindow
         drawList.AddRectFilled(rowRect.Min, rowRect.Max,
           LaunchPadTheme.OverU32(Color.white, 0.025f));
 
-      // the selectable stops before the always-on toggle so it stays clickable
+      // the selectable stops before the clientside toggle so it stays clickable
       var content = row.ColumnsFrom(1);
       var toggleX = rowRect.Max.x - toggleWidth;
       var selectSize = new Vector2(Math.Max(1f, toggleX - content.Min.x), content.Size.y);
@@ -595,7 +593,7 @@ public static class ManualLoadWindow
       ImGui.SetCursorScreenPos(new Vector2(
         checkboxCol.Min.x + (checkboxCol.Size.x - checkboxSize) / 2f,
         checkboxCol.Min.y + (rowHeight - checkboxSize) / 2f));
-      var canToggle = !isCore && (!packsOn || (!isAlwaysOn && profileManager.ActiveEditable));
+      var canToggle = !isCore && (!packsOn || (!isClientside && profileManager.ActiveEditable));
       ImGui.BeginDisabled(!canToggle);
       var enabled = mod.Enabled;
       if (ImGui.Checkbox("##enable", ref enabled))
@@ -605,9 +603,9 @@ public static class ManualLoadWindow
       ImGui.EndDisabled();
       if (packsOn && !isCore)
         ImGuiHelper.ItemTooltip(
-          isAlwaysOn ? profileManager.AlwaysOnActive
-              ? "Always on, so it loads in every pack. Turn always on off to change it here."
-              : "Always on, but Vanilla loads no mods at all."
+          isClientside ? profileManager.ClientsideActive
+              ? "Clientside, so it loads in every pack. Take it out of your clientside mods to change it here."
+              : "Clientside, but Vanilla loads no mods at all."
           : profileManager.IsBuiltIn(active) ? $"{active.Name} is built in. Pick or create a pack to choose mods."
           : !profileManager.ActiveEditable ? $"{active.Name} follows its server."
           : enabled ? $"In {active.Name}. Untick to remove it." : $"Tick to add it to {active.Name}.",
@@ -616,7 +614,7 @@ public static class ManualLoadWindow
       DrawThumb(drawList, mod, row.Column(1), rowPadding, thumbWidth, thumbHeight,
         dim: !mod.Enabled && !isCore);
 
-      // name and details, clipped before the always-on toggle
+      // name and details, clipped before the clientside toggle
       var textCol = row.Column(2);
       ImGui.PushClipRect(textCol.Min, new Vector2(toggleX - ImGui.GetStyle().ItemSpacing.x, textCol.Max.y), true);
       var nameColor = mod.Enabled || isCore ? LaunchPadTheme.Text : LaunchPadTheme.TextSub;
@@ -627,10 +625,10 @@ public static class ManualLoadWindow
         ImGui.SameLine();
         ImGuiHelper.TextColored("BETA", LaunchPadTheme.Warn);
       }
-      if (isAlwaysOn)
+      if (isClientside)
       {
         ImGui.SameLine();
-        ImGuiHelper.TextColored("ALWAYS ON", LaunchPadTheme.Accent);
+        ImGuiHelper.TextColored("CLIENTSIDE", LaunchPadTheme.Accent);
       }
       ImGui.SetCursorScreenPos(new Vector2(
         textCol.Min.x, textCol.Min.y + rowPadding + lineHeight + ImGui.GetStyle().ItemSpacing.y));
@@ -642,19 +640,19 @@ public static class ManualLoadWindow
       {
         ImGui.SetCursorScreenPos(new Vector2(toggleX + (toggleWidth - checkboxSize) / 2f,
           rowRect.Min.y + (rowHeight - checkboxSize) / 2f));
-        if (DrawAlwaysOnButton(isAlwaysOn, new Vector2(checkboxSize, checkboxSize)))
+        if (DrawClientsideButton(isClientside, new Vector2(checkboxSize, checkboxSize)))
         {
-          if (isAlwaysOn)
-            changed |= profileManager.SetAlwaysOn(mod, false, modList);
+          if (isClientside)
+            changed |= profileManager.SetClientside(mod, false, modList);
           else
           {
-            confirmAlwaysOn = mod;
+            confirmClientside = mod;
             openConfirm = true;
           }
         }
-        ImGuiHelper.ItemTooltip(isAlwaysOn
-          ? "Always on: loads in every pack except Vanilla, server packs included. Click to turn it off."
-          : "Make it always on: it loads in every pack except Vanilla, server packs included. Only for mods that work purely client-side.",
+        ImGuiHelper.ItemTooltip(isClientside
+          ? "Clientside: loads in every pack except Vanilla, server packs included. Click to take it out."
+          : "Make it clientside: it loads in every pack except Vanilla, server packs included. Only for mods that work purely on your side.",
           400f);
       }
 
@@ -671,12 +669,12 @@ public static class ManualLoadWindow
     ImGui.PopStyleVar();
     ImGui.PopStyleColor(5);
 
-    if (confirmAlwaysOn != null)
+    if (confirmClientside != null)
     {
       if (openConfirm)
-        ImGui.OpenPopup("##alwayson");
+        ImGui.OpenPopup("##clientside");
       openConfirm = false;
-      if (DrawAlwaysOnConfirm(profileManager, modList))
+      if (DrawClientsideConfirm(profileManager, modList))
         changed = true;
     }
     return changed;
@@ -688,7 +686,7 @@ public static class ManualLoadWindow
     var users = modList.EnabledMods.Count(BoosterInfo.UsedBy);
     DrawSystemRow(ref row, idx++, ModImages.SlpImage, "StationeersLaunchPad", true,
       $"SLP{ModInfoPanel.MetaSeparator}v{LaunchPadInfo.VERSION}{ModInfoPanel.MetaSeparator}always loads",
-      "Loads your mods and packs. Always on.");
+      "Loads your mods and packs.");
     DrawSystemRow(ref row, idx++, ModImages.BoosterImage, "LaunchPadBooster", users > 0,
       $"Booster{ModInfoPanel.MetaSeparator}v{BoosterInfo.Version}{ModInfoPanel.MetaSeparator}"
         + (users > 0 ? $"used by {users} mod{(users == 1 ? "" : "s")}" : "not used by these mods"),
@@ -740,75 +738,90 @@ public static class ManualLoadWindow
     row.NextRow();
   }
 
-  private static ModInfo confirmAlwaysOn;
+  private static ModInfo confirmClientside;
   private static bool openConfirm;
 
   // we can't tell if a mod is client-side, so the player has to confirm it
-  private static bool DrawAlwaysOnConfirm(ProfileManager profileManager, ModList modList)
+  private static bool DrawClientsideConfirm(ProfileManager profileManager, ModList modList)
   {
     var changed = false;
     var display = ImGui.GetIO().DisplaySize;
     ImGui.SetNextWindowPos(display / 2f, ImGuiCond.Appearing, new Vector2(0.5f, 0.5f));
-    ImGui.SetNextWindowSize(new Vector2(Math.Min(640f, display.x - 40f), 0f));
+    ImGui.SetNextWindowSize(new Vector2(Math.Min(620f, display.x - 40f), 0f));
     ImGui.PushStyleColor(ImGuiCol.Border, (Vector4)LaunchPadTheme.Over(LaunchPadTheme.Warn, 0.6f));
     ImGui.PushStyleVar(ImGuiStyleVar.WindowBorderSize, 1f);
-    var open = ImGui.BeginPopup("##alwayson");
-    ImGui.PopStyleVar();
+    ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(20f, 16f));
+    var open = ImGui.BeginPopup("##clientside");
+    ImGui.PopStyleVar(2);
     ImGui.PopStyleColor();
     if (!open)
     {
-      confirmAlwaysOn = null;
+      confirmClientside = null;
       return false;
     }
-    var mod = confirmAlwaysOn;
-    ImGuiHelper.TextColored($"Make {mod.Name} always on?", LaunchPadTheme.Text);
-    ImGui.Spacing();
+    var mod = confirmClientside;
+    var gap = ImGui.GetTextLineHeight() * 0.6f;
     ImGui.PushTextWrapPos(0f);
+    ImGuiHelper.TextColored($"Make {mod.Name} a clientside mod?", LaunchPadTheme.Text);
+    ImGui.Dummy(new Vector2(0f, gap));
     ImGuiHelper.TextColored(
-      "It will load in every pack except Vanilla, including server packs and on servers that don't have it.",
+      "Just want to enable it? Tick the box at the start of its row instead.",
+      LaunchPadTheme.Info);
+    ImGui.Dummy(new Vector2(0f, gap));
+    ImGuiHelper.TextColored(
+      "Clientside mods load in every pack except Vanilla, also on servers that don't have them.",
       LaunchPadTheme.TextSub);
-    ImGui.Spacing();
+    ImGui.Dummy(new Vector2(0f, gap));
     ImGuiHelper.TextColored(
-      "Only do this for mods that work purely on your side, like UI or quality of life mods. A mod that needs the server to have it too can break the game, desync or get you kicked when you join a server without it. LaunchPad can't tell which kind a mod is, so check its description first.",
+      "Only for mods that run purely on your side, like UI tweaks or some QOL mods. A mod the server needs too can get you kicked or desync the game. Not sure? Check its description.",
       LaunchPadTheme.Warn);
     ImGui.PopTextWrapPos();
-    ImGui.Spacing();
-    if (ImGui.Button("It's client-side, make it always on"))
+    ImGui.Dummy(new Vector2(0f, gap * 1.5f));
+    var buttonSize = new Vector2(120f, ImGui.GetFrameHeight() * 1.3f);
+    if (ImGui.Button("Add", buttonSize))
     {
-      changed = profileManager.SetAlwaysOn(mod, true, modList);
-      confirmAlwaysOn = null;
+      changed = profileManager.SetClientside(mod, true, modList);
+      confirmClientside = null;
       ImGui.CloseCurrentPopup();
     }
     ImGui.SameLine();
-    if (ImGui.Button("Cancel") || ImGui.IsKeyPressed(ImGuiKey.Escape))
+    if (ImGui.Button("Cancel", buttonSize) || ImGui.IsKeyPressed(ImGuiKey.Escape))
     {
-      confirmAlwaysOn = null;
+      confirmClientside = null;
       ImGui.CloseCurrentPopup();
     }
     ImGui.EndPopup();
     return changed;
   }
 
-  // power symbol, faint until hovered or on
-  private static bool DrawAlwaysOnButton(bool on, Vector2 size)
+  // a plus, like Vanilla+. filled when the mod is clientside, faint until hovered otherwise
+  private static bool DrawClientsideButton(bool on, Vector2 size)
   {
     var min = ImGui.GetCursorScreenPos();
-    var clicked = ImGui.InvisibleButton("##alwayson", size);
+    var clicked = ImGui.InvisibleButton("##clientside", size);
     var hovered = ImGui.IsItemHovered();
-    var color = on ? LaunchPadTheme.Accent
-      : hovered ? LaunchPadTheme.TextSub
-      : LaunchPadTheme.Over(Color.white, 0.22f);
-    var u32 = ImGui.ColorConvertFloat4ToU32((Vector4)color);
     var drawList = ImGui.GetWindowDrawList();
-    var center = min + size / 2f + new Vector2(0f, size.y * 0.04f);
-    var radius = size.y * 0.3f;
-    var thickness = Math.Max(1.5f, size.y * 0.08f);
+    var inset = size.y * 0.12f;
+    var boxMin = min + new Vector2(inset, inset);
+    var boxMax = min + size - new Vector2(inset, inset);
+    var rounding = size.y * 0.18f;
+    var thickness = Math.Max(1.5f, size.y * 0.09f);
+    Color mark;
     if (on)
-      drawList.AddCircleFilled(center, radius * 1.45f, LaunchPadTheme.OverU32(LaunchPadTheme.Accent, 0.18f), 20);
-    // the ring leaves a gap at the top for the bar
-    drawList.PathArcTo(center, radius, -Mathf.PI / 2f + 0.75f, Mathf.PI * 1.5f - 0.75f, 20);
-    drawList.PathStroke(u32, ImDrawFlags.None, thickness);
-    drawList.AddLine(center - new Vector2(0f, radius * 1.25f), center - new Vector2(0f, radius * 0.2f), u32, thickness);
+    {
+      drawList.AddRectFilled(boxMin, boxMax, ImGui.ColorConvertFloat4ToU32((Vector4)LaunchPadTheme.Accent), rounding);
+      mark = Color.white;
+    }
+    else
+    {
+      mark = hovered ? LaunchPadTheme.TextSub : LaunchPadTheme.Over(Color.white, 0.22f);
+      drawList.AddRect(boxMin, boxMax, ImGui.ColorConvertFloat4ToU32((Vector4)mark), rounding, ImDrawFlags.None, 1f);
+    }
+    var u32 = ImGui.ColorConvertFloat4ToU32((Vector4)mark);
+    var center = (boxMin + boxMax) / 2f;
+    var arm = (boxMax.y - boxMin.y) * 0.28f;
+    drawList.AddLine(center - new Vector2(arm, 0f), center + new Vector2(arm, 0f), u32, thickness);
+    drawList.AddLine(center - new Vector2(0f, arm), center + new Vector2(0f, arm), u32, thickness);
     return clicked;
   }
 

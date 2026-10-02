@@ -118,7 +118,7 @@ public static class PackGallery
 
     drawList.AddRectFilled(min, max, LaunchPadTheme.OverU32(Color.white, hovered ? 0.07f : 0.035f), 4f);
     var mods = manager.IsVanilla(pack) ? []
-      : pack.Name == ProfileManager.VanillaPlusName ? ProfileManager.InstalledMods(manager.AlwaysOn, modIndex)
+      : pack.Name == ProfileManager.VanillaPlusName ? ProfileManager.InstalledMods(manager.Clientside, modIndex)
       : ProfileManager.InstalledMods(pack, modIndex);
     var imageMin = min + new Vector2(1f, 1f);
     var imageMax = new Vector2(max.x - 1f, min.y + imageHeight);
@@ -138,7 +138,7 @@ public static class PackGallery
       ImGui.ColorConvertFloat4ToU32((Vector4)(isActive ? LaunchPadTheme.Accent : LaunchPadTheme.Text)), pack.Name);
     var count = ProfileManager.ModCount(pack);
     var detail = manager.IsVanilla(pack) ? "no mods"
-      : pack.Name == ProfileManager.VanillaPlusName ? $"{ProfileManager.ModCount(manager.AlwaysOn)} always on"
+      : pack.Name == ProfileManager.VanillaPlusName ? $"{ProfileManager.ModCount(manager.Clientside)} clientside"
       : isServer ? $"server, {count} mods"
       : $"{count} mod{(count == 1 ? "" : "s")}";
     var detailPos = textPos + new Vector2(0f, lineHeight + style.ItemSpacing.y);
@@ -151,9 +151,9 @@ public static class PackGallery
 
     if (hovered)
       ImGuiHelper.TextTooltip(
-        manager.IsVanilla(pack) ? "Vanilla: the game without any mods, not even always-on ones."
-        : pack.Name == ProfileManager.VanillaPlusName ? "Vanilla+: the game with only your always-on mods."
-        : isServer ? $"{pack.Name}: the mods of {pack.ServerName}, plus your always-on mods."
+        manager.IsVanilla(pack) ? "Vanilla: the game without any mods, not even clientside ones."
+        : pack.Name == ProfileManager.VanillaPlusName ? "Vanilla+: the game with only your clientside mods."
+        : isServer ? $"{pack.Name}: the mods of {pack.ServerName}, plus your clientside mods."
         : isActive ? $"{pack.Name} is the active pack." : $"Switch to {pack.Name}.",
         400f);
     ImGui.PopID();

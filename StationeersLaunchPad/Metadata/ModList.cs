@@ -157,15 +157,15 @@ public class ModList
       Logger.Global.LogDebug($"Pack '{profile.Name}' skipped {missing} missing mod(s)");
   }
 
-  // applies the pack, then enables the always-on mods on top
-  public void ApplyProfiles(ProfileData pack, ProfileData alwaysOn)
+  // applies the pack, then enables the clientside mods on top
+  public void ApplyProfiles(ProfileData pack, ProfileData clientside)
   {
     ApplyProfile(pack);
-    if (alwaysOn == null)
+    if (clientside == null)
       return;
 
     var missing = 0;
-    foreach (var entry in alwaysOn.Mods)
+    foreach (var entry in clientside.Mods)
     {
       var mod = ProfileManager.FindMod(entry, mods);
       if (mod == null)
@@ -176,7 +176,7 @@ public class ModList
       mod.Enabled = true;
     }
     if (missing > 0)
-      Logger.Global.LogDebug($"{alwaysOn.Name} skipped {missing} missing mod(s)");
+      Logger.Global.LogDebug($"{clientside.Name} skipped {missing} missing mod(s)");
     SortCanonical();
   }
 

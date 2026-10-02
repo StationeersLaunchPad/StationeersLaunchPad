@@ -14,116 +14,41 @@ public static class BetaProgramsPanel
 
   public static bool Busy => operations.Count > 0;
 
-  public static bool Draw(LoadStage stage, ModList modList)
+  // beta switch for the mod shown in Mod Info, works from either the stable or the beta copy
+  public static bool DrawModControls(LoadStage stage, ModList modList, ModInfo mod)
   {
+    var stable = mod.HasBetaProgram ? mod
+      : modList.IsBetaMod(mod) ? modList.AllMods.FirstOrDefault(other => other.IsBetaProgramFor(mod))
+      : null;
+    if (stable == null)
+      return false;
+
     var changed = false;
-    var stableMods = modList.AllMods
-      .Where(mod => mod.HasBetaProgram)
-      .GroupBy(mod => mod.BetaWorkshopHandle)
-      .Select(mods => mods.FirstOrDefault(mod => mod.Enabled) ?? mods.First())
-      .ToList();
-    var betaMods = modList.AllMods.Where(modList.IsBetaMod).ToList();
-
-    Widgets.PageHeader("Betas", "Switch installed mods between their stable and beta Workshop versions.");
-    ImGui.BeginDisabled(stage != LoadStage.Configuring || Busy);
-    if (ImGui.Button("Refresh subscribed betas"))
-      LaunchPadConfig.ReloadMods();
-    ImGui.EndDisabled();
-    ImGuiHelper.ItemTooltip(stage == LoadStage.Configuring
-      ? "Reload the current local and workshop mod list."
-      : "The mod list can only be refreshed before loading mods.",
-      hoverFlags: ImGuiHoveredFlags.AllowWhenDisabled);
-
-    if (stableMods.Count == 0 && betaMods.Count == 0)
+    var beta = modList.AllMods.FirstOrDefault(other => other.WorkshopHandle == stable.BetaWorkshopHandle);
+    var busy = operations.Contains(stable.BetaWorkshopHandle);
+    ImGui.PushID($"beta-{stable.BetaWorkshopHandle}");
+    ImGui.BeginDisabled(stage != LoadStage.Configuring || busy);
+    if (beta == null)
     {
-      ImGui.Spacing();
-      ImGuiHelper.TextDisabled("No installed mods advertise a beta program.");
+      if (ImGui.Button(busy ? "Downloading beta..." : "Subscribe to beta"))
+        SubscribeToBeta(stable, modList).Forget();
     }
     else
-      Widgets.SectionHeader("Mods with a beta program");
-
-    var lineHeight = ImGui.GetTextLineHeightWithSpacing();
-    foreach (var stable in stableMods)
     {
-      var beta = modList.AllMods.FirstOrDefault(mod =>
-        mod.WorkshopHandle == stable.BetaWorkshopHandle);
-      var busy = operations.Contains(stable.BetaWorkshopHandle);
-
-      ImGui.PushID($"beta-{stable.BetaWorkshopHandle}");
-
-      // 16:9 preview on the left, details and actions on the right
-      var start = ImGui.GetCursorScreenPos();
-      var imageHeight = lineHeight * 4f;
-      var imageMax = start + new Vector2(imageHeight * 16f / 9f, imageHeight);
-      ModImages.DrawFill(ImGui.GetWindowDrawList(), stable, start, imageMax);
-      ImGui.SetCursorScreenPos(new Vector2(imageMax.x + ImGui.GetStyle().ItemSpacing.x * 2f, start.y));
-      ImGui.BeginGroup();
-
-      ImGuiHelper.Text(stable.Name);
-      ImGui.SameLine();
-      if (beta?.Enabled == true && stable.Enabled)
-        Widgets.Chip("stable and beta both enabled", LaunchPadTheme.Err);
-      else if (beta?.Enabled == true)
-        Widgets.Chip("beta active", LaunchPadTheme.Warn);
-      else if (stable.Enabled)
-        Widgets.Chip("stable active", LaunchPadTheme.Ok);
-      else
-        Widgets.Chip("disabled", LaunchPadTheme.TextMuted);
-
-      ImGuiHelper.TextColored(
-        $"Stable  v{stable.About?.Version ?? "?"}  ({stable.WorkshopHandle})", LaunchPadTheme.TextSub);
-      ImGuiHelper.TextColored(beta == null
-        ? $"Beta    not subscribed  ({stable.BetaWorkshopHandle})"
-        : $"Beta    v{beta.About?.Version ?? "?"}  ({beta.WorkshopHandle})", LaunchPadTheme.TextSub);
-
-      if (beta == null)
-      {
-        ImGui.BeginDisabled(stage != LoadStage.Configuring || busy);
-        if (ImGui.Button(busy ? "Downloading..." : "Subscribe to beta"))
-          SubscribeToBeta(stable, modList).Forget();
-        ImGui.EndDisabled();
-      }
-      else
-      {
-        var useBeta = beta.Enabled;
-        ImGui.BeginDisabled(stage != LoadStage.Configuring || busy);
-        if (ImGui.Checkbox("Use beta version", ref useBeta))
-          changed = SetBetaEnabled(stable, beta, modList, useBeta);
-        ImGui.EndDisabled();
-      }
-      ImGui.SameLine();
-      if (ImGui.Button("Beta workshop page"))
-        Steam.OpenWorkshopPage(stable.BetaWorkshopHandle);
-      if (stable.WorkshopHandle > 1)
-      {
-        ImGui.SameLine();
-        if (ImGui.Button("Stable workshop page"))
-          Steam.OpenWorkshopPage(stable.WorkshopHandle);
-      }
-      if (statuses.TryGetValue(stable.BetaWorkshopHandle, out var status))
-        ImGuiHelper.TextDisabled(status);
-
-      ImGui.EndGroup();
-      var bottom = System.Math.Max(imageMax.y, ImGui.GetItemRectMax().y);
-      ImGui.SetCursorScreenPos(new Vector2(start.x, bottom));
-      ImGui.Dummy(new Vector2(0f, ImGui.GetStyle().ItemSpacing.y * 2f));
-      ImGui.PopID();
+      var useBeta = beta.Enabled;
+      if (ImGui.Checkbox($"Use beta v{beta.About?.Version ?? "?"}", ref useBeta))
+        changed = SetBetaEnabled(stable, beta, modList, useBeta);
     }
-
-    var linkedBetaHandles = stableMods.Select(mod => mod.BetaWorkshopHandle).ToHashSet();
-    var unlinkedBetas = betaMods.Where(mod => !linkedBetaHandles.Contains(mod.WorkshopHandle)).ToList();
-    if (unlinkedBetas.Count > 0)
+    ImGui.EndDisabled();
+    ImGuiHelper.ItemTooltip(stage == LoadStage.Configuring
+      ? "Betas are separate Workshop items. Switching subscribes or unsubscribes them for you."
+      : "Betas can only be switched before mods load.", hoverFlags: ImGuiHoveredFlags.AllowWhenDisabled);
+    if (statuses.TryGetValue(stable.BetaWorkshopHandle, out var status))
     {
-      Widgets.SectionHeader("Other beta program mods");
-      foreach (var beta in unlinkedBetas)
-      {
-        ImGuiHelper.Text(beta.Name);
-        ImGui.SameLine();
-        ImGuiHelper.TextColored($"v{beta.About?.Version}    {(beta.Enabled ? "active" : "disabled")}",
-          LaunchPadTheme.TextMuted);
-      }
+      ImGui.SameLine();
+      ImGuiHelper.TextDisabled(status);
     }
-
+    ImGui.PopID();
     return changed;
   }
 

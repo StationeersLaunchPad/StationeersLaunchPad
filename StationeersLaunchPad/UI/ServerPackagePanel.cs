@@ -17,29 +17,28 @@ public static class ServerPackagePanel
 
   public static void Draw(ProfileManager manager, ModList modList)
   {
-    Widgets.PageHeader("Server Package",
-      "Zip a pack's mods together with a modconfig.xml, ready to drop into a dedicated server.");
+    ImGui.PushTextWrapPos(0f);
+    ImGuiHelper.TextColored(
+      "Zips a pack's mods together with a modconfig.xml, ready to drop into a dedicated server.",
+      LaunchPadTheme.TextMuted);
+    ImGui.PopTextWrapPos();
 
     var active = manager.ActiveProfile;
     var mods = manager.ServerPackageMods(modList).Where(mod => mod.Source != ModSourceType.Core).ToList();
     var missing = active == null ? [] : ProfileManager.GetMissingMods(active, modList);
-    var leftOut = manager.AlwaysOnActive ? modList.AllMods.Where(manager.IsAlwaysOn).ToList() : [];
+    var leftOut = manager.ClientsideActive ? modList.AllMods.Where(manager.IsClientside).ToList() : [];
 
-    Widgets.SectionHeader("Pack");
-    ImGuiHelper.TextColored(active?.Name ?? "No pack", LaunchPadTheme.Accent);
-    ImGui.SameLine();
-    ImGuiHelper.TextColored("pick another pack in the gallery below", LaunchPadTheme.TextMuted);
-
-    ImGui.Spacing();
     ImGui.PushTextWrapPos(0f);
     if (mods.Count == 0)
-      ImGuiHelper.TextColored("This pack has no mods to export.", LaunchPadTheme.TextSub);
+      ImGuiHelper.TextColored($"{active?.Name ?? "This pack"} has no mods to export.", LaunchPadTheme.TextSub);
     else
     {
-      ImGuiHelper.Text($"The {mods.Count} mod{(mods.Count == 1 ? "" : "s")} listed on the left go into the package. Check them before exporting.");
+      ImGuiHelper.Text($"Exports the {mods.Count} mod{(mods.Count == 1 ? "" : "s")} of {active?.Name}. Check them before exporting.");
+      if (ImGui.SmallButton(ManualLoadWindow.ShowingServerPackageList ? "Back to the normal mod list" : "Show them in the mod list"))
+        ManualLoadWindow.ToggleServerPackageList();
       if (leftOut.Count > 0)
         ImGuiHelper.TextColored(
-          $"Always-on mods are left out, they are meant to be client-side: {NameList(leftOut.Select(mod => mod.Name))}",
+          $"Clientside mods are left out: {NameList(leftOut.Select(mod => mod.Name))}",
           LaunchPadTheme.TextMuted);
     }
     if (missing.Count > 0)
