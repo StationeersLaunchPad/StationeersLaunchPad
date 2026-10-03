@@ -65,6 +65,7 @@ public static class LaunchPadConfig
 
   private static LoadStage Stage = LoadStage.Initializing;
   public static bool ModsLoaded => Stage > LoadStage.Configuring;
+  public static bool Reloading => Stage == LoadStage.Searching;
   public static bool GameRunning => Stage == LoadStage.Running;
 
   private static bool AutoLoad = true;
@@ -118,7 +119,14 @@ public static class LaunchPadConfig
 
   public static void Draw()
   {
-    if (AutoLoad)
+    // the server check decides what happens next, so only the splash and the status bar stay
+    if (Networking.Slp2ProfileSync.GateStatus is { } gateStatus)
+    {
+      // the SLP menu hides the splash, bring it back
+      Platform.SetBackgroundEnabled(true);
+      AutoLoadWindow.Draw(Stage, CurWait, gateStatus);
+    }
+    else if (AutoLoad)
     {
       var profileAction = ProfileLaunchWindow.Draw(Stage, profileManager, modList, out var profileChanged);
       if (profileChanged)
@@ -187,13 +195,14 @@ public static class LaunchPadConfig
       await StageSearching(firstLoad);
       await StageConfiguring(firstLoad);
       firstLoad = false;
+      // the server check can download missing mods, which reloads the mod list
+      if (Stage == LoadStage.Configuring)
+        await Networking.Slp2ProfileSync.WaitForGate();
     }
     while (Stage == LoadStage.Searching);
-    Networking.Slp2ProfileSync.TryStartVerify(profileManager);
     await StageLoading();
     await StageFinal();
 
-    await Networking.Slp2ProfileSync.WaitForGate();
     Networking.Slp2AutoConnect.ArmIfVerified();
     StartGame();
     await SLPCommand.MoveToStage(CommandStage.GameRunning);
@@ -408,6 +417,7 @@ public static class LaunchPadConfig
     await SLPCommand.MoveToStage(CommandStage.ConfigLoaded);
     PrepareProfileStartup(firstLoad, preserveSelectionAfterReload);
     preserveSelectionAfterReload = true;
+    Networking.Slp2ProfileSync.TryStartVerify(profileManager);
     await Platform.Wait(CurWait, CommandStage.ConfigLoaded);
   }
 
@@ -543,6 +553,13 @@ public static class LaunchPadConfig
 
   // packs pick which copy of a mod loads themselves
   private static bool DedupeApplies => Platform.IsServer || string.IsNullOrEmpty(Configs.ModProfile.Value);
+
+  // the active pack changed outside the mod list, e.g. a server pack update
+  internal static void ReapplyActivePack()
+  {
+    profileManager.Apply(modList);
+    NormalizeModList();
+  }
 
   private static bool NormalizeModList()
   {

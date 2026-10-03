@@ -15,7 +15,7 @@ internal static class Slp2AutoConnect
   internal static void ArmIfVerified()
   {
     if (!Slp2ProfileSync.WasVerified || !Configs.ServerPacksEnabled.Value
-      || !Configs.ServerPacksAutoJoin.Value)
+      || !Configs.ServerPacksAutoConnect.Value)
       return;
 
     armed = true;

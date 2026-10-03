@@ -375,7 +375,6 @@ public class ProfileManager
     [.. entries.Where(entry => entry.WorkshopHandle > 1).Select(entry => new ProfileModEntry
     {
       Name = entry.Name,
-      ModID = entry.ModID,
       WorkshopHandle = entry.WorkshopHandle,
       Source = ModSourceType.Workshop,
     })];

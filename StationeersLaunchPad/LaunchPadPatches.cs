@@ -122,7 +122,7 @@ static class LaunchPadPatches
   private static void RunNetworkPatches()
   {
     harmony.CreateClassProcessor(typeof(Networking.Slp2Channel), true).Patch();
-    harmony.CreateClassProcessor(typeof(Networking.Slp2JoinPiggyback), true).Patch();
+    harmony.CreateClassProcessor(typeof(Networking.Slp2JoinMarker), true).Patch();
     harmony.CreateClassProcessor(typeof(Networking.Slp2JoinFailureOffer), true).Patch();
     harmony.CreateClassProcessor(typeof(Networking.Slp2SaveFlow), true).Patch();
   }

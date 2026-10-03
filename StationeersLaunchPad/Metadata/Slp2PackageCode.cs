@@ -9,10 +9,9 @@ namespace StationeersLaunchPad.Metadata;
 // separate from WorkshopPackageCode so the SLP1 format stays stable
 public static class Slp2PackageCode
 {
-  public readonly struct Entry(ulong workshopHandle, string modId, string name, string version)
+  public readonly struct Entry(ulong workshopHandle, string name, string version)
   {
     public readonly ulong WorkshopHandle = workshopHandle;
-    public readonly string ModID = modId;
     public readonly string Name = name;
     public readonly string Version = version;
   }
@@ -35,7 +34,6 @@ public static class Slp2PackageCode
     foreach (var mod in list)
     {
       WriteVarUInt(stream, mod.WorkshopHandle);
-      WriteVarString(stream, mod.ModID ?? "");
       WriteVarString(stream, mod.Name ?? "");
       WriteVarString(stream, mod.Version ?? "");
     }
@@ -104,11 +102,10 @@ public static class Slp2PackageCode
     for (ulong i = 0; i < count; i++)
     {
       if (!TryReadVarUInt(bytes, ref offset, payloadLength, out var workshopHandle)
-        || !TryReadVarString(bytes, ref offset, payloadLength, out var modId)
         || !TryReadVarString(bytes, ref offset, payloadLength, out var name)
         || !TryReadVarString(bytes, ref offset, payloadLength, out var version))
         return false;
-      mods.Add(new(workshopHandle, modId, name, version));
+      mods.Add(new(workshopHandle, name, version));
     }
     return offset == payloadLength;
   }

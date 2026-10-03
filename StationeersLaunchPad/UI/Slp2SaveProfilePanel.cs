@@ -1,30 +1,43 @@
 
-using System;
+using System.Collections.Generic;
 using System.Linq;
 using Assets.Scripts;
-using Assets.Scripts.UI;
 using Cysharp.Threading.Tasks;
-using HarmonyLib;
 using ImGuiNET;
+using StationeersLaunchPad.Metadata;
 using UnityEngine;
 
 namespace StationeersLaunchPad.UI;
 
+public enum Slp2SaveChoice { None, Save, SaveAndActivate }
+
 public static class Slp2SaveProfilePanel
 {
-  private sealed class OfferState(string name, float completedAt)
+  private const int MaxListedMods = 6;
+  private const float SecondsAfterJoin = 30f;
+
+  private sealed class OfferState(string name, List<Slp2PackageCode.Entry> mods, float completedAt)
   {
     internal readonly string Name = name;
+    internal readonly List<Slp2PackageCode.Entry> Mods = mods;
     internal float CompletedAt = completedAt;
     internal bool Completed;
-    internal bool Result;
+    internal Slp2SaveChoice Result;
   }
 
-  private static Harmony harmony;
   private static OfferState currentOffer;
   private static float joinCompletedAt = -1f;
 
-  // the offer stays up while loading and for ten seconds after
+  private static readonly DialogButton[] buttons =
+  [
+    new("Save server pack", () => Choose(Slp2SaveChoice.Save),
+      tooltip: "Saves the pack, you can pick it at the next start."),
+    new("Save & Activate", () => Choose(Slp2SaveChoice.SaveAndActivate), primary: true,
+      tooltip: "Saves the pack and makes it the active one, it loads at the next start."),
+    new("No thanks", () => Choose(Slp2SaveChoice.None), cancel: true),
+  ];
+
+  // the offer stays up while loading and for a while after, it takes a moment to read
   public static void OnJoinFinished()
   {
     joinCompletedAt = Time.realtimeSinceStartup;
@@ -32,49 +45,19 @@ public static class Slp2SaveProfilePanel
       offer.CompletedAt = joinCompletedAt;
   }
 
-  private static bool EnsurePatch()
+  public static async UniTask<Slp2SaveChoice> Offer(string forServerName, List<Slp2PackageCode.Entry> mods)
   {
-    harmony ??= new("SLP2SaveProfile");
-    try
-    {
-      var patchMethod = typeof(Slp2SaveProfilePanel).GetMethod(nameof(Draw));
-      if (patchMethod == null)
-        return false;
-      foreach (var target in new[]
-      {
-        typeof(OrbitalSimulation).GetMethod(nameof(OrbitalSimulation.Draw)),
-        typeof(ImGuiLoadingScreen).GetMethod(nameof(ImGuiLoadingScreen.DrawStandardLoading)),
-      })
-      {
-        if (target == null)
-          return false;
-        var info = Harmony.GetPatchInfo(target);
-        if (info?.Postfixes.Any(patch => patch.PatchMethod == patchMethod) != true)
-          harmony.Patch(target, postfix: new(patchMethod));
-      }
-      return true;
-    }
-    catch (Exception ex)
-    {
-      Logger.Global.LogWarning("SLP2 save-pack popup could not be installed");
-      Logger.Global.LogException(ex);
-      return false;
-    }
-  }
-
-  // returns true if the user chose to save
-  public static async UniTask<bool> Offer(string forServerName)
-  {
-    if (Platform.IsServer || currentOffer != null || !EnsurePatch())
-      return false;
-    if (joinCompletedAt >= 0f && Time.realtimeSinceStartup - joinCompletedAt >= 10f)
-      return false;
-    var offer = new OfferState(forServerName, joinCompletedAt);
+    if (Platform.IsServer || currentOffer != null)
+      return Slp2SaveChoice.None;
+    if (joinCompletedAt >= 0f && Time.realtimeSinceStartup - joinCompletedAt >= SecondsAfterJoin)
+      return Slp2SaveChoice.None;
+    var offer = new OfferState(forServerName, mods, joinCompletedAt);
     currentOffer = offer;
+    SlpDialog.AddPanel(DrawCard);
     while (!offer.Completed)
     {
-      if (offer.CompletedAt >= 0f && Time.realtimeSinceStartup - offer.CompletedAt >= 10f)
-        Complete(offer, false);
+      if (offer.CompletedAt >= 0f && Time.realtimeSinceStartup - offer.CompletedAt >= SecondsAfterJoin)
+        Complete(offer, Slp2SaveChoice.None);
       await UniTask.Yield();
     }
     return offer.Result;
@@ -83,11 +66,18 @@ public static class Slp2SaveProfilePanel
   public static void CancelOffer()
   {
     if (currentOffer is { } offer)
-      Complete(offer, false);
+      Complete(offer, Slp2SaveChoice.None);
     joinCompletedAt = -1f;
   }
 
-  private static void Complete(OfferState offer, bool result)
+  private static bool Choose(Slp2SaveChoice choice)
+  {
+    if (currentOffer is { } offer)
+      Complete(offer, choice);
+    return true;
+  }
+
+  private static void Complete(OfferState offer, Slp2SaveChoice result)
   {
     if (offer.Completed)
       return;
@@ -97,43 +87,44 @@ public static class Slp2SaveProfilePanel
       currentOffer = null;
   }
 
-  public static void Draw()
-  {
-    if (currentOffer == null)
-      return;
-    ImGuiHelper.Draw(DrawCard);
-  }
-
   private static void DrawCard()
   {
     var offer = currentOffer;
     if (offer == null)
       return;
-    // sits under the loading screen's progress bar, in its style
+    // under the loading screen's progress bar
     var display = ImGui.GetIO().DisplaySize;
-    var width = Math.Min(560f, display.x - 48f);
-    ImGui.SetNextWindowPos(new(display.x * 0.5f, display.y * 0.5f + 60f), ImGuiCond.Always, new(0.5f, 0f));
-    ImGui.SetNextWindowSize(new(width, 0f), ImGuiCond.Always);
-    ImGui.Begin("##Slp2Offer", ImGuiWindowFlags.NoDecoration | ImGuiWindowFlags.NoBackground
-      | ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoSavedSettings | ImGuiWindowFlags.AlwaysAutoResize);
-    CenteredText($"{offer.Name} runs these mods.", LaunchPadTheme.Text);
-    CenteredText("Save them as a pack to join with one click next time.", LaunchPadTheme.TextSub);
-    ImGui.Spacing();
-    var style = ImGui.GetStyle();
-    var buttonWidth = 170f;
-    var buttonHeight = ImGui.GetFrameHeight() * 1.3f;
-    ImGui.SetCursorPosX((ImGui.GetWindowWidth() - buttonWidth * 2f - style.ItemSpacing.x) / 2f);
-    if (Widgets.PrimaryButton("Save as pack##slp2save", new(buttonWidth, buttonHeight), true, 1f))
-      Complete(offer, true);
-    ImGui.SameLine();
-    if (ImGui.Button("No thanks##slp2skip", new(buttonWidth, buttonHeight)))
-      Complete(offer, false);
-    ImGui.End();
-  }
+    SlpDialog.BeginPanel("##Slp2Offer", new Vector2(display.x * 0.5f, display.y * 0.5f + 60f), new Vector2(0.5f, 0f),
+      SlpDialog.DefaultWidth);
 
-  private static void CenteredText(string text, Color color)
-  {
-    ImGui.SetCursorPosX((ImGui.GetWindowWidth() - ImGui.CalcTextSize(text).x) / 2f);
-    ImGuiHelper.TextColored(text, color);
+    var count = offer.Mods.Count;
+    SlpDialog.Title($"{offer.Name} offers a server modpack with {count} mod{(count == 1 ? "" : "s")}:");
+    ImGui.Spacing();
+
+    var versionX = ImGui.GetContentRegionAvail().x * 0.72f;
+    ImGui.Indent();
+    foreach (var mod in offer.Mods.Take(MaxListedMods))
+    {
+      var x = ImGui.GetCursorPosX();
+      ImGuiHelper.TextColored(mod.Name ?? "", LaunchPadTheme.TextSub);
+      var version = mod.Version?.Trim().TrimStart('v', 'V');
+      if (!string.IsNullOrEmpty(version))
+      {
+        ImGui.SameLine(x + versionX);
+        ImGuiHelper.TextColored($"v{version}", LaunchPadTheme.TextMuted);
+      }
+    }
+    if (count > MaxListedMods)
+      ImGuiHelper.TextColored($"and {count - MaxListedMods} more", LaunchPadTheme.TextMuted);
+    ImGui.Unindent();
+    ImGui.Spacing();
+
+    SlpDialog.Text("Save it below, then pick it the next time you start the game. SLP loads exactly these mods, "
+      + "validates them against the server and can join you straight in after loading!");
+    SlpDialog.Gap();
+    var clicked = SlpDialog.ButtonRow(buttons);
+    if (clicked >= 0)
+      buttons[clicked].OnClick();
+    ImGui.End();
   }
 }

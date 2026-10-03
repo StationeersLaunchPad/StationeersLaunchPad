@@ -60,6 +60,6 @@ public class Slp2ProbeCommand : SubCommand
 
     Logger.Global.LogInfo($"  decoded {mods.Count} mod(s), serverCode={serverCode}, serverName='{serverName}':");
     foreach (var mod in mods)
-      Logger.Global.LogInfo($"    - {mod.Name} (ModID={mod.ModID}, workshop={mod.WorkshopHandle}, v{mod.Version})");
+      Logger.Global.LogInfo($"    - {mod.Name} (workshop={mod.WorkshopHandle}, v{mod.Version})");
   }
 }

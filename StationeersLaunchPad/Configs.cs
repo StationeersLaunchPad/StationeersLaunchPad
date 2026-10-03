@@ -64,7 +64,7 @@ public static class Configs
   public static ConfigEntry<bool> RepoModValidateVersion;
   public static ConfigEntry<string> ModProfile;
   public static ConfigEntry<bool> ServerPacksEnabled;
-  public static ConfigEntry<bool> ServerPacksAutoJoin;
+  public static ConfigEntry<bool> ServerPacksAutoConnect;
   public static ConfigEntry<bool> ShareModList;
 
   public static ConfigEntry<bool> NewsCheckOnStart;
@@ -310,11 +310,11 @@ public static class Configs
         "Offer to save a server's mods as a pack when you join it, and check server packs against their server before loading."
       )
     );
-    ServerPacksAutoJoin = config.Bind(
-      new ConfigDefinition("Server Packs", "AutoJoin"),
+    ServerPacksAutoConnect = config.Bind(
+      new ConfigDefinition("Server Packs", "AutoConnect"),
       true,
       new ConfigDescription(
-        "Join the server right away once its pack has been checked on startup."
+        "Connect to a server automatically when its server modpack is selected and validated successfully on startup."
       )
     );
     ShareModList = config.Bind(

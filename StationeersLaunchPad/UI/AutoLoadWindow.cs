@@ -7,11 +7,12 @@ namespace StationeersLaunchPad.UI;
 
 public class AutoLoadWindow
 {
-  // returns true if the user clicked to stop autoloading
-  public static bool Draw(LoadStage stage, StageWait wait)
+  // returns true if the user clicked to stop autoloading. a status replaces the stage text
+  // and turns off the bar's input, for when something else decides what happens next
+  public static bool Draw(LoadStage stage, StageWait wait, string status = null)
   {
     var openMenu = false;
-    var acceptsStartupInput = stage == LoadStage.Configuring || stage == LoadStage.Loaded;
+    var acceptsStartupInput = status == null && (stage == LoadStage.Configuring || stage == LoadStage.Loaded);
 
     if (acceptsStartupInput && ImGui.IsKeyPressed(ImGuiKey.Space, false))
       LaunchPadConfig.SkipAutoWaits();
@@ -30,7 +31,7 @@ public class AutoLoadWindow
       ImGui.Begin("##preloaderauto", ImGuiWindowFlags.NoDecoration | ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoSavedSettings);
 
       ImGuiHelper.Text($"StationeersLaunchPad {LaunchPadInfo.VERSION}");
-      ImGuiHelper.Text(stage switch
+      ImGuiHelper.Text(status ?? stage switch
       {
         LoadStage.Updating => "Checking for Update",
         LoadStage.Initializing => "Initializing",
@@ -53,7 +54,7 @@ public class AutoLoadWindow
       else
         ImGuiHelper.Text("");
 
-      if (ImGui.IsWindowHovered() && stage != LoadStage.News)
+      if (status == null && ImGui.IsWindowHovered() && stage != LoadStage.News)
       {
         ImGuiHelper.TextTooltip("Click to open SLP.");
         if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))

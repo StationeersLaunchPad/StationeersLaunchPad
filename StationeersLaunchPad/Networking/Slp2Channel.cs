@@ -88,7 +88,7 @@ internal static class Slp2Channel
     return Send(connectionId, KindRequest, []);
   }
 
-  // used after joining when the code was too large for VerifyPlayerRequest
+  // asks the server we are connected to, see Slp2Query
   internal static async UniTask<string> RequestConnectedCode(float timeoutSeconds = 5f)
   {
     if (!NetworkManager.IsClient || NetworkManager.NetworkState != NetworkState.Online
@@ -123,19 +123,19 @@ internal static class Slp2Channel
     var bytes = Encoding.UTF8.GetBytes(code ?? "");
     if (bytes.Length > Slp2CodeTransfer.MaxCodeBytes)
     {
-      Logger.Global.LogWarning($"SLP2 code too large ({bytes.Length}b), dropping probe reply");
+      Logger.Global.LogWarning($"SLP2 code too large ({bytes.Length}b), dropping the reply");
       return;
     }
     if (bytes.Length <= Slp2CodeTransfer.MaxFramePayload)
     {
       if (!Send(connectionId, KindResponse, bytes))
-        Logger.Global.LogWarning("SLP2 probe reply could not be sent");
+        Logger.Global.LogWarning("SLP2 reply could not be sent");
       return;
     }
     foreach (var chunk in Slp2CodeTransfer.Split(bytes))
       if (!Send(connectionId, KindResponseChunk, chunk))
       {
-        Logger.Global.LogWarning("SLP2 probe reply stopped after a failed chunk send");
+        Logger.Global.LogWarning("SLP2 reply stopped after a failed chunk send");
         break;
       }
   }
@@ -189,7 +189,7 @@ internal static class Slp2Channel
         }
         catch (Exception ex)
         {
-          Logger.Global.LogWarning("SLP2 channel: failed to build server code for probe reply");
+          Logger.Global.LogWarning("SLP2 channel: failed to build server code for a reply");
           Logger.Global.LogException(ex);
           code = "";
         }

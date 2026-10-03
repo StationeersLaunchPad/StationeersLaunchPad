@@ -24,7 +24,6 @@ public static class Slp2ProbeClient
       return null;
     }
 
-    LaunchPadConfig.PauseAutoWait();
     Slp2Channel.EnsureNetworkManagerExists();
     Slp2Channel.ResetResponse();
 
@@ -56,7 +55,7 @@ public static class Slp2ProbeClient
         return null;
       }
 
-      var connected = false;
+      var requested = false;
       var lastLoggedState = NetworkManager.NetworkState;
       var deadline = Time.realtimeSinceStartup + timeoutSeconds;
       Logger.Global.LogInfo($"SLP2 probe: connecting, initial state {lastLoggedState}");
@@ -69,11 +68,18 @@ public static class Slp2ProbeClient
           lastLoggedState = NetworkManager.NetworkState;
           Logger.Global.LogInfo($"SLP2 probe: state changed to {lastLoggedState}");
         }
-        if (!connected && NetworkManager.NetworkState == NetworkState.Online)
+        // only ask servers whose join message says they share their mods, older ones
+        // would throw on a packet for a channel they don't know
+        if (!requested && Slp2JoinMarker.RequestReceived)
         {
-          connected = true;
+          if (!Slp2JoinMarker.ServerSharesMods)
+          {
+            Logger.Global.LogInfo("SLP2 probe: the server doesn't share its mods");
+            break;
+          }
+          requested = true;
           var hostId = Slp2Channel.GetHostId();
-          Logger.Global.LogInfo($"SLP2 probe: connected (hostId={hostId}), sending request on channel {(int)Slp2Channel.Channel}");
+          Logger.Global.LogInfo($"SLP2 probe: server shares its mods (hostId={hostId}), sending request on channel {(int)Slp2Channel.Channel}");
           if (!Slp2Channel.SendRequest(hostId))
           {
             Logger.Global.LogWarning("SLP2 probe request could not be sent");
@@ -88,8 +94,8 @@ public static class Slp2ProbeClient
         await UniTask.Yield();
       }
 
-      if (!responded && !cancellationToken.IsCancellationRequested)
-        Logger.Global.LogWarning($"SLP2 probe: timed out (connected={connected}, finalState={NetworkManager.NetworkState})");
+      if (!responded && !cancellationToken.IsCancellationRequested && Time.realtimeSinceStartup >= deadline)
+        Logger.Global.LogWarning($"SLP2 probe: timed out (requested={requested}, finalState={NetworkManager.NetworkState})");
 
       return cancellationToken.IsCancellationRequested ? null : result;
     }
@@ -112,7 +118,7 @@ public static class Slp2ProbeClient
         finally
         {
           // a dropped probe can be offline without EndConnection running
-          Slp2JoinPiggyback.TakeReceivedCode();
+          Slp2JoinMarker.Reset();
           Slp2Channel.ResetResponse();
           Slp2Channel.ProbePending = false;
         }

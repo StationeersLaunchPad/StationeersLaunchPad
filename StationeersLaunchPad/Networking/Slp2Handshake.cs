@@ -1,3 +1,5 @@
+
+using System.Collections.Generic;
 using System.Linq;
 using Assets.Scripts.Serialization;
 using StationeersLaunchPad.Metadata;
@@ -15,11 +17,14 @@ public static class Slp2Handshake
     Slp2Channel.ServerCodeProvider = BuildServerCode;
   }
 
-  // disabled servers still answer with an empty code so probes don't time out
-  private static string BuildServerCode()
+  // null when this server doesn't share its mods
+  internal static string SharedServerName() =>
+    SharedMods() == null ? null : Slp2ServerMatch.CleanName(Settings.CurrentData.ServerName);
+
+  private static List<ModInfo> SharedMods()
   {
     if (!Configs.ShareModList.Value)
-      return "";
+      return null;
 
     // players can only get workshop mods, a list with anything else can't be loaded
     var mods = LaunchPadConfig.ModList.EnabledMods.Where(mod => mod.Source != ModSourceType.Core).ToList();
@@ -31,10 +36,19 @@ public static class Slp2Handshake
         warnedLocal = true;
         Logger.Global.LogWarning($"SLP2: not sharing the mod list, '{local.Name}' isn't on the workshop");
       }
-      return "";
+      return null;
     }
+    return mods;
+  }
 
-    var serverName = Settings.CurrentData.ServerName;
+  // disabled servers still answer with an empty code so queries don't time out
+  private static string BuildServerCode()
+  {
+    var mods = SharedMods();
+    if (mods == null)
+      return "";
+
+    var serverName = Slp2ServerMatch.CleanName(Settings.CurrentData.ServerName);
     if (!warnedName && !Slp2ServerMatch.IsMatchableName(serverName))
     {
       warnedName = true;
@@ -42,7 +56,7 @@ public static class Slp2Handshake
     }
 
     return Slp2PackageCode.Encode(
-      mods.Select(mod => new Slp2PackageCode.Entry(mod.WorkshopHandle, mod.ModID, mod.Name, mod.About?.Version ?? "")),
+      mods.Select(mod => new Slp2PackageCode.Entry(mod.WorkshopHandle, mod.Name, mod.About?.Version ?? "")),
       serverCode: true,
       serverName: serverName);
   }
