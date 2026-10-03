@@ -652,10 +652,7 @@ public static class ManualLoadWindow
           if (isClientside)
             changed |= profileManager.SetClientside(mod, false, modList);
           else
-          {
             confirmClientside = mod;
-            openConfirm = true;
-          }
         }
         ImGuiHelper.ItemTooltip(isClientside
           ? "Clientside: loads in every pack except Vanilla, server packs included. Click to take it out."
@@ -679,14 +676,8 @@ public static class ManualLoadWindow
     ImGui.PopStyleVar();
     ImGui.PopStyleColor(5);
 
-    if (confirmClientside != null)
-    {
-      if (openConfirm)
-        ImGui.OpenPopup("##clientside");
-      openConfirm = false;
-      if (DrawClientsideConfirm(profileManager, modList))
-        changed = true;
-    }
+    if (confirmClientside != null && DrawClientsideConfirm(profileManager, modList))
+      changed = true;
     return changed;
   }
 
@@ -808,63 +799,42 @@ public static class ManualLoadWindow
   }
 
   private static ModInfo confirmClientside;
-  private static bool openConfirm;
+
+  private static readonly DialogButton[] clientsideButtons =
+  [
+    new("Add"),
+    new("Cancel", cancel: true),
+  ];
 
   // we can't tell if a mod is client-side, so the player has to confirm it
   private static bool DrawClientsideConfirm(ProfileManager profileManager, ModList modList)
   {
-    var changed = false;
-    var display = ImGui.GetIO().DisplaySize;
-    ImGui.SetNextWindowPos(display / 2f, ImGuiCond.Appearing, new Vector2(0.5f, 0.5f));
-    ImGui.SetNextWindowSize(new Vector2(Math.Min(620f, display.x - 40f), 0f));
-    ImGui.PushStyleColor(ImGuiCol.Border, (Vector4)LaunchPadTheme.Over(LaunchPadTheme.Warn, 0.6f));
-    ImGui.PushStyleVar(ImGuiStyleVar.WindowBorderSize, 1f);
-    ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(20f, 16f));
-    var open = ImGui.BeginPopup("##clientside");
-    ImGui.PopStyleVar(2);
-    ImGui.PopStyleColor();
-    if (!open)
-    {
-      confirmClientside = null;
-      return false;
-    }
     var mod = confirmClientside;
-    var gap = ImGui.GetTextLineHeight() * 0.6f;
-    ImGui.PushTextWrapPos(0f);
-    ImGuiHelper.TextColored($"Make {mod.Name} a clientside mod?", LaunchPadTheme.Text);
     var (side, label, guess, reason) = ModScan.Side(mod);
     var needsServer = side is ModSide.Both or ModSide.Server;
-    ImGuiHelper.TextColored($"{label}{(guess ? " (SLP's guess)" : "")}. {reason}",
+    SlpDialog.BeginPanel("##clientside", ImGui.GetIO().DisplaySize * 0.5f, new Vector2(0.5f, 0.5f), 620f,
+      DialogTone.Warn, focus: true);
+    SlpDialog.Title($"Make {mod.Name} a clientside mod?");
+    SlpDialog.Text($"{label}{(guess ? " (SLP's guess)" : "")}. {reason}",
       needsServer ? LaunchPadTheme.Err : LaunchPadTheme.TextSub);
     if (needsServer)
-      ImGuiHelper.TextColored("Don't add it unless you know what you're doing.", LaunchPadTheme.Err);
-    ImGui.Dummy(new Vector2(0f, gap));
-    ImGuiHelper.TextColored(
-      "Just want to enable it? Tick the box at the start of its row instead.",
-      LaunchPadTheme.Text);
-    ImGui.Dummy(new Vector2(0f, gap));
-    ImGuiHelper.TextColored(needsServer
+      SlpDialog.Text("Don't add it unless you know what you're doing.", LaunchPadTheme.Err);
+    SlpDialog.Gap();
+    SlpDialog.Text("Just want to enable it? Tick the box at the start of its row instead.", LaunchPadTheme.Text);
+    SlpDialog.Gap();
+    SlpDialog.Text(needsServer
       ? "Clientside mods load in every pack except Vanilla, also on servers that don't have them."
       : "Clientside mods load in every pack except Vanilla, also on servers that don't have them. "
         + "Only for mods that run purely on your side, like UI tweaks or some QOL mods. Not sure? Check its description.",
       LaunchPadTheme.TextMuted);
-    ImGui.PopTextWrapPos();
-    ImGui.Dummy(new Vector2(0f, gap * 1.5f));
-    var buttonSize = new Vector2(120f, ImGui.GetFrameHeight() * 1.3f);
-    if (ImGui.Button("Add", buttonSize))
-    {
-      changed = profileManager.SetClientside(mod, true, modList);
-      confirmClientside = null;
-      ImGui.CloseCurrentPopup();
-    }
-    ImGui.SameLine();
-    if (ImGui.Button("Cancel", buttonSize) || ImGui.IsKeyPressed(ImGuiKey.Escape))
-    {
-      confirmClientside = null;
-      ImGui.CloseCurrentPopup();
-    }
-    ImGui.EndPopup();
-    return changed;
+    SlpDialog.Gap();
+    var clicked = SlpDialog.ButtonRow(clientsideButtons);
+    ImGui.End();
+
+    if (clicked < 0)
+      return false;
+    confirmClientside = null;
+    return clicked == 0 && profileManager.SetClientside(mod, true, modList);
   }
 
   // filled when the mod is clientside

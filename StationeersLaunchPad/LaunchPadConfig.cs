@@ -157,7 +157,7 @@ public static class LaunchPadConfig
       HandleChange(changed);
     }
 
-    AlertPopup.Draw();
+    SlpDialog.Draw();
     NewsPopup.Draw();
     Networking.Slp2ProfileSync.DrawWarningIfVisible();
     Networking.Slp2ProfileSync.DrawStatusIfActive();

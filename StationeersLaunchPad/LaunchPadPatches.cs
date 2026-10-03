@@ -347,7 +347,11 @@ static class WorkshopPatches
     DrawWorkshopMenuConfig();
     DrawSettingsMenuConfig();
     LogPanel.DrawStandaloneLogs();
+    SlpDialog.Draw();
   }
+
+  [HarmonyPatch(typeof(ImGuiLoadingScreen), nameof(ImGuiLoadingScreen.DrawStandardLoading)), HarmonyPostfix]
+  static void DrawLoadingScreenWindows() => SlpDialog.Draw();
 
   private static void DrawWorkshopMenuConfig()
   {
