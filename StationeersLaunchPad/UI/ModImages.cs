@@ -20,6 +20,7 @@ public static class ModImages
   public const string NoPreviewImage = "nopreview";
   public const string SlpImage = "slp";
   public const string BoosterImage = "booster";
+  public const string TrustedImage = "trusted";
 
   // previews are often 1024px+, keep a smaller mipmapped copy
   private const int MaxSize = 384;
@@ -217,7 +218,9 @@ public static class ModImages
   {
     try
     {
-      using var stream = typeof(ModImages).Assembly.GetManifestResourceStream($"StationeersLaunchPad.Images.{name}.jpg");
+      var assembly = typeof(ModImages).Assembly;
+      using var stream = assembly.GetManifestResourceStream($"StationeersLaunchPad.Images.{name}.jpg")
+        ?? assembly.GetManifestResourceStream($"StationeersLaunchPad.Images.{name}.png");
       if (stream == null)
         return null;
       using var memory = new MemoryStream();

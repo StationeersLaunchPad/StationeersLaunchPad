@@ -12,7 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="Images\*.jpg" LogicalName="StationeersLaunchPad.Images.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Images\*.jpg;Images\*.png" LogicalName="StationeersLaunchPad.Images.%(Filename)%(Extension)" />
   </ItemGroup>
 
   <!-- the server zip ships the stub from Compatibility/RG.ImGui instead -->

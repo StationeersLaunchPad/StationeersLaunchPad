@@ -213,6 +213,27 @@ public static class Widgets
     return selected;
   }
 
+  // the Discord's trusted modder checkmark, one text line tall
+  public static void TrustedBadge()
+  {
+    var height = ImGui.GetTextLineHeight();
+    var size = new Vector2(height, height);
+    var min = ImGui.GetCursorScreenPos();
+    ImGui.Dummy(size);
+    // nudged onto the text baseline and faded next to the grey author name
+    if (ModImages.TryGetBuiltIn(ModImages.TrustedImage, out var id, out _))
+    {
+      var offset = new Vector2(0f, Mathf.Round(height * 0.12f));
+      ImGui.GetWindowDrawList().AddImage(id, min + offset, min + size + offset,
+        Vector2.zero, Vector2.one, ImGui.ColorConvertFloat4ToU32(new Vector4(1f, 1f, 1f, 0.4f)));
+    }
+    ImGuiHelper.ItemTooltip(
+      "Trusted modder\n\n"
+      + "One or multiple author(s) named here are recognized by the Stationeers Modding Community for their work.\n\n"
+      + "Only the author name field is checked. This is not a rating of the mod's quality or security.",
+      ImGui.GetFontSize() * 28f);
+  }
+
   // solid accent button for the main action on screen
   public static bool PrimaryButton(string label, Vector2 size, bool enabled, float fontScale = 1.25f)
   {

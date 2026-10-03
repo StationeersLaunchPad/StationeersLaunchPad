@@ -97,11 +97,19 @@ public class ModInfoPanel
     ImGui.SetWindowFontScale(1f);
 
     var meta = new List<string>();
-    if (!string.IsNullOrWhiteSpace(about?.Author))
-      meta.Add($"by {about.Author.Trim()}");
     if (!string.IsNullOrWhiteSpace(about?.Version))
       meta.Add($"v{about.Version.Trim().TrimStart('v', 'V')}");
     meta.Add(mod.Source.ToString());
+    if (!string.IsNullOrWhiteSpace(about?.Author))
+    {
+      ImGuiHelper.TextColored($"by {about.Author.Trim()}", LaunchPadTheme.TextSub);
+      if (TrustedModders.IsTrusted(about.Author))
+      {
+        ImGui.SameLine(0f, 4f);
+        Widgets.TrustedBadge();
+      }
+      ImGui.SameLine(0f, ImGui.CalcTextSize(MetaSeparator).x);
+    }
     ImGui.PushTextWrapPos(0f);
     ImGuiHelper.TextColored(string.Join(MetaSeparator, meta), LaunchPadTheme.TextSub);
     ImGui.PopTextWrapPos();

@@ -635,6 +635,12 @@ public static class ManualLoadWindow
         textCol.Min.x, textCol.Min.y + rowPadding + lineHeight + ImGui.GetStyle().ItemSpacing.y));
       ImGuiHelper.TextColored(ModMetaLine(mod, listView == ModListView.LoadOrder ? loadPosition : 0),
         LaunchPadTheme.TextMuted);
+      // the meta line ends with the author
+      if (TrustedModders.IsTrusted(mod.About?.Author))
+      {
+        ImGui.SameLine(0f, 4f);
+        Widgets.TrustedBadge();
+      }
       ImGui.PopClipRect();
 
       if (packsOn && !isCore)
