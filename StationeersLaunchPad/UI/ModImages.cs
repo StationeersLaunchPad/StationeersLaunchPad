@@ -21,6 +21,7 @@ public static class ModImages
   public const string SlpImage = "slp";
   public const string BoosterImage = "booster";
   public const string TrustedImage = "trusted";
+  public const string RocketImage = "rocket";
 
   // previews are often 1024px+, keep a smaller mipmapped copy
   private const int MaxSize = 384;

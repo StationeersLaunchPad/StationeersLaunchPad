@@ -119,16 +119,15 @@ public static class LaunchPadConfig
 
   public static void Draw()
   {
-    // the server check decides what happens next, so only the splash and the status bar stay
-    if (Networking.Slp2ProfileSync.GateStatus is { } gateStatus)
+    // the box stays locked during the server check and steps aside for the takeoff
+    var gateStatus = Networking.Slp2ProfileSync.GateStatus;
+    var boxShown = (AutoLoad || gateStatus != null) && Stage != LoadStage.Running;
+    if (boxShown)
     {
       // the SLP menu hides the splash, bring it back
-      Platform.SetBackgroundEnabled(true);
-      AutoLoadWindow.Draw(Stage, CurWait, gateStatus);
-    }
-    else if (AutoLoad)
-    {
-      var profileAction = ProfileLaunchWindow.Draw(Stage, profileManager, modList, out var profileChanged);
+      if (gateStatus != null)
+        Platform.SetBackgroundEnabled(true);
+      var action = LaunchWindow.Draw(Stage, CurWait, profileManager, modList, gateStatus, out var profileChanged);
       if (profileChanged)
       {
         NormalizeModList();
@@ -140,35 +139,34 @@ public static class LaunchPadConfig
         }
       }
 
-      if (profileAction == ProfileLaunchAction.Continue)
+      if (action == LaunchAction.Continue)
       {
         quickProfileOpen = false;
         SkipAutoWaits();
       }
-      else if (profileAction == ProfileLaunchAction.OpenMenu)
+      else if (action is LaunchAction.OpenMenu or LaunchAction.OpenPacks)
       {
         quickProfileOpen = false;
         StopAutoLoad();
-        ManualLoadWindow.OpenProfilesTab();
-      }
-
-      if (AutoLoad && AutoLoadWindow.Draw(Stage, CurWait))
-      {
-        quickProfileOpen = false;
-        StopAutoLoad();
-        ManualLoadWindow.OpenModInfoTab();
+        if (action == LaunchAction.OpenPacks)
+          ManualLoadWindow.OpenProfilesTab();
+        else
+          ManualLoadWindow.OpenModInfoTab();
       }
     }
-    else
+    else if (!AutoLoad)
     {
       var changed = ManualLoadWindow.Draw(Stage, modList, profileManager);
       HandleChange(changed);
     }
 
+    ImGuiHelper.Draw(RocketBar.DrawFlights);
     SlpDialog.Draw();
     NewsPopup.Draw();
     Networking.Slp2ProfileSync.DrawWarningIfVisible();
-    Networking.Slp2ProfileSync.DrawStatusIfActive();
+    // the box shows it in its header
+    if (!boxShown && Stage != LoadStage.Running)
+      Networking.Slp2ProfileSync.DrawStatusIfActive();
   }
 
   public static async void Run()
@@ -204,6 +202,10 @@ public static class LaunchPadConfig
     await StageFinal();
 
     Networking.Slp2AutoConnect.ArmIfVerified();
+    // the game waits for the rocket to clear the screen
+    Stage = LoadStage.Running;
+    RocketBar.Launch();
+    await RocketBar.WaitForFlights();
     StartGame();
     await SLPCommand.MoveToStage(CommandStage.GameRunning);
   }
@@ -425,6 +427,7 @@ public static class LaunchPadConfig
   {
     if (Stage == LoadStage.Failed) return;
     Stage = LoadStage.Loading;
+    RocketBar.Launch();
 
     var stopwatch = Stopwatch.StartNew();
 

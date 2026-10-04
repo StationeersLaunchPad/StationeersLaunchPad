@@ -142,8 +142,14 @@ public static class PackGallery
       : isServer ? $"server, {count} mods"
       : $"{count} mod{(count == 1 ? "" : "s")}";
     var detailPos = textPos + new Vector2(0f, lineHeight + style.ItemSpacing.y);
-    drawList.AddText(detailPos, ImGui.ColorConvertFloat4ToU32((Vector4)LaunchPadTheme.TextMuted), detail);
     var right = missing > 0 ? $"{missing} missing" : isActive ? "active" : "";
+    // the detail gives way to the right text instead of running into it
+    var detailMax = max.x - 6f - (right.Length > 0 ? ImGui.CalcTextSize(right).x + 6f : 0f);
+    if (isServer && detailPos.x + ImGui.CalcTextSize(detail).x > detailMax)
+      detail = $"{count} mods";
+    drawList.PushClipRect(detailPos, new Vector2(detailMax, max.y), true);
+    drawList.AddText(detailPos, ImGui.ColorConvertFloat4ToU32((Vector4)LaunchPadTheme.TextMuted), detail);
+    drawList.PopClipRect();
     if (right.Length > 0)
       drawList.AddText(new Vector2(max.x - 6f - ImGui.CalcTextSize(right).x, detailPos.y),
         ImGui.ColorConvertFloat4ToU32((Vector4)(missing > 0 ? LaunchPadTheme.Err : LaunchPadTheme.Accent)), right);

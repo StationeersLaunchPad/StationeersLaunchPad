@@ -14,9 +14,17 @@ public class LoadStrategy
 {
   private bool failed = false;
 
+  // for the startup bar: steps done out of all steps, and the mod being loaded
+  public static int StepsDone { get; private set; }
+  public static int StepsTotal { get; private set; }
+  public static string Current { get; private set; }
+
   // returns true if all mods loaded successfully
   public async UniTask<bool> LoadMods()
   {
+    StepsDone = 0;
+    StepsTotal = ModLoader.LoadedMods.Count * 3;
+    Current = null;
     Logger.Global.LogDebug($"Assemblies loading...");
     var stopwatch = Stopwatch.StartNew();
     await LoadAssemblies();
@@ -51,6 +59,8 @@ public class LoadStrategy
   {
     foreach (var mod in ModLoader.LoadedMods)
     {
+      StepsDone++;
+      Current = mod?.Info.Name;
       if (mod.LoadedAssemblies || mod.LoadFailed || mod.LoadFinished)
         continue;
 
@@ -70,6 +80,8 @@ public class LoadStrategy
   {
     foreach (var mod in ModLoader.LoadedMods)
     {
+      StepsDone++;
+      Current = mod?.Info.Name;
       if (mod == null || mod.LoadedAssets || mod.LoadFailed || mod.LoadFinished)
         continue;
 
@@ -89,6 +101,8 @@ public class LoadStrategy
   {
     foreach (var mod in ModLoader.LoadedMods)
     {
+      StepsDone++;
+      Current = mod?.Info.Name;
       if (mod == null || mod.LoadedEntryPoints || mod.LoadFailed || mod.LoadFinished)
         continue;
 
