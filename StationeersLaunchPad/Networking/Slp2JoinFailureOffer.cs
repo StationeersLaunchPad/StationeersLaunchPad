@@ -137,7 +137,7 @@ internal static class Slp2JoinFailureOffer
     }
 
     var close = original.Button1OnClick ?? panel.CloseCurrentPanel;
-    Show(panel, $"Your mods don't match {result.ServerName}", BuildMessage(result.ServerName, rows, CleanReason(original.Message)),
+    Show(panel, $"Your mods don't match {result.ServerName}", BuildMessage(result.ServerName, rows),
       "Save server pack", () =>
       {
         close();
@@ -169,7 +169,7 @@ internal static class Slp2JoinFailureOffer
     }
   }
 
-  private static string BuildMessage(string serverName, List<Slp2ModRow> rows, string reason)
+  private static string BuildMessage(string serverName, List<Slp2ModRow> rows)
   {
     var serverMods = rows.Where(row => row.State != Slp2ModState.NotOnServer).ToList();
     var extra = rows.Count - serverMods.Count;
@@ -186,8 +186,6 @@ internal static class Slp2JoinFailureOffer
     sb.Append("Save them as a server pack and restart the game. SLP switches to it, loads exactly these mods");
     sb.Append(Configs.ServerPacksAutoConnect.Value ? " and joins the server for you." : " and checks them against the server.");
     sb.Append(" Next time, just pick it when the game starts.");
-    if (!string.IsNullOrEmpty(reason))
-      sb.Append($"\n\nServer: {reason}");
     return sb.ToString();
   }
 
@@ -201,18 +199,4 @@ internal static class Slp2JoinFailureOffer
     Slp2ModState.Older => $"you have{Versioned(row.LocalVersion)}",
     _ => "loaded",
   };
-
-  // rejection texts that aren't localization keys come through as <T:EN:text>
-  private static string CleanReason(string message)
-  {
-    if (string.IsNullOrWhiteSpace(message))
-      return "";
-    var text = message.Trim();
-    if (text.StartsWith("<T:") && text.EndsWith(">"))
-    {
-      var start = text.IndexOf(':', 3);
-      text = start < 0 ? text : text.Substring(start + 1, text.Length - start - 2);
-    }
-    return text.Trim();
-  }
 }
