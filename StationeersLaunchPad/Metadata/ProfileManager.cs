@@ -107,11 +107,12 @@ public class ProfileManager
     return true;
   }
 
-  public string UniqueName(string baseName)
+  public string UniqueName(string baseName, string fallback = "Pack")
   {
-    baseName = Platform.MakeValidFileName((baseName ?? "").Trim());
+    // names become file names, a trailing dot would end up as "name..xml"
+    baseName = Platform.MakeValidFileName((baseName ?? "").Trim().TrimEnd('.').TrimEnd());
     if (string.IsNullOrWhiteSpace(baseName))
-      baseName = "Pack";
+      baseName = fallback;
     var name = baseName;
     var suffix = 2;
     while ((!ProfileStorage.IsValidName(name) || IsReservedName(name) || FindProfile(name) != null) && suffix < 1000)
@@ -388,7 +389,7 @@ public class ProfileManager
     var existing = FindProfileByServerName(serverName);
     var profile = existing ?? new ProfileData
     {
-      Name = MakeServerProfileName(serverName),
+      Name = UniqueName(serverName, "Server"),
       ServerName = serverName,
     };
     var previousCode = profile.ServerCode;
@@ -419,19 +420,6 @@ public class ProfileManager
     if (activate)
       Configs.ModProfile.Value = profile.Name;
     return true;
-  }
-
-  private string MakeServerProfileName(string serverName)
-  {
-    // server names can contain characters that aren't valid in file names
-    var baseName = Platform.MakeValidFileName(serverName.Trim());
-    if (string.IsNullOrWhiteSpace(baseName))
-      baseName = "Server";
-    var name = baseName;
-    var suffix = 2;
-    while ((!ProfileStorage.IsValidName(name) || IsReservedName(name) || FindProfile(name) != null) && suffix < 1000)
-      name = $"{baseName} ({suffix++})";
-    return name;
   }
 
   public List<ProfileModEntry> GetMissingMods(string profileName, ModList modList) =>

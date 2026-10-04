@@ -91,7 +91,11 @@ public static class SlpDialog
 
   private static void DrawEntry(Entry entry)
   {
-    BeginPanel("##slpdialog", ImGui.GetIO().DisplaySize * 0.5f, new Vector2(0.5f, 0.5f), entry.Width, entry.Tone, focus: true);
+    // wide enough that the longest label fits on every equal width button
+    var label = entry.Buttons.Max(button => ImGui.CalcTextSize(button.Label).x) + ImGui.GetStyle().FramePadding.x * 4f;
+    var width = Math.Max(entry.Width,
+      label * entry.Buttons.Length + ImGui.GetStyle().ItemSpacing.x * (entry.Buttons.Length - 1) + Padding.x * 2f);
+    BeginPanel("##slpdialog", ImGui.GetIO().DisplaySize * 0.5f, new Vector2(0.5f, 0.5f), width, entry.Tone, focus: true);
     if (!string.IsNullOrEmpty(entry.Title))
       Title(entry.Title);
     entry.Body?.Invoke();
