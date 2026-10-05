@@ -26,15 +26,20 @@ public static class LaunchWindow
     string status, out bool profileChanged)
   {
     profileChanged = false;
-    var input = status == null && (stage == LoadStage.Configuring || stage == LoadStage.Loaded);
+    var input = status == null && !RocketBar.Diving && (stage == LoadStage.Configuring || stage == LoadStage.Loaded);
     var action = LaunchAction.None;
 
-    if (input && ImGui.IsKeyPressed(ImGuiKey.Space, false))
+    if (input && (ImGui.IsKeyPressed(ImGuiKey.Space, false) || ImGui.IsKeyPressed(ImGuiKey.UpArrow, false)))
       action = LaunchAction.Continue;
     else if (input && wait.Auto && (ImGui.IsKeyPressed(ImGuiKey.Escape, false) || Input.GetKeyDown(KeyCode.P)))
       LaunchPadConfig.PauseAutoWait();
-    else if (input && Input.GetKeyDown(KeyCode.M))
+    else if (input && (Input.GetKeyDown(KeyCode.M) || ImGui.IsKeyPressed(ImGuiKey.DownArrow, false)))
       action = LaunchAction.OpenMenu;
+    // unadvertised: the arrows steer the countdown
+    else if (input && wait.Auto && ImGui.IsKeyPressed(ImGuiKey.LeftArrow))
+      wait.Shift(1);
+    else if (input && wait.Auto && ImGui.IsKeyPressed(ImGuiKey.RightArrow))
+      wait.Shift(-1);
     if (Input.GetKeyDown(KeyCode.C))
       RocketBar.AlwaysCrash();
 
@@ -234,7 +239,6 @@ public static class LaunchWindow
         LoadStage.Loading => (LoadingText(), LaunchPadTheme.Text),
         LoadStage.Loaded when countdown => ($"Starting game in {seconds}s", LaunchPadTheme.Text),
         LoadStage.Loaded => ("Mods loaded, paused", LaunchPadTheme.TextSub),
-        LoadStage.Failed => ("Loading failed, open the SLP menu for details", LaunchPadTheme.Err),
         _ => ("", LaunchPadTheme.TextSub),
       };
     ImGuiHelper.TextColored(text, color);
@@ -250,8 +254,6 @@ public static class LaunchWindow
     }
     else if (stage == LoadStage.Loading && LoadStrategy.StepsTotal > 0)
       RocketBar.Draw(LoadStrategy.StepsDone / (float)LoadStrategy.StepsTotal, RocketBar.Rocket.None);
-    else if (stage == LoadStage.Failed)
-      RocketBar.Draw(0f, RocketBar.Rocket.None);
     else
       RocketBar.Draw(0f, RocketBar.Rocket.None, indeterminate: true);
   }

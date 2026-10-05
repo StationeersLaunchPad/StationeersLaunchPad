@@ -325,6 +325,7 @@ public static class ManualLoadWindow
       return (false, modsChanged);
     }
 
+    RocketBar.DiveTarget = ImGui.GetCursorScreenPos() + new Vector2(avail.x, buttonHeight) / 2f;
     if (Widgets.PrimaryButton($"{nextText}##next", new Vector2(avail.x, buttonHeight), nextEnabled))
     {
       if (workshopMissing.Count > 0)

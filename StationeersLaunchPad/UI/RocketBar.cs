@@ -19,16 +19,21 @@ public static class RocketBar
   private const float ClimbSeconds = 1.5f;
   private const float CrashUpSeconds = 0.95f;
   private const float CrashDownSeconds = 0.7f;
-  private const float CrashSeconds = 2f;
+  private const float CrashSeconds = CrashUpSeconds + CrashDownSeconds + BoomSeconds;
   private const float CrashChance = 1f / 50f;
+  private const float DiveOutSeconds = 0.6f;
+  private const float DiveInSeconds = 1.5f;
+  private const float BoomSeconds = 0.35f;
+
+  private enum Path { Climb, Crash, Dive }
 
   private sealed class Flight
   {
     internal Vector2 Start;
-    internal Vector2 Screen;
     internal float Height;
     internal float StartTime;
-    internal bool Crash;
+    internal Path Path;
+    internal System.Action OnExit;
   }
 
   private static readonly List<Flight> flights = [];
@@ -36,6 +41,10 @@ public static class RocketBar
   private static float lastHeight;
   private static int lastFrame = -100;
   private static bool alwaysCrash;
+  private static float shown;
+
+  // the Load Mods button, where the rocket ends up when it dives into the SLP menu
+  public static Vector2? DiveTarget;
 
   public enum Rocket { None, Pad, Burn, Hold }
 
@@ -73,6 +82,8 @@ public static class RocketBar
     }
 
     fraction = Mathf.Clamp01(fraction);
+    if (Diving)
+      rocket = Rocket.None;
     if (rocket == Rocket.None)
     {
       if (fraction > 0f)
@@ -80,19 +91,23 @@ public static class RocketBar
       return;
     }
 
+    // glides when the countdown jumps, starts where it is on a new bar
+    shown = UnityEngine.Time.frameCount - lastFrame > 5 ? fraction
+      : Mathf.Lerp(shown, fraction, 1f - Mathf.Exp(-UnityEngine.Time.unscaledDeltaTime * 14f));
     // the nose is the head of the bar, the whole rocket stays inside it
-    var headX = Mathf.Lerp(min.x + halfLength * 2f, max.x, fraction);
+    var headX = Mathf.Lerp(min.x + halfLength * 2f, max.x, shown);
     var center = new Vector2(headX - halfLength, centerY);
     var tailX = center.x - halfLength;
     if (tailX > min.x + 1f)
       drawList.AddRectFilled(min, new Vector2(tailX + height * 0.3f, max.y), U32(accent), barHeight / 2f);
 
-    var time = UnityEngine.Time.unscaledTime;
-    if (rocket == Rocket.Burn)
-      DrawFlames(drawList, center, 0f, height, 0.9f + Flicker(time) * 0.4f);
-    else if (rocket == Rocket.Hold)
-      DrawFlames(drawList, center, 0f, height, 0.35f + Flicker(time) * 0.15f);
-    DrawRocket(drawList, center, 0f, height);
+    var flicker = Flicker(UnityEngine.Time.unscaledTime);
+    DrawShip(drawList, center, 0f, height, rocket switch
+    {
+      Rocket.Burn => 0.9f + flicker * 0.4f,
+      Rocket.Hold => 0.35f + flicker * 0.15f,
+      _ => 0f,
+    });
 
     lastCenter = center;
     lastHeight = height;
@@ -104,19 +119,32 @@ public static class RocketBar
   }
 
   // the rocket drawn last frame lifts off the bar and flies off screen
-  public static void Launch()
+  public static void Launch() => Fly(alwaysCrash || Random.value < CrashChance ? Path.Crash : Path.Climb);
+
+  // the rocket drawn last frame dives off the splash, onExit opens the SLP menu, then it hits Load Mods
+  public static void Dive(System.Action onExit)
+  {
+    if (!Fly(Path.Dive, onExit))
+      onExit();
+  }
+
+  // the rocket is on its way off the splash
+  public static bool Diving => flights.Exists(flight => flight.OnExit != null);
+
+  private static bool Fly(Path path, System.Action onExit = null)
   {
     if (UnityEngine.Time.frameCount - lastFrame > 5)
-      return;
+      return false;
     flights.Add(new Flight
     {
       Start = lastCenter,
       Height = lastHeight,
-      Screen = ImGui.GetIO().DisplaySize,
       StartTime = UnityEngine.Time.unscaledTime,
-      Crash = alwaysCrash || Random.value < CrashChance,
+      Path = path,
+      OnExit = onExit,
     });
     lastFrame = -100;
+    return true;
   }
 
   // secret: the C key on the splash
@@ -141,27 +169,33 @@ public static class RocketBar
     {
       var flight = flights[i];
       var t = now - flight.StartTime;
-      var done = flight.Crash ? DrawCrash(drawList, flight, t, now) : DrawClimb(drawList, flight, t, now);
+      var done = flight.Path switch
+      {
+        Path.Crash => DrawCrash(drawList, flight, t, now),
+        Path.Dive => DrawDive(drawList, flight, t, now),
+        _ => DrawClimb(drawList, flight, t, now),
+      };
       if (done)
         flights.RemoveAt(i);
     }
   }
 
-  // pitch up off the bar and climb straight out of the top of the screen
+  // straight out of the top of the screen
   private static bool DrawClimb(ImDrawListPtr drawList, Flight flight, float t, float time)
   {
     if (t >= ClimbSeconds)
       return true;
-    var h = flight.Height;
-    var turn = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t / 0.25f));
-    var u = t / ClimbSeconds;
-    var pos = new Vector2(
-      flight.Start.x + h * 0.6f * turn,
-      flight.Start.y - (flight.Start.y + h * Aspect) * u * u);
-    var angle = -Mathf.PI / 2f * turn;
-    DrawFlames(drawList, pos, angle, h, 1.6f + Flicker(time) * 0.6f);
-    DrawRocket(drawList, pos, angle, h);
+    var (pos, angle) = LiftOff(flight, t / ClimbSeconds, -1f, flight.Start.y + flight.Height * Aspect, 2f, t);
+    DrawShip(drawList, pos, angle, flight.Height, 1.6f + Flicker(time) * 0.6f);
     return false;
+  }
+
+  // turns off the bar towards straight up (-1) or down (1) and covers the distance by u = 1
+  private static (Vector2 pos, float angle) LiftOff(Flight flight, float u, float vertical, float distance, float power, float t)
+  {
+    var turn = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t / 0.25f));
+    var pos = flight.Start + new Vector2(flight.Height * 0.6f * turn, vertical * distance * Mathf.Pow(u, power));
+    return (pos, vertical * Mathf.PI / 2f * turn);
   }
 
   // one smooth path: climbs and curls over to the left, nearly stalls at the top,
@@ -172,7 +206,7 @@ public static class RocketBar
       return true;
     var h = flight.Height;
     var half = h * Aspect / 2f;
-    var screen = flight.Screen;
+    var screen = ImGui.GetIO().DisplaySize;
     var start = flight.Start;
     var apex = new Vector2(start.x - screen.x * 0.14f, screen.y * 0.1f);
     var wall = new Vector2(half, screen.y * 0.5f);
@@ -182,8 +216,7 @@ public static class RocketBar
     if (t >= CrashUpSeconds + CrashDownSeconds)
     {
       var end = BezierTangent(down, 1f).normalized;
-      DrawBoom(drawList, new Vector2(0f, (wall + end * half).y), h,
-        (t - CrashUpSeconds - CrashDownSeconds) / (CrashSeconds - CrashUpSeconds - CrashDownSeconds));
+      DrawBoom(drawList, new Vector2(0f, (wall + end * half).y), 0f, h, (t - CrashUpSeconds - CrashDownSeconds) / BoomSeconds);
       return false;
     }
 
@@ -198,20 +231,57 @@ public static class RocketBar
     }
     else
     {
-      // picks up speed towards the wall
       var v = (t - CrashUpSeconds) / CrashDownSeconds;
       var s = AtDistance(down, Mathf.Pow(v, 1.6f));
       pos = Bezier(down, s);
       dir = BezierTangent(down, s);
     }
     var angle = Mathf.Atan2(dir.y, dir.x);
-    // off the bar it still points along it
+    // turns off the bar instead of snapping to the path
     if (t < 0.25f)
       angle = Mathf.LerpAngle(0f, angle * Mathf.Rad2Deg, Mathf.SmoothStep(0f, 1f, t / 0.25f)) * Mathf.Deg2Rad;
-    DrawFlames(drawList, pos, angle, h, 1.6f + Flicker(time) * 0.6f);
-    DrawRocket(drawList, pos, angle, h);
+    DrawShip(drawList, pos, angle, h, 1.6f + Flicker(time) * 0.6f);
     return false;
   }
+
+  // noses down off the splash and swoops across the SLP menu into Load Mods
+  private static bool DrawDive(ImDrawListPtr drawList, Flight flight, float t, float time)
+  {
+    if (t >= DiveOutSeconds + DiveInSeconds + BoomSeconds)
+      return true;
+    var h = flight.Height;
+    var half = h * Aspect / 2f;
+    var screen = ImGui.GetIO().DisplaySize;
+    var target = DiveTarget ?? new Vector2(screen.x * 0.85f, screen.y * 0.9f);
+
+    if (t >= DiveOutSeconds + DiveInSeconds)
+    {
+      DrawBoom(drawList, target, -Mathf.PI / 2f, h, (t - DiveOutSeconds - DiveInSeconds) / BoomSeconds);
+      return false;
+    }
+
+    Vector2 pos;
+    float angle;
+    if (t < DiveOutSeconds)
+      (pos, angle) = LiftOff(flight, t / DiveOutSeconds, 1f, screen.y - flight.Start.y + half * 2f, 1.4f, t);
+    else
+    {
+      // off the bottom: the menu opens, the rocket comes back in at the top in the same column
+      flight.OnExit?.Invoke();
+      flight.OnExit = null;
+      var entry = new Vector2(flight.Start.x + h * 0.6f, -half * 2f);
+      Vector2[] path = [entry, entry + new Vector2(0f, screen.y * 0.45f), target + new Vector2(-screen.x * 0.35f, -screen.y * 0.05f), target];
+      var s = AtDistance(path, Glide((t - DiveOutSeconds) / DiveInSeconds));
+      pos = Bezier(path, s);
+      var dir = BezierTangent(path, s);
+      angle = Mathf.Atan2(dir.y, dir.x);
+    }
+    DrawShip(drawList, pos, angle, h, 1.6f + Flicker(time) * 0.6f);
+    return false;
+  }
+
+  // 0 to 1 at twice the average speed at both ends, half of it in the middle
+  private static float Glide(float u) => u * (2f * u * u - 3f * u + 2f);
 
   private static Vector2 Bezier(Vector2[] p, float s)
   {
@@ -245,24 +315,25 @@ public static class RocketBar
   }
 
   // opaque only, translucent fills turn pink over the splash
-  private static void DrawBoom(ImDrawListPtr drawList, Vector2 at, float h, float e)
+  // facing is where the debris flies, away from what the rocket hit
+  private static void DrawBoom(ImDrawListPtr drawList, Vector2 at, float facing, float h, float e)
   {
     var color = e < 0.3f ? Color.Lerp(FlameInner, FlameOuter, e / 0.3f) : Color.Lerp(FlameOuter, Smoke, (e - 0.3f) / 0.7f);
     var size = h * (1.5f + 5f * e) * (1f - e * e * e);
     for (var k = 0; k < 6; k++)
     {
-      var a = (k / 6f - 0.5f) * Mathf.PI;
+      var a = facing + (k / 6f - 0.5f) * Mathf.PI;
       var offset = new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * size * 0.7f;
       drawList.AddCircleFilled(at + offset, size * (0.55f + 0.1f * (k % 3)), U32(color), 16);
     }
     drawList.AddCircleFilled(at, size * 0.6f, U32(Color.Lerp(FlameInner, color, e)), 16);
 
-    // bits of rocket bouncing off the wall
+    // bits of rocket bouncing off
     var hull = U32(Hull);
-    var s = e * (CrashSeconds - CrashUpSeconds - CrashDownSeconds);
+    var s = e * BoomSeconds;
     for (var k = 0; k < 8; k++)
     {
-      var a = (k / 7f - 0.5f) * Mathf.PI * 0.8f;
+      var a = facing + (k / 7f - 0.5f) * Mathf.PI * 0.8f;
       var speed = h * (12f + 8f * Mathf.Abs(Mathf.Sin(k * 12.9898f)));
       var pos = at + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * speed * s + new Vector2(0f, h * 40f * s * s);
       var spin = s * 12f + k;
@@ -282,28 +353,23 @@ public static class RocketBar
     return center + new Vector2(x * cos - y * sin, x * sin + y * cos) * h;
   }
 
-  private static void DrawRocket(ImDrawListPtr drawList, Vector2 center, float angle, float h)
+  // the sprite with a flame per nozzle, flame is its length in rocket heights
+  private static void DrawShip(ImDrawListPtr drawList, Vector2 center, float angle, float h, float flame)
   {
-    if (!ModImages.TryGetBuiltIn(ModImages.RocketImage, out var id, out _))
-      return;
     var half = Aspect / 2f;
-    drawList.AddImageQuad(id,
-      Local(center, angle, h, -half, -0.5f), Local(center, angle, h, half, -0.5f),
-      Local(center, angle, h, half, 0.5f), Local(center, angle, h, -half, 0.5f),
-      new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(0f, 1f));
-  }
-
-  // one flame per nozzle
-  private static void DrawFlames(ImDrawListPtr drawList, Vector2 center, float angle, float h, float length)
-  {
-    var tail = -Aspect / 2f + 0.02f;
-    foreach (var y in new[] { -NozzleY, NozzleY })
+    var tail = -half + 0.02f;
+    foreach (var y in flame > 0f ? new[] { -NozzleY, NozzleY } : [])
     {
-      drawList.AddTriangleFilled(Local(center, angle, h, tail, y - 0.17f), Local(center, angle, h, tail - length, y),
+      drawList.AddTriangleFilled(Local(center, angle, h, tail, y - 0.17f), Local(center, angle, h, tail - flame, y),
         Local(center, angle, h, tail, y + 0.17f), U32(FlameOuter));
-      drawList.AddTriangleFilled(Local(center, angle, h, tail, y - 0.09f), Local(center, angle, h, tail - length * 0.55f, y),
+      drawList.AddTriangleFilled(Local(center, angle, h, tail, y - 0.09f), Local(center, angle, h, tail - flame * 0.55f, y),
         Local(center, angle, h, tail, y + 0.09f), U32(FlameInner));
     }
+    if (ModImages.TryGetBuiltIn(ModImages.RocketImage, out var id, out _))
+      drawList.AddImageQuad(id,
+        Local(center, angle, h, -half, -0.5f), Local(center, angle, h, half, -0.5f),
+        Local(center, angle, h, half, 0.5f), Local(center, angle, h, -half, 0.5f),
+        new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(0f, 1f));
   }
 
   private static uint U32(Color color) => ImGui.ColorConvertFloat4ToU32((Vector4)color);

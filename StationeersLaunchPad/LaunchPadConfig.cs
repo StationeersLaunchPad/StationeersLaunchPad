@@ -48,10 +48,15 @@ public class StageWait(double seconds, bool auto)
   public readonly double Seconds = seconds;
   public bool Auto = auto;
 
-  public double SecondsRemaining => Seconds - stopwatch.Elapsed.TotalSeconds;
+  private double shift;
+
+  public double SecondsRemaining => Seconds - stopwatch.Elapsed.TotalSeconds + shift;
   public bool Done { get => field || (Auto && SecondsRemaining <= 0); private set; } = false;
 
   public void Skip() => Done = true;
+
+  // the arrow keys on the splash, never past a full countdown
+  public void Shift(double seconds) => shift = Math.Min(shift + seconds, stopwatch.Elapsed.TotalSeconds);
 }
 
 public static class LaunchPadConfig
@@ -147,11 +152,21 @@ public static class LaunchPadConfig
       else if (action is LaunchAction.OpenMenu or LaunchAction.OpenPacks)
       {
         quickProfileOpen = false;
-        StopAutoLoad();
         if (action == LaunchAction.OpenPacks)
+        {
+          StopAutoLoad();
           ManualLoadWindow.OpenProfilesTab();
+        }
         else
-          ManualLoadWindow.OpenModInfoTab();
+        {
+          // the menu opens once the rocket has dived off the splash
+          CurWait.Auto = false;
+          RocketBar.Dive(() =>
+          {
+            StopAutoLoad();
+            ManualLoadWindow.OpenModInfoTab();
+          });
+        }
       }
     }
     else if (!AutoLoad)
