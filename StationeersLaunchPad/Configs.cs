@@ -340,7 +340,7 @@ public static class Configs
     );
     UiAccent = config.Bind(
       new ConfigDefinition("Appearance", "AccentColor"),
-      UiAccentColor.Classic,
+      UiAccentColor.Orange,
       new ConfigDescription(
         "Accent color for LaunchPad controls."
       )
