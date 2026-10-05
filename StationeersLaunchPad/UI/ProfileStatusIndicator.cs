@@ -26,24 +26,15 @@ public static class ProfileStatusIndicator
     ProfileManager manager, ProfileData profile, ModList modList)
   {
     if (profile == null)
-      return new(ProfileStatusKind.Error, "Profile unavailable",
-        "The selected profile could not be loaded.");
+      return new(ProfileStatusKind.Error, "Pack unavailable",
+        "The selected pack could not be loaded.");
 
-    var modIndex = ProfileManager.BuildModIndex(modList.AllMods);
     var missing = manager.GetMissingMods(profile.Name, modList).Count;
-    var diverged = manager.HasDiverged(profile.Name, modList, modIndex);
-
     if (missing > 0)
       return new(ProfileStatusKind.Error,
         $"{missing} required mod{(missing == 1 ? " is" : "s are")} missing",
-        "Loading is paused. Restore the missing mods or remove them from this profile.");
-    if (diverged)
-      return new(ProfileStatusKind.Unsaved, "Unsaved changes",
-        "The working mod list differs from this saved profile. Save it or revert the changes.");
-    if (ProfileManager.IsVanillaProfile(profile.Name))
-      return new(ProfileStatusKind.Saved, "Built-in: Mods disabled",
-        "Vanilla is a built-in profile that loads Stationeers without mods.");
-    return new(ProfileStatusKind.Saved, "Saved", "This profile matches the working mod list.");
+        "Loading is paused. Restore the missing mods or remove them from this pack.");
+    return new(ProfileStatusKind.Saved, "Ready", "Every mod of this pack is installed.");
   }
 
   public static void Draw(ProfileStatusInfo status, bool prominent = false) =>

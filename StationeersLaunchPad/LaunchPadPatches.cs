@@ -88,6 +88,17 @@ static class LaunchPadPatches
       failed = true;
     }
 
+    try
+    {
+      RunNetworkPatches();
+    }
+    catch (Exception ex)
+    {
+      Logger.Global.LogError("An error occurred running network patches. The SLP2 server handshake may not work properly");
+      Logger.Global.LogException(ex);
+      failed = true;
+    }
+
     return !failed;
   }
 
@@ -107,6 +118,14 @@ static class LaunchPadPatches
 
   private static void RunCustomSavePathPatches() =>
     harmony.CreateClassProcessor(typeof(CustomSavePathPatches), true).Patch();
+
+  private static void RunNetworkPatches()
+  {
+    harmony.CreateClassProcessor(typeof(Networking.Slp2Channel), true).Patch();
+    harmony.CreateClassProcessor(typeof(Networking.Slp2JoinMarker), true).Patch();
+    harmony.CreateClassProcessor(typeof(Networking.Slp2JoinFailureOffer), true).Patch();
+    harmony.CreateClassProcessor(typeof(Networking.Slp2SaveFlow), true).Patch();
+  }
 
   public static void RunLinuxPathPatch() =>
     harmony.CreateClassProcessor(typeof(LinuxPathPatch), true).Patch();
@@ -328,7 +347,11 @@ static class WorkshopPatches
     DrawWorkshopMenuConfig();
     DrawSettingsMenuConfig();
     LogPanel.DrawStandaloneLogs();
+    SlpDialog.Draw();
   }
+
+  [HarmonyPatch(typeof(ImGuiLoadingScreen), nameof(ImGuiLoadingScreen.DrawStandardLoading)), HarmonyPostfix]
+  static void DrawLoadingScreenWindows() => SlpDialog.Draw();
 
   private static void DrawWorkshopMenuConfig()
   {

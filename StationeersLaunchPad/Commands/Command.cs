@@ -336,6 +336,7 @@ public class RootCommand : SubCommand
     new DebugPkgCommand(),
     new LoadToCommand(),
     new ExitCommand(),
+    new Slp2ProbeCommand(),
   ];
   private static readonly SubCommand[] InGameCommands =
   [
@@ -383,7 +384,15 @@ public class ModPkgCommand : SubCommand
       result = null;
       return false;
     }
-    result = LaunchPadConfig.ExportModPackage(pkgpath);
+    try
+    {
+      result = $"exported {LaunchPadConfig.ExportModPackage(LaunchPadConfig.ServerPackageMods(), pkgpath)}";
+    }
+    catch (Exception ex)
+    {
+      Logger.Global.LogException(ex);
+      result = ex.ToString();
+    }
     return true;
   }
 }

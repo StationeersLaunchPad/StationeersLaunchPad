@@ -86,7 +86,7 @@ internal static class ConfigPanel
     }
     else
       ImGuiHelper.TextDisabled("These configurations may require a restart to apply");
-    ImGui.BeginChild("##config", ImGuiWindowFlags.HorizontalScrollbar);
+    ImGui.BeginChild("##config");
     foreach (var configFile in configFiles)
     {
       DrawConfigFile(configFile);
@@ -96,7 +96,7 @@ internal static class ConfigPanel
 
   public static bool DrawConfigFile(SortedConfigFile configFile, Func<string, bool> categoryFilter = null)
   {
-    ImGuiHelper.Text(configFile.FileName);
+    ImGuiHelper.TextColored(configFile.FileName, LaunchPadTheme.TextMuted);
     ImGui.PushID(configFile.FileName);
 
     var changed = false;
@@ -106,7 +106,7 @@ internal static class ConfigPanel
       if (categoryFilter != null && !categoryFilter(category.Category))
         continue;
 
-      if (!ImGui.CollapsingHeader(category.Category, ImGuiTreeNodeFlags.DefaultOpen))
+      if (!Widgets.CollapsibleSection($"{configFile.FileName}/{category.Category}", category.Category))
         continue;
 
       ImGui.PushID(category.Category);
@@ -146,16 +146,26 @@ internal static class ConfigPanel
     ImGui.BeginDisabled(wrapper.Disabled);
     var entry = wrapper.Entry as ConfigEntry<T>;
     var value = entry.Value;
-    if (value is not bool)
+
+    var compact = Configs.CompactConfigPanel.Value;
+    var description = wrapper.Description?.Description;
+    var spacing = ImGui.GetStyle().ItemSpacing.x;
+    var startX = ImGui.GetCursorPosX();
+    var labelWidth = Mathf.Clamp(ImGui.GetContentRegionAvail().x * 0.45f, 140f, 460f);
+    ImGui.BeginGroup();
+    ImGui.AlignTextToFramePadding();
+    ImGuiHelper.Text(wrapper.DisplayName);
+    if (!compact && !string.IsNullOrEmpty(description))
     {
-      if (Configs.CompactConfigPanel.Value)
-        ImGui.AlignTextToFramePadding();
-      ImGuiHelper.Text(wrapper.DisplayName);
-      if (Configs.CompactConfigPanel.Value)
-        ImGui.SameLine();
+      ImGui.PushTextWrapPos(startX + labelWidth - spacing * 2f);
+      ImGuiHelper.TextColored(description.Trim(), LaunchPadTheme.TextMuted);
+      ImGui.PopTextWrapPos();
     }
+    ImGui.EndGroup();
+    ImGui.SameLine(startX + labelWidth);
+    // full width inputs look stretched on wide screens; text fits in 480px
     if (fill)
-      ImGui.SetNextItemWidth(-float.Epsilon);
+      ImGui.SetNextItemWidth(Math.Min(ImGui.GetContentRegionAvail().x, 480f));
 
     var changed = false;
     if (wrapper.CustomDrawer != null)
@@ -196,9 +206,17 @@ internal static class ConfigPanel
     ImGui.EndGroup();
     ImGui.PopID();
 
-    var description = wrapper.Description?.Description;
-    if (!string.IsNullOrEmpty(description))
+    if (compact && !string.IsNullOrEmpty(description))
       ImGuiHelper.ItemTooltip(description, 600f);
+
+    // hairline between entries
+    var lineStart = ImGui.GetCursorScreenPos();
+    ImGui.Dummy(new Vector2(0f, 2f));
+    ImGui.GetWindowDrawList().AddLine(
+      new Vector2(lineStart.x, lineStart.y),
+      new Vector2(lineStart.x + ImGui.GetContentRegionAvail().x, lineStart.y),
+      LaunchPadTheme.OverU32(Color.white, 0.05f));
+    ImGui.Dummy(new Vector2(0f, 2f));
     return changed;
   }
 
@@ -365,13 +383,8 @@ internal static class ConfigPanel
     var changed = false;
 
     var value = entry.Value;
-    var compact = Configs.CompactConfigPanel.Value;
-    if (compact)
-    {
-      ImGuiHelper.Text(wrapper.DisplayName);
-      ImGui.SameLine();
-    }
-    if (ImGui.Checkbox(compact ? "##boolvalue" : wrapper.DisplayName, ref value))
+    // the label is drawn by DrawConfigEntry
+    if (ImGui.Checkbox("##boolvalue", ref value))
     {
       entry.Value = value;
       changed = true;

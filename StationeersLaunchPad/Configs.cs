@@ -38,14 +38,11 @@ public static class Configs
   public static ConfigEntry<int> UpdateCheckTimeout;
   public static ConfigEntry<int> UpdateDownloadTimeout;
   public static ConfigEntry<bool> AutoLoadOnStart;
-  public static ConfigEntry<bool> AutoSortOnStart;
   public static ConfigEntry<int> AutoLoadWaitTime;
   public static ConfigEntry<bool> DedupeMods;
   public static ConfigEntry<int> DedupePriorityLocal;
   public static ConfigEntry<int> DedupePriorityRepo;
   public static ConfigEntry<int> DedupePriorityWorkshop;
-  public static ConfigEntry<LoadStrategyType> LoadStrategyType;
-  public static ConfigEntry<LoadStrategyMode> LoadStrategyMode;
   public static ConfigEntry<bool> DisableSteamOnStart;
   public static ConfigEntry<string> SavePathOnStart;
   public static ConfigEntry<bool> RetainWorkshopMods;
@@ -66,6 +63,9 @@ public static class Configs
   public static ConfigEntry<bool> RepoModValidateDigest;
   public static ConfigEntry<bool> RepoModValidateVersion;
   public static ConfigEntry<string> ModProfile;
+  public static ConfigEntry<bool> ServerPacksEnabled;
+  public static ConfigEntry<bool> ServerPacksAutoConnect;
+  public static ConfigEntry<bool> ShareModList;
 
   public static ConfigEntry<bool> NewsCheckOnStart;
   public static ConfigEntry<string> NewsFeedUrl;
@@ -81,7 +81,6 @@ public static class Configs
 
   public static bool RunPostUpdateCleanup => CheckForUpdate.Value && PostUpdateCleanup.Value;
   public static bool RunOneTimeBoosterInstall => CheckForUpdate.Value && OneTimeBoosterInstall.Value;
-  public static (LoadStrategyType, LoadStrategyMode) LoadStrategy => (LoadStrategyType.Value, LoadStrategyMode.Value);
 
   public static void Initialize(ConfigFile config)
   {
@@ -131,13 +130,6 @@ public static class Configs
         new AcceptableValueRange<int>(0, 30)
       )
     );
-    AutoSortOnStart = config.Bind(
-      new ConfigDefinition("Startup", "AutoSort"),
-      true,
-      new ConfigDescription(
-        "Automatically sort based on dependencies and OrderBefore/OrderAfter tags in mod data"
-      )
-    );
     DisableSteamOnStart = config.Bind(
       new ConfigDefinition("Startup", "DisableSteam"),
       false,
@@ -180,20 +172,6 @@ public static class Configs
       dedupeDefault[3],
       new ConfigDescription(
         "Priority of Repo mods when deduping, lower priority gets disabled"
-      )
-    );
-    LoadStrategyType = config.Bind(
-      new ConfigDefinition("Mod Loading", "LoadStrategyType"),
-      Loading.LoadStrategyType.Linear,
-      new ConfigDescription(
-        "Linear type loads mods one by one in sequential order. More types of mod loading will be added later."
-      )
-    );
-    LoadStrategyMode = config.Bind(
-      new ConfigDefinition("Mod Loading", "LoadStrategyMode"),
-      Loading.LoadStrategyMode.Serial,
-      new ConfigDescription(
-        "Parallel mode loads faster for a large number of mods, but may fail in extremely rare cases. Switch to serial mode if running into loading issues."
       )
     );
     SavePathOnStart = config.Bind(
@@ -322,7 +300,28 @@ public static class Configs
       new ConfigDefinition("Internal", "ModProfile"),
       "",
       new ConfigDescription(
-        "The active mod profile. Leave empty to use the normal mod configuration."
+        "The active mod pack. Managed by the Mod Packs page."
+      )
+    );
+    ServerPacksEnabled = config.Bind(
+      new ConfigDefinition("Server Packs", "Enabled"),
+      true,
+      new ConfigDescription(
+        "Offer to save a server's mods as a pack when you join it, and check server packs against their server before loading."
+      )
+    );
+    ServerPacksAutoConnect = config.Bind(
+      new ConfigDefinition("Server Packs", "AutoConnect"),
+      true,
+      new ConfigDescription(
+        "Connect to a server automatically when its server modpack is selected and validated successfully on startup."
+      )
+    );
+    ShareModList = config.Bind(
+      new ConfigDefinition("Hosting", "ShareModList"),
+      true,
+      new ConfigDescription(
+        "When hosting or running a dedicated server, send the mod list to joining SLP players so they can save it as a pack."
       )
     );
     LinuxPathPatch = config.Bind(
@@ -341,9 +340,9 @@ public static class Configs
     );
     UiAccent = config.Bind(
       new ConfigDefinition("Appearance", "AccentColor"),
-      UiAccentColor.Classic,
+      UiAccentColor.Orange,
       new ConfigDescription(
-        "Accent color for LaunchPad controls. Classic uses the existing SLP theme."
+        "Accent color for LaunchPad controls."
       )
     );
     Sorted = new SortedConfigFile(config);
@@ -406,9 +405,13 @@ public class ConfigEntryWrapper
   public ConfigDefinition Definition => Entry.Definition;
   public ConfigDescription Description => Entry.Description;
 
+  // "DedupePriorityLocal" -> "Dedupe Priority Local", for entries without a DisplayName tag
+  private static readonly System.Text.RegularExpressions.Regex WordBoundary =
+    new(@"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])");
+
   public ConfigEntryWrapper(ConfigEntryBase entry)
   {
-    DisplayName = entry.Definition.Key;
+    DisplayName = WordBoundary.Replace(entry.Definition.Key.Replace('_', ' '), " ");
     Entry = entry;
     foreach (var tag in entry.Description.Tags)
     {
