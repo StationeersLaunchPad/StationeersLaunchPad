@@ -77,6 +77,7 @@ public static class LaunchPadConfig
   private static bool SkipNextAutoWaits;
   private static bool SteamDisabled;
   private static bool quickProfileOpen;
+  private static StageWait takeoffWait;
   private static bool preserveSelectionAfterReload = true;
 
   private static StageWait CurWait = new(0, false);
@@ -175,6 +176,12 @@ public static class LaunchPadConfig
       HandleChange(changed);
     }
 
+    if (Stage == LoadStage.Loaded && CurWait is { Auto: true, Done: false } wait && wait != takeoffWait
+      && wait.SecondsRemaining <= RocketBar.TakeoffSeconds)
+    {
+      takeoffWait = wait;
+      RocketBar.Launch();
+    }
     ImGuiHelper.Draw(RocketBar.DrawFlights);
     SlpDialog.Draw();
     NewsPopup.Draw();
@@ -217,10 +224,7 @@ public static class LaunchPadConfig
     await StageFinal();
 
     Networking.Slp2AutoConnect.ArmIfVerified();
-    // the game waits for the rocket to clear the screen
     Stage = LoadStage.Running;
-    RocketBar.Launch();
-    await RocketBar.WaitForFlights();
     StartGame();
     await SLPCommand.MoveToStage(CommandStage.GameRunning);
   }

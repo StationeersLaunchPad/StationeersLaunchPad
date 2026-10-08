@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using Cysharp.Threading.Tasks;
 using ImGuiNET;
 using UnityEngine;
 
@@ -82,7 +81,7 @@ public static class RocketBar
     }
 
     fraction = Mathf.Clamp01(fraction);
-    if (Diving)
+    if (flights.Count > 0)
       rocket = Rocket.None;
     if (rocket == Rocket.None)
     {
@@ -131,6 +130,9 @@ public static class RocketBar
   // the rocket is on its way off the splash
   public static bool Diving => flights.Exists(flight => flight.OnExit != null);
 
+  // the longest takeoff, a countdown launches this long before it ends
+  public const float TakeoffSeconds = CrashSeconds;
+
   private static bool Fly(Path path, System.Action onExit = null)
   {
     if (UnityEngine.Time.frameCount - lastFrame > 5)
@@ -149,14 +151,6 @@ public static class RocketBar
 
   // secret: the C key on the splash
   public static void AlwaysCrash() => alwaysCrash = true;
-
-  // until the rockets are gone, never longer than a flight
-  public static async UniTask WaitForFlights()
-  {
-    var timeout = UnityEngine.Time.unscaledTime + CrashSeconds + 0.1f;
-    while (flights.Count > 0 && UnityEngine.Time.unscaledTime < timeout)
-      await UniTask.Yield();
-  }
 
   // call once per frame from the splash, the rockets fly over everything
   public static void DrawFlights()
