@@ -38,7 +38,8 @@ public static class Configs
   public static ConfigEntry<int> UpdateCheckTimeout;
   public static ConfigEntry<int> UpdateDownloadTimeout;
   public static ConfigEntry<bool> AutoLoadOnStart;
-  public static ConfigEntry<int> AutoLoadWaitTime;
+  public static ConfigEntry<int> AutoLoadCountdown;
+  public static ConfigEntry<int> AutoStartCountdown;
   public static ConfigEntry<bool> DevMode;
   public static ConfigEntry<bool> DedupeMods;
   public static ConfigEntry<int> DedupePriorityLocal;
@@ -123,11 +124,19 @@ public static class Configs
         new AcceptableValueRange<int>(10, 300)
       )
     );
-    AutoLoadWaitTime = config.Bind(
-      new ConfigDefinition("Startup", "AutoLoadWaitTime"),
-      3,
+    AutoLoadCountdown = config.Bind(
+      new ConfigDefinition("Startup", "AutoLoadCountdown"),
+      5,
       new ConfigDescription(
-        "How many seconds to wait before loading mods, then loading the game",
+        "Seconds to wait on the splash before loading mods",
+        new AcceptableValueRange<int>(0, 30)
+      )
+    );
+    AutoStartCountdown = config.Bind(
+      new ConfigDefinition("Startup", "AutoStartCountdown"),
+      2,
+      new ConfigDescription(
+        "Seconds to wait after the mods loaded before starting the game, 0 starts it right away",
         new AcceptableValueRange<int>(0, 30)
       )
     );

@@ -44,9 +44,21 @@ public struct LoadState
 
 public class StageWait(double seconds, bool auto)
 {
-  private readonly Stopwatch stopwatch = Stopwatch.StartNew();
+  private readonly Stopwatch stopwatch = auto ? Stopwatch.StartNew() : new();
   public readonly double Seconds = seconds;
-  public bool Auto = auto;
+
+  public bool Auto
+  {
+    get => field;
+    set
+    {
+      field = value;
+      if (value)
+        stopwatch.Start();
+      else
+        stopwatch.Stop();
+    }
+  } = auto;
 
   private double shift;
 
@@ -77,7 +89,6 @@ public static class LaunchPadConfig
   private static bool SkipNextAutoWaits;
   private static bool SteamDisabled;
   private static bool quickProfileOpen;
-  private static StageWait takeoffWait;
   private static bool preserveSelectionAfterReload = true;
 
   private static StageWait CurWait = new(0, false);
@@ -102,9 +113,9 @@ public static class LaunchPadConfig
       CurWait.Auto = false;
   }
 
-  private static StageWait NewAutoWait()
+  private static StageWait NewAutoWait(int seconds)
   {
-    var wait = new StageWait(Configs.DevMode.Value ? 0 : Configs.AutoLoadWaitTime.Value, AutoLoad);
+    var wait = new StageWait(Configs.DevMode.Value ? 0 : seconds, AutoLoad);
 
     if (AutoLoad && SkipNextAutoWaits)
       wait.Skip();
@@ -183,12 +194,6 @@ public static class LaunchPadConfig
       HandleChange(changed);
     }
 
-    if (Stage == LoadStage.Loaded && CurWait is { Auto: true, Done: false } wait && wait != takeoffWait
-      && wait.SecondsRemaining <= RocketBar.TakeoffSeconds)
-    {
-      takeoffWait = wait;
-      RocketBar.Launch();
-    }
     ImGuiHelper.Draw(RocketBar.DrawFlights);
     SlpDialog.Draw();
     NewsPopup.Draw();
@@ -440,7 +445,7 @@ public static class LaunchPadConfig
     if (Stage == LoadStage.Failed) return;
     Stage = LoadStage.Configuring;
 
-    CurWait = NewAutoWait();
+    CurWait = NewAutoWait(Configs.AutoLoadCountdown.Value);
 
     await SLPCommand.MoveToStage(CommandStage.ConfigLoaded);
     PrepareProfileStartup(firstLoad, preserveSelectionAfterReload);
@@ -453,7 +458,6 @@ public static class LaunchPadConfig
   {
     if (Stage == LoadStage.Failed) return;
     Stage = LoadStage.Loading;
-    RocketBar.Launch();
 
     var stopwatch = Stopwatch.StartNew();
 
@@ -489,7 +493,7 @@ public static class LaunchPadConfig
 
     await SLPCommand.MoveToStage(CommandStage.ModsLoaded);
 
-    CurWait = NewAutoWait();
+    CurWait = NewAutoWait(Configs.AutoStartCountdown.Value);
     await Platform.Wait(CurWait, CommandStage.ModsLoaded);
     await SLPRefCheck.RunRefCheck();
   }
