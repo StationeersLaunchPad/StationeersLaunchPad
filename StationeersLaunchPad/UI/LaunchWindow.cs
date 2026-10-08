@@ -31,8 +31,8 @@ public static class LaunchWindow
 
     if (input && (ImGui.IsKeyPressed(ImGuiKey.Space, false) || ImGui.IsKeyPressed(ImGuiKey.UpArrow, false)))
       action = LaunchAction.Continue;
-    else if (input && wait.Auto && (ImGui.IsKeyPressed(ImGuiKey.Escape, false) || Input.GetKeyDown(KeyCode.P)))
-      LaunchPadConfig.PauseAutoWait();
+    else if (input && (ImGui.IsKeyPressed(ImGuiKey.Escape, false) || Input.GetKeyDown(KeyCode.P)))
+      wait.Auto = !wait.Auto;
     else if (input && (Input.GetKeyDown(KeyCode.M) || ImGui.IsKeyPressed(ImGuiKey.DownArrow, false)))
       action = LaunchAction.OpenMenu;
     // unadvertised: the arrows steer the countdown
@@ -80,6 +80,8 @@ public static class LaunchWindow
         {
           changed = true;
           switched = true;
+          // picking a pack means the player is choosing, give them time
+          LaunchPadConfig.PauseAutoWait();
         }
         if (missing.Count > 0)
           ImGuiHelper.TextColored(
@@ -91,6 +93,10 @@ public static class LaunchWindow
       }
 
       DrawStatus(stage, wait, active, status);
+      // a click on the box itself, not on anything in it, pauses or resumes
+      if (input && action == LaunchAction.None && ImGui.IsMouseClicked(ImGuiMouseButton.Left)
+        && ImGui.IsWindowHovered(ImGuiHoveredFlags.ChildWindows) && !ImGui.IsAnyItemHovered())
+        wait.Auto = !wait.Auto;
       ImGui.End();
     });
     profileChanged = changed;
@@ -165,10 +171,11 @@ public static class LaunchWindow
     {
       if (missing.Count == 0 && !switched)
         hints.Add(("Space", "Start now", () => local = LaunchAction.Continue));
-      if (wait.Auto)
-        hints.Add(("P", "Stay here", LaunchPadConfig.PauseAutoWait));
       if (missing.Count == 0)
+      {
+        hints.Add(("P", wait.Auto ? "Stay here" : "Resume", () => wait.Auto = !wait.Auto));
         hints.Add(("M", "SLP Menu", () => local = LaunchAction.OpenMenu));
+      }
     }
 
     var hintWidths = hints.Select(hint => KeyHintWidth(hint.key, hint.label)).ToList();
