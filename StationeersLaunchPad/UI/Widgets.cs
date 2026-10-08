@@ -216,6 +216,7 @@ public static class Widgets
   // the Discord's trusted modder checkmark, one text line tall
   public static void TrustedBadge()
   {
+    var authorHovered = ImGui.IsItemHovered();
     var height = ImGui.GetTextLineHeight();
     var size = new Vector2(height, height);
     var min = ImGui.GetCursorScreenPos();
@@ -227,11 +228,12 @@ public static class Widgets
       ImGui.GetWindowDrawList().AddImage(id, min + offset, min + size + offset,
         Vector2.zero, Vector2.one, ImGui.ColorConvertFloat4ToU32(new Vector4(1f, 1f, 1f, 0.4f)));
     }
-    ImGuiHelper.ItemTooltip(
-      "Trusted modder\n\n"
-      + "One or multiple author(s) named here are recognized by the Stationeers Modding Community for their work.\n\n"
-      + "Only the author name field is checked. This is not a rating of the mod's quality or security.",
-      ImGui.GetFontSize() * 28f);
+    if (authorHovered || ImGui.IsItemHovered())
+      ImGuiHelper.TextTooltip(
+        "Trusted modder\n\n"
+        + "One or multiple author(s) named here are recognized by the Stationeers Modding Community for their work.\n\n"
+        + "Only the author name field is checked. This is not a rating of the mod's quality or security.",
+        ImGui.GetFontSize() * 28f);
   }
 
   // solid accent button for the main action on screen
