@@ -118,7 +118,11 @@ public static class RocketBar
   }
 
   // the rocket drawn last frame lifts off the bar and flies off screen
-  public static void Launch() => Fly(alwaysCrash || Random.value < CrashChance ? Path.Crash : Path.Climb);
+  public static void Launch()
+  {
+    if (!Configs.DevMode.Value)
+      Fly(alwaysCrash || Random.value < CrashChance ? Path.Crash : Path.Climb);
+  }
 
   // the rocket drawn last frame dives off the splash, onExit opens the SLP menu, then it hits Load Mods
   public static void Dive(System.Action onExit)

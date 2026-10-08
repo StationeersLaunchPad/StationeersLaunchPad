@@ -39,6 +39,7 @@ public static class Configs
   public static ConfigEntry<int> UpdateDownloadTimeout;
   public static ConfigEntry<bool> AutoLoadOnStart;
   public static ConfigEntry<int> AutoLoadWaitTime;
+  public static ConfigEntry<bool> DevMode;
   public static ConfigEntry<bool> DedupeMods;
   public static ConfigEntry<int> DedupePriorityLocal;
   public static ConfigEntry<int> DedupePriorityRepo;
@@ -128,6 +129,13 @@ public static class Configs
       new ConfigDescription(
         "How many seconds to wait before loading mods, then loading the game",
         new AcceptableValueRange<int>(0, 30)
+      )
+    );
+    DevMode = config.Bind(
+      new ConfigDefinition("Startup", "DevMode"),
+      false,
+      new ConfigDescription(
+        "For mod developers: no countdowns, no animations and no news, SLP loads straight into the game. Hold M while the game starts to stop on the splash."
       )
     );
     DisableSteamOnStart = config.Bind(

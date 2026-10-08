@@ -104,7 +104,7 @@ public static class LaunchPadConfig
 
   private static StageWait NewAutoWait()
   {
-    var wait = new StageWait(Configs.AutoLoadWaitTime.Value, AutoLoad);
+    var wait = new StageWait(Configs.DevMode.Value ? 0 : Configs.AutoLoadWaitTime.Value, AutoLoad);
 
     if (AutoLoad && SkipNextAutoWaits)
       wait.Skip();
@@ -125,6 +125,13 @@ public static class LaunchPadConfig
 
   public static void Draw()
   {
+    // dev mode loads straight through, holding M on startup stops on the splash
+    if (Configs.DevMode.Value && AutoLoad && Stage is LoadStage.Searching or LoadStage.Configuring
+      && UnityEngine.Input.GetKey(UnityEngine.KeyCode.M))
+    {
+      StopAutoLoad();
+      ManualLoadWindow.OpenModInfoTab();
+    }
     // the box stays locked during the server check and steps aside for the takeoff
     var gateStatus = Networking.Slp2ProfileSync.GateStatus;
     var boxShown = (AutoLoad || gateStatus != null) && Stage != LoadStage.Running;
@@ -382,7 +389,7 @@ public static class LaunchPadConfig
 
   private static async UniTask CheckNewsNotices()
   {
-    if (Platform.IsServer || !Configs.NewsCheckOnStart.Value) return;
+    if (Platform.IsServer || !Configs.NewsCheckOnStart.Value || Configs.DevMode.Value) return;
 
     var prevStage = Stage;
     try
