@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using ImGuiNET;
 using StationeersLaunchPad.Loading;
@@ -26,13 +27,13 @@ public static class LaunchWindow
     string status, out bool profileChanged)
   {
     profileChanged = false;
-    var input = status == null && !RocketBar.Diving && (stage == LoadStage.Configuring || stage == LoadStage.Loaded);
+    var input = status == null && !RocketBar.Diving && !SlpDialog.Open && (stage == LoadStage.Configuring || stage == LoadStage.Loaded);
     var action = LaunchAction.None;
 
     if (input && (ImGui.IsKeyPressed(ImGuiKey.Space, false) || ImGui.IsKeyPressed(ImGuiKey.UpArrow, false)))
       action = LaunchAction.Continue;
-    else if (input && wait.Auto && (ImGui.IsKeyPressed(ImGuiKey.Escape, false) || Input.GetKeyDown(KeyCode.P)))
-      LaunchPadConfig.PauseAutoWait();
+    else if (input && (ImGui.IsKeyPressed(ImGuiKey.Escape, false) || Input.GetKeyDown(KeyCode.P)))
+      wait.Auto = !wait.Auto;
     else if (input && (Input.GetKeyDown(KeyCode.M) || ImGui.IsKeyPressed(ImGuiKey.DownArrow, false)))
       action = LaunchAction.OpenMenu;
     // unadvertised: the arrows steer the countdown
@@ -40,8 +41,6 @@ public static class LaunchWindow
       wait.Shift(1);
     else if (input && wait.Auto && ImGui.IsKeyPressed(ImGuiKey.RightArrow))
       wait.Shift(-1);
-    if (Input.GetKeyDown(KeyCode.C))
-      RocketBar.AlwaysCrash();
 
     var changed = false;
     ImGuiHelper.Draw(() =>
@@ -75,11 +74,14 @@ public static class LaunchWindow
         var locked = status != null || stage != LoadStage.Configuring || ProfilePanel.Busy;
         DrawHeader(active, missing, wait, input, buttonHeight, ref action);
         var picked = PackGallery.Draw("##launchgallery", manager, modList,
-          new Vector2(ImGui.GetContentRegionAvail().x, galleryHeight), false, out _, enabled: !locked);
+          new Vector2(ImGui.GetContentRegionAvail().x, galleryHeight), false, out _, enabled: !locked,
+          onMenuCard: () => action = LaunchAction.OpenMenu);
         if (picked != null && manager.ApplyProfile(picked.Name, modList))
         {
           changed = true;
           switched = true;
+          // picking a pack means the player is choosing, give them time
+          LaunchPadConfig.PauseAutoWait();
         }
         if (missing.Count > 0)
           ImGuiHelper.TextColored(
@@ -91,6 +93,10 @@ public static class LaunchWindow
       }
 
       DrawStatus(stage, wait, active, status);
+      // a click on the box itself, not on anything in it, pauses or resumes
+      if (input && action == LaunchAction.None && ImGui.IsMouseClicked(ImGuiMouseButton.Left)
+        && ImGui.IsWindowHovered(ImGuiHoveredFlags.ChildWindows) && !ImGui.IsAnyItemHovered())
+        wait.Auto = !wait.Auto;
       ImGui.End();
     });
     profileChanged = changed;
@@ -104,9 +110,7 @@ public static class LaunchWindow
     var y = ImGui.GetCursorPosY();
     var textY = y + (height - ImGui.GetTextLineHeight()) / 2f;
     ImGui.SetCursorPosY(textY);
-    ImGuiHelper.TextColored("MOD PACK", LaunchPadTheme.TextMuted);
-    ImGui.SameLine();
-    ImGuiHelper.TextColored(active.Name, LaunchPadTheme.Accent);
+    ImGuiHelper.TextColored("StationeersLaunchPad", LaunchPadTheme.Accent);
 
     if (Networking.Slp2ProfileSync.SyncStatus is { } sync)
     {
@@ -165,10 +169,11 @@ public static class LaunchWindow
     {
       if (missing.Count == 0 && !switched)
         hints.Add(("Space", "Start now", () => local = LaunchAction.Continue));
-      if (wait.Auto)
-        hints.Add(("P", "Stay here", LaunchPadConfig.PauseAutoWait));
       if (missing.Count == 0)
+      {
+        hints.Add(("P", wait.Auto ? "Stay here" : "Resume", () => wait.Auto = !wait.Auto));
         hints.Add(("M", "SLP Menu", () => local = LaunchAction.OpenMenu));
+      }
     }
 
     var hintWidths = hints.Select(hint => KeyHintWidth(hint.key, hint.label)).ToList();
@@ -225,6 +230,7 @@ public static class LaunchWindow
   {
     var countdown = status == null && wait.Auto && stage is LoadStage.Configuring or LoadStage.Loaded;
     var seconds = Mathf.Max(0, Mathf.CeilToInt((float)wait.SecondsRemaining));
+    var precise = Mathf.Max(0f, (float)wait.SecondsRemaining).ToString("0.0", CultureInfo.InvariantCulture);
     var pack = active?.Name ?? "mods";
 
     var (text, color) = status != null ? (status, LaunchPadTheme.Text)
@@ -237,7 +243,7 @@ public static class LaunchWindow
         LoadStage.Configuring when countdown => ($"Loading {pack} in {seconds}s", LaunchPadTheme.Text),
         LoadStage.Configuring => ("Paused", LaunchPadTheme.TextSub),
         LoadStage.Loading => (LoadingText(), LaunchPadTheme.Text),
-        LoadStage.Loaded when countdown => ($"Starting game in {seconds}s", LaunchPadTheme.Text),
+        LoadStage.Loaded when countdown => ($"Starting game in {precise}s", LaunchPadTheme.Text),
         LoadStage.Loaded => ("Mods loaded, paused", LaunchPadTheme.TextSub),
         _ => ("", LaunchPadTheme.TextSub),
       };
@@ -247,16 +253,18 @@ public static class LaunchWindow
 
     if (status != null)
       RocketBar.Draw(1f, RocketBar.Rocket.Hold);
-    else if (stage is LoadStage.Configuring or LoadStage.Loaded)
-    {
-      var fraction = countdown && wait.Seconds > 0 ? 1f - (float)(wait.SecondsRemaining / wait.Seconds) : 0f;
-      RocketBar.Draw(fraction, countdown ? RocketBar.Rocket.Burn : RocketBar.Rocket.Pad);
-    }
-    else if (stage == LoadStage.Loading && LoadStrategy.StepsTotal > 0)
-      RocketBar.Draw(LoadStrategy.StepsDone / (float)LoadStrategy.StepsTotal, RocketBar.Rocket.None);
+    else if (stage == LoadStage.Configuring)
+      RocketBar.Draw(countdown ? Progress(wait) : 0f, countdown ? RocketBar.Rocket.Burn : RocketBar.Rocket.Pad);
+    else if (stage == LoadStage.Loading)
+      RocketBar.DrawLiftoff(0f, RocketBar.Rocket.Pad);
+    else if (stage == LoadStage.Loaded)
+      RocketBar.DrawLiftoff(Progress(wait), countdown ? RocketBar.Rocket.Burn : RocketBar.Rocket.Hold);
     else
       RocketBar.Draw(0f, RocketBar.Rocket.None, indeterminate: true);
   }
+
+  private static float Progress(StageWait wait) =>
+    wait.Seconds <= 0 ? 1f : 1f - (float)(wait.SecondsRemaining / wait.Seconds);
 
   private static string LoadingText()
   {

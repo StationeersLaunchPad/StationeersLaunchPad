@@ -239,6 +239,15 @@ public class ProfileManager
     return false;
   }
 
+  public List<ModInfo> OutsideChanges(ModList modList)
+  {
+    var active = ActiveProfile;
+    if (active == null)
+      return [];
+    return [.. modList.AllMods.Where(mod => mod.Source != ModSourceType.Core && mod.Enabled
+      && !IsInPack(mod, active) && !(ClientsideActive && IsClientside(mod)))];
+  }
+
   // picks up enabled changes made outside the mod list, like switching to a beta
   public void AbsorbEnabledChanges(ModList modList)
   {

@@ -24,9 +24,9 @@ public static class PackGallery
     return (Mathf.Max(20f, height - textHeight), textHeight);
   }
 
-  // returns the clicked pack if it isn't the active one
+  // returns the clicked pack if it isn't the active one. onMenuCard adds the SLP menu card up front
   public static ProfileData Draw(string id, ProfileManager manager, ModList modList, Vector2 size,
-    bool newCard, out bool newClicked, bool enabled = true)
+    bool newCard, out bool newClicked, bool enabled = true, Action onMenuCard = null)
   {
     newClicked = false;
     if (!ReferenceEquals(indexedModList, modList))
@@ -66,9 +66,17 @@ public static class PackGallery
       ImGui.SameLine();
     }
 
-    foreach (var pack in manager.ShownBuiltInPacks)
+    var menuDivider = onMenuCard != null;
+    if (menuDivider)
     {
       Gap(false);
+      if (DrawMenuCard(cardWidth, cardHeight))
+        onMenuCard();
+    }
+    foreach (var pack in manager.ShownBuiltInPacks)
+    {
+      Gap(menuDivider);
+      menuDivider = false;
       if (DrawCard(manager, modList, pack, active, cardWidth, cardHeight))
         picked = pack;
     }
@@ -163,6 +171,29 @@ public static class PackGallery
         : isActive ? $"{pack.Name} is the active pack." : $"Switch to {pack.Name}.",
         400f);
     ImGui.PopID();
+    return clicked;
+  }
+
+  private static bool DrawMenuCard(float width, float height)
+  {
+    var (imageHeight, _) = Metrics(height);
+    var min = ImGui.GetCursorScreenPos();
+    var max = min + new Vector2(width, height);
+    var clicked = ImGui.InvisibleButton("##menucard", new Vector2(width, height));
+    var hovered = ImGui.IsItemHovered();
+    var drawList = ImGui.GetWindowDrawList();
+    var accent = ImGui.ColorConvertFloat4ToU32((Vector4)LaunchPadTheme.Accent);
+
+    drawList.AddRectFilled(min, max, LaunchPadTheme.OverU32(Color.white, hovered ? 0.07f : 0.035f), 4f);
+    ModImages.DrawBuiltIn(drawList, ModImages.MenuImage, min + new Vector2(1f, 1f), new Vector2(max.x - 1f, min.y + imageHeight));
+    drawList.AddRect(min, max, LaunchPadTheme.OverU32(Color.white, hovered ? 0.3f : 0.1f), 4f);
+
+    var textPos = new Vector2(min.x + 6f, min.y + imageHeight + 5f);
+    drawList.AddText(textPos, accent, "SLP Menu");
+    drawList.AddText(textPos + new Vector2(0f, ImGui.GetTextLineHeight() + ImGui.GetStyle().ItemSpacing.y),
+      ImGui.ColorConvertFloat4ToU32((Vector4)LaunchPadTheme.TextMuted), "mods, packs, settings");
+    if (hovered)
+      ImGuiHelper.TextTooltip("Open the SLP menu to change your mods and packs. M does the same.", 400f);
     return clicked;
   }
 

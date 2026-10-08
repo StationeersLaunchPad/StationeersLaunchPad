@@ -44,9 +44,21 @@ public struct LoadState
 
 public class StageWait(double seconds, bool auto)
 {
-  private readonly Stopwatch stopwatch = Stopwatch.StartNew();
+  private readonly Stopwatch stopwatch = auto ? Stopwatch.StartNew() : new();
   public readonly double Seconds = seconds;
-  public bool Auto = auto;
+
+  public bool Auto
+  {
+    get => field;
+    set
+    {
+      field = value;
+      if (value)
+        stopwatch.Start();
+      else
+        stopwatch.Stop();
+    }
+  } = auto;
 
   private double shift;
 
@@ -101,9 +113,9 @@ public static class LaunchPadConfig
       CurWait.Auto = false;
   }
 
-  private static StageWait NewAutoWait()
+  private static StageWait NewAutoWait(int seconds)
   {
-    var wait = new StageWait(Configs.AutoLoadWaitTime.Value, AutoLoad);
+    var wait = new StageWait(Configs.DevMode.Value ? 0 : seconds, AutoLoad);
 
     if (AutoLoad && SkipNextAutoWaits)
       wait.Skip();
@@ -124,6 +136,13 @@ public static class LaunchPadConfig
 
   public static void Draw()
   {
+    // dev mode loads straight through, holding M on startup stops on the splash
+    if (Configs.DevMode.Value && AutoLoad && Stage is LoadStage.Searching or LoadStage.Configuring
+      && UnityEngine.Input.GetKey(UnityEngine.KeyCode.M))
+    {
+      StopAutoLoad();
+      ManualLoadWindow.OpenModInfoTab();
+    }
     // the box stays locked during the server check and steps aside for the takeoff
     var gateStatus = Networking.Slp2ProfileSync.GateStatus;
     var boxShown = (AutoLoad || gateStatus != null) && Stage != LoadStage.Running;
@@ -217,10 +236,7 @@ public static class LaunchPadConfig
     await StageFinal();
 
     Networking.Slp2AutoConnect.ArmIfVerified();
-    // the game waits for the rocket to clear the screen
     Stage = LoadStage.Running;
-    RocketBar.Launch();
-    await RocketBar.WaitForFlights();
     StartGame();
     await SLPCommand.MoveToStage(CommandStage.GameRunning);
   }
@@ -378,7 +394,7 @@ public static class LaunchPadConfig
 
   private static async UniTask CheckNewsNotices()
   {
-    if (Platform.IsServer || !Configs.NewsCheckOnStart.Value) return;
+    if (Platform.IsServer || !Configs.NewsCheckOnStart.Value || Configs.DevMode.Value) return;
 
     var prevStage = Stage;
     try
@@ -429,7 +445,7 @@ public static class LaunchPadConfig
     if (Stage == LoadStage.Failed) return;
     Stage = LoadStage.Configuring;
 
-    CurWait = NewAutoWait();
+    CurWait = NewAutoWait(Configs.AutoLoadCountdown.Value);
 
     await SLPCommand.MoveToStage(CommandStage.ConfigLoaded);
     PrepareProfileStartup(firstLoad, preserveSelectionAfterReload);
@@ -442,7 +458,6 @@ public static class LaunchPadConfig
   {
     if (Stage == LoadStage.Failed) return;
     Stage = LoadStage.Loading;
-    RocketBar.Launch();
 
     var stopwatch = Stopwatch.StartNew();
 
@@ -478,7 +493,7 @@ public static class LaunchPadConfig
 
     await SLPCommand.MoveToStage(CommandStage.ModsLoaded);
 
-    CurWait = NewAutoWait();
+    CurWait = NewAutoWait(Configs.AutoStartCountdown.Value);
     await Platform.Wait(CurWait, CommandStage.ModsLoaded);
     await SLPRefCheck.RunRefCheck();
   }
@@ -511,6 +526,34 @@ public static class LaunchPadConfig
     }
   }
 
+  private static async UniTaskVoid OfferOutsideChanges(ProfileData profile, List<ModInfo> mods)
+  {
+    var text = "Your mods changed outside SLP, for example a new Workshop subscription or the game's mod menu.\n\n"
+      + $"New or turned on, but not in {profile.Name}:\n  {string.Join("\n  ", mods.Select(mod => mod.Name))}\n\n"
+      + $"Mods only load if they are enabled. Add them to {profile.Name}, the pack you're starting now, "
+      + "or keep them disabled and sort them into a pack later in the SLP menu.";
+
+    var choice = await SlpDialog.Show($"{mods.Count} mod{(mods.Count == 1 ? "" : "s")} changed", text,
+      DialogTone.Normal,
+      new DialogButton($"Add to {profile.Name}", primary: true),
+      new DialogButton("Open SLP Menu"),
+      new DialogButton("Keep disabled", cancel: true));
+    if (choice == 0 && profileManager.ActiveProfile == profile)
+    {
+      foreach (var mod in mods)
+        mod.Enabled = true;
+      profileManager.AbsorbEnabledChanges(modList);
+      NormalizeModList();
+    }
+    if (choice == 1)
+    {
+      StopAutoLoad();
+      ManualLoadWindow.OpenModInfoTab();
+    }
+    else
+      CurWait.Auto = AutoLoad;
+  }
+
   private static void PrepareProfileStartup(bool firstLoad, bool preserveSelection)
   {
     // servers don't use packs, they load modconfig.xml as it is
@@ -528,11 +571,18 @@ public static class LaunchPadConfig
         ManualLoadWindow.OpenProfilesTab();
       return;
     }
+    // server packs and the built-in packs can't take changes, they just load as they are
+    var outside = profileManager.ActiveEditable ? profileManager.OutsideChanges(modList) : [];
     if (!profileManager.ApplyProfile(profile.Name, modList))
     {
       Logger.Global.LogError($"Could not apply mod pack '{profile.Name}'");
       StopAutoLoad();
       return;
+    }
+    if (outside.Count > 0)
+    {
+      CurWait.Auto = false;
+      OfferOutsideChanges(profile, outside).Forget();
     }
     var depNotice = NormalizeModList();
 
