@@ -75,7 +75,8 @@ public static class LaunchWindow
         var locked = status != null || stage != LoadStage.Configuring || ProfilePanel.Busy;
         DrawHeader(active, missing, wait, input, buttonHeight, ref action);
         var picked = PackGallery.Draw("##launchgallery", manager, modList,
-          new Vector2(ImGui.GetContentRegionAvail().x, galleryHeight), false, out _, enabled: !locked);
+          new Vector2(ImGui.GetContentRegionAvail().x, galleryHeight), false, out _, enabled: !locked,
+          onMenuCard: () => action = LaunchAction.OpenMenu);
         if (picked != null && manager.ApplyProfile(picked.Name, modList))
         {
           changed = true;
@@ -110,9 +111,7 @@ public static class LaunchWindow
     var y = ImGui.GetCursorPosY();
     var textY = y + (height - ImGui.GetTextLineHeight()) / 2f;
     ImGui.SetCursorPosY(textY);
-    ImGuiHelper.TextColored("MOD PACK", LaunchPadTheme.TextMuted);
-    ImGui.SameLine();
-    ImGuiHelper.TextColored(active.Name, LaunchPadTheme.Accent);
+    ImGuiHelper.TextColored("StationeersLaunchPad", LaunchPadTheme.Accent);
 
     if (Networking.Slp2ProfileSync.SyncStatus is { } sync)
     {
