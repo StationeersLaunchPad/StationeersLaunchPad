@@ -26,7 +26,7 @@ public static class LaunchWindow
     string status, out bool profileChanged)
   {
     profileChanged = false;
-    var input = status == null && !RocketBar.Diving && (stage == LoadStage.Configuring || stage == LoadStage.Loaded);
+    var input = status == null && !RocketBar.Diving && !SlpDialog.Open && (stage == LoadStage.Configuring || stage == LoadStage.Loaded);
     var action = LaunchAction.None;
 
     if (input && (ImGui.IsKeyPressed(ImGuiKey.Space, false) || ImGui.IsKeyPressed(ImGuiKey.UpArrow, false)))

@@ -515,6 +515,34 @@ public static class LaunchPadConfig
     }
   }
 
+  private static async UniTaskVoid OfferOutsideChanges(ProfileData profile, List<ModInfo> mods)
+  {
+    var text = "Your mods changed outside SLP, for example a new Workshop subscription or the game's mod menu.\n\n"
+      + $"New or turned on, but not in {profile.Name}:\n  {string.Join("\n  ", mods.Select(mod => mod.Name))}\n\n"
+      + $"Mods only load if they are enabled. Add them to {profile.Name}, the pack you're starting now, "
+      + "or keep them disabled and sort them into a pack later in the SLP menu.";
+
+    var choice = await SlpDialog.Show($"{mods.Count} mod{(mods.Count == 1 ? "" : "s")} changed", text,
+      DialogTone.Normal,
+      new DialogButton($"Add to {profile.Name}", primary: true),
+      new DialogButton("Open SLP Menu"),
+      new DialogButton("Keep disabled", cancel: true));
+    if (choice == 0 && profileManager.ActiveProfile == profile)
+    {
+      foreach (var mod in mods)
+        mod.Enabled = true;
+      profileManager.AbsorbEnabledChanges(modList);
+      NormalizeModList();
+    }
+    if (choice == 1)
+    {
+      StopAutoLoad();
+      ManualLoadWindow.OpenModInfoTab();
+    }
+    else
+      CurWait.Auto = AutoLoad;
+  }
+
   private static void PrepareProfileStartup(bool firstLoad, bool preserveSelection)
   {
     // servers don't use packs, they load modconfig.xml as it is
@@ -532,11 +560,18 @@ public static class LaunchPadConfig
         ManualLoadWindow.OpenProfilesTab();
       return;
     }
+    // server packs and the built-in packs can't take changes, they just load as they are
+    var outside = profileManager.ActiveEditable ? profileManager.OutsideChanges(modList) : [];
     if (!profileManager.ApplyProfile(profile.Name, modList))
     {
       Logger.Global.LogError($"Could not apply mod pack '{profile.Name}'");
       StopAutoLoad();
       return;
+    }
+    if (outside.Count > 0)
+    {
+      CurWait.Auto = false;
+      OfferOutsideChanges(profile, outside).Forget();
     }
     var depNotice = NormalizeModList();
 
