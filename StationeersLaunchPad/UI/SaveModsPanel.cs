@@ -16,6 +16,9 @@ using UI.LoadGame;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
+using UnityEngine.Events;
+using ConfirmationPanel = global::UI.ConfirmationPanel;
+using Localization = Assets.Scripts.Localization;
 using PanelToolTip = Assets.Scripts.UI.PanelToolTip;
 using PromptPanel = Assets.Scripts.UI.PromptPanel;
 
@@ -518,6 +521,69 @@ internal static class SaveModsPanel
       Logger.Global.LogError("Could not switch to the save's mods");
       Logger.Global.LogException(ex);
       ShowFailure("Something went wrong while switching to this save's mods.");
+    }
+  }
+
+  [HarmonyPatch]
+  internal static class LoadError
+  {
+    private const string TitleKey = "FailedToStartGameMessageTitle";
+    private const int MaxNames = 8;
+
+    private static string loadingPath;
+    private static string loadingName;
+
+    [HarmonyPatch(typeof(LoadHelper), nameof(LoadHelper.LoadGame)), HarmonyPrefix]
+    private static void RememberSave(string path, string stationName)
+    {
+      loadingPath = path;
+      loadingName = stationName;
+    }
+
+    [HarmonyPatch(typeof(ConfirmationPanel), nameof(ConfirmationPanel.Show)), HarmonyPrefix]
+    private static bool AddModHint(ConfirmationPanel __instance, string titleKey, string messageKey,
+      string button1Key, UnityAction button1OnClick)
+    {
+      if (titleKey != TitleKey || loadingPath == null)
+        return true;
+      try
+      {
+        var rows = ReadRows(new FileInfo(loadingPath), out var entries);
+        if (rows == null || entries == null)
+          return true;
+        var notInstalled = rows.Where(row => row.State == Slp2ModState.NotInstalled).ToList();
+        var notEnabled = rows.Where(row => row.State == Slp2ModState.NotEnabled).ToList();
+        if (notInstalled.Count == 0 && notEnabled.Count == 0)
+          return true;
+
+        var message = new StringBuilder(Localization.GetInterface(messageKey));
+        message.Append("\n\nThis save was made with mods that aren't loaded right now, that may be why.");
+        if (notInstalled.Count > 0)
+          message.Append($"\n<color={Missing}>Not installed:</color> {Names(notInstalled)}");
+        if (notEnabled.Count > 0)
+          message.Append($"\n<color={Disabled}>Not enabled:</color> {Names(notEnabled)}");
+        message.Append("\n\nSLP can switch to a pack with this save's mods and restart the game.");
+
+        var mods = entries.Where(entry => entry.WorkshopHandle > 1).ToList();
+        var label = notInstalled.Count > 0 ? $"Get {Plural(notInstalled.Count, "mod")}" : $"Enable {Plural(notEnabled.Count, "mod")}";
+        var worldName = loadingName;
+        __instance.ShowRaw(Localization.GetInterface(titleKey), message.ToString(),
+          Localization.GetInterface(button1Key), button1OnClick,
+          label, () => UseMods(worldName, mods));
+        return false;
+      }
+      catch (Exception ex)
+      {
+        Logger.Global.LogWarning("Could not add the save's mods to the load error");
+        Logger.Global.LogException(ex);
+        return true;
+      }
+    }
+
+    private static string Names(List<Slp2ModRow> rows)
+    {
+      var names = string.Join(", ", rows.Take(MaxNames).Select(row => Escape(LaunchPadTag.Replace(DisplayName(row), ""))));
+      return rows.Count > MaxNames ? $"{names} and {rows.Count - MaxNames} more" : names;
     }
   }
 

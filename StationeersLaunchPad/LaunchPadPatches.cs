@@ -138,8 +138,19 @@ static class LaunchPadPatches
     harmony.CreateClassProcessor(typeof(Networking.Slp2SaveFlow), true).Patch();
   }
 
-  private static void RunSaveModsPatches() =>
+  private static void RunSaveModsPatches()
+  {
     harmony.CreateClassProcessor(typeof(UI.SaveModsPanel), true).Patch();
+    try
+    {
+      harmony.CreateClassProcessor(typeof(UI.SaveModsPanel.LoadError), true).Patch();
+    }
+    catch (Exception ex)
+    {
+      Logger.Global.LogWarning("Could not hook the load error, it won't mention a save's mods");
+      Logger.Global.LogException(ex);
+    }
+  }
 
   public static void RunLinuxPathPatch() =>
     harmony.CreateClassProcessor(typeof(LinuxPathPatch), true).Patch();
