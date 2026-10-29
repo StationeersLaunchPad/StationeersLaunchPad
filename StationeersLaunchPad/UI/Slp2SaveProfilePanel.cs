@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace StationeersLaunchPad.UI;
 
-public enum Slp2SaveChoice { None, Save, SaveAndActivate }
+public enum Slp2SaveChoice { None, Save, SaveAndActivate, Declined }
 
 public static class Slp2SaveProfilePanel
 {
@@ -34,7 +34,8 @@ public static class Slp2SaveProfilePanel
       tooltip: "Saves the pack, you can pick it at the next start."),
     new("Save & Activate", () => Choose(Slp2SaveChoice.SaveAndActivate), primary: true,
       tooltip: "Saves the pack and makes it the active one, it loads at the next start."),
-    new("No thanks", () => Choose(Slp2SaveChoice.None), cancel: true),
+    new("No thanks", () => Choose(Slp2SaveChoice.Declined), cancel: true,
+      tooltip: "SLP won't offer this server's pack again."),
   ];
 
   // the offer stays up while loading and for a while after, it takes a moment to read
