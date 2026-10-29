@@ -71,6 +71,17 @@ public static class ModImages
   public static bool TryGetBuiltIn(string name, out IntPtr textureId, out Vector2 size) =>
     TryGetCached($"slp:{name}", () => LoadBuiltIn(name), out textureId, out size);
 
+  // for the game's own UI
+  public static Texture GetBuiltInTexture(string name)
+  {
+    if (!Resolve())
+      return null;
+    var key = $"slp:{name}";
+    if (!cache.TryGetValue(key, out var texture) || texture is RenderTexture rt && !rt.IsCreated())
+      cache[key] = texture = LoadBuiltIn(name);
+    return texture;
+  }
+
   private static bool TryGetCached(string key, Func<Texture> load, out IntPtr textureId, out Vector2 size)
   {
     textureId = IntPtr.Zero;

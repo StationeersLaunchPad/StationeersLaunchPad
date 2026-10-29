@@ -99,6 +99,17 @@ static class LaunchPadPatches
       failed = true;
     }
 
+    try
+    {
+      RunSaveModsPatches();
+    }
+    catch (Exception ex)
+    {
+      Logger.Global.LogError("An error occurred running save mod list patches. The load menu won't show a save's mods");
+      Logger.Global.LogException(ex);
+      failed = true;
+    }
+
     return !failed;
   }
 
@@ -126,6 +137,9 @@ static class LaunchPadPatches
     harmony.CreateClassProcessor(typeof(Networking.Slp2JoinFailureOffer), true).Patch();
     harmony.CreateClassProcessor(typeof(Networking.Slp2SaveFlow), true).Patch();
   }
+
+  private static void RunSaveModsPatches() =>
+    harmony.CreateClassProcessor(typeof(UI.SaveModsPanel), true).Patch();
 
   public static void RunLinuxPathPatch() =>
     harmony.CreateClassProcessor(typeof(LinuxPathPatch), true).Patch();
