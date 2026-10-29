@@ -1,10 +1,11 @@
-
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using Assets.Scripts.Serialization;
+using Cysharp.Threading.Tasks;
 using HarmonyLib;
 using ICSharpCode.SharpZipLib.Zip;
 using StationeersLaunchPad.Metadata;
@@ -23,24 +24,27 @@ namespace StationeersLaunchPad.UI;
 [HarmonyPatch]
 internal static class SaveModsPanel
 {
-  internal const string FileName = "slp-mods.txt";
+  private const string FileName = "slp-mods.txt";
   private const string ObjectName = "SLP Save Mods";
 
   private const float DetailHeight = 380f;
-  private const float Left = 760f;
+  private const float Left = 680f;
   private const float Inset = 40f;
   private const float RightInset = 80f;
-  private const int MaxNameLength = 36;
-  private const float RowScale = 0.72f;
-  private const string TitleSize = "110%";
-  private const float ColumnGap = 30f;
+  private const float TitleSize = 24f;
+  private const float RowSize = 20f;
+  private const float RowSpacing = 6f;
+  private const float GroupGap = 18f;
+  private const float ColumnGap = 40f;
   private const int SingleColumnRows = 8;
+  private const float MaxGroupColumnShare = 0.65f;
   private const int MaxRows = 300;
 
   private const string Ok = "#7CD992";
   private const string Missing = "#FF6B6B";
-  private const string Warn = "#FFC857";
+  private const string Disabled = "#FFA94D";
   private const string Dim = "#9AA0A6";
+  private static readonly Color RowColor = new(0.86f, 0.87f, 0.89f);
 
   private static bool savedCodeBuilt;
   private static string savedCode;
@@ -95,7 +99,7 @@ internal static class SaveModsPanel
 
   [HarmonyPatch(typeof(SaveItem), nameof(SaveItem.OnWorldItemExpanded)), HarmonyPostfix]
   private static void AddModList(SaveItem __instance, RectTransform ____detailPanelRectTransform,
-    TextMeshProUGUI ____versionText, GameObject ____deleteButtonGameObject, Button ____loadButton, FileInfo ____fileInfo)
+    TextMeshProUGUI ____versionText, GameObject ____deleteButtonGameObject, FileInfo ____fileInfo)
   {
     try
     {
@@ -103,9 +107,7 @@ internal static class SaveModsPanel
         return;
       if (____detailPanelRectTransform.Find(ObjectName) != null)
         return;
-      if (Build(__instance, ____detailPanelRectTransform, ____versionText, ____deleteButtonGameObject, ____fileInfo))
-        AddMatchIcon(____loadButton,
-          "This save was made with exactly the mods you have loaded right now.\nExpand it to see the list.");
+      Build(__instance, ____detailPanelRectTransform, ____versionText, ____deleteButtonGameObject, ____fileInfo);
     }
     catch (Exception ex)
     {
@@ -141,17 +143,18 @@ internal static class SaveModsPanel
     }
     return Slp2ModCompare.Compare(entries, LaunchPadConfig.ModList, LaunchPadConfig.ProfileManager)
       .Where(row => row.State != Slp2ModState.NotOnServer)
-      .OrderBy(row => row.State == Slp2ModState.Match)
-      .ThenBy(row => row.Name, StringComparer.OrdinalIgnoreCase)
+      .Select(row => row.State is Slp2ModState.Older or Slp2ModState.Newer
+        ? new Slp2ModRow(row.WorkshopHandle, row.Name, row.ServerVersion, row.LocalVersion, Slp2ModState.Match)
+        : row)
+      .OrderBy(row => row.Name, StringComparer.OrdinalIgnoreCase)
       .ToList();
   }
 
-  // true when the save's mods are exactly what's loaded
-  private static bool Build(SaveItem item, RectTransform detail, TextMeshProUGUI template, GameObject deleteButton, FileInfo saveFile)
+  private static void Build(SaveItem item, RectTransform detail, TextMeshProUGUI template, GameObject deleteButton, FileInfo saveFile)
   {
     var rows = ReadRows(saveFile, out var entries);
     if (rows == null)
-      return false;
+      return;
 
     var container = new GameObject(ObjectName, typeof(RectTransform)).GetComponent<RectTransform>();
     container.SetParent(detail, false);
@@ -162,56 +165,111 @@ internal static class SaveModsPanel
     container.offsetMax = new Vector2(-RightInset, 0);
     container.anchoredPosition = new Vector2(container.anchoredPosition.x, -Inset);
 
-    var width = detail.rect.width > Left + RightInset ? detail.rect.width - Left - RightInset : 400f;
+    var titleHeight = LineHeight(template, TitleSize);
+    var rowHeight = LineHeight(template, RowSize);
+    var lines = BuildLines(rows, entries == null);
+    var columns = lines.Count(line => line.Row != null) > SingleColumnRows ? 2 : 1;
+    var parts = columns == 1 ? [lines] : SplitColumns(lines, titleHeight, rowHeight);
 
-    var header = CreateText(container, template, "Header");
-    header.text = BuildHeader(rows, entries == null);
-    var headerHeight = Place(header, 0, 1, 0, 0, 0, width);
-
-    var lines = BuildLines(rows);
-
-    var top = headerHeight + 10f;
     var listHeight = 0f;
-    if (lines.Count > 0)
+    for (var i = 0; i < parts.Count; i++)
     {
-      var columns = lines.Count > SingleColumnRows ? 2 : 1;
-      var columnWidth = (width - ColumnGap * (columns - 1)) / columns;
-      var parts = columns == 1 ? [lines] : SplitColumns(lines);
-      for (var i = 0; i < parts.Count; i++)
+      var from = (float)i / columns;
+      var to = (float)(i + 1) / columns;
+      var padLeft = i > 0 ? ColumnGap / 2 : 0;
+      var padRight = i < columns - 1 ? ColumnGap / 2 : 0;
+      var y = 0f;
+      foreach (var line in parts[i])
       {
-        var column = CreateText(container, template, $"Column {i + 1}");
-        // a size per line throws off the measured height
-        column.fontSize = template.fontSize * RowScale;
-        column.text = string.Join("\n", parts[i].Select(line => line.Text));
-        listHeight = Math.Max(listHeight, Place(column, (float)i / columns, (float)(i + 1) / columns,
-          i > 0 ? ColumnGap / 2 : 0, i < columns - 1 ? ColumnGap / 2 : 0, top, columnWidth));
+        if (line.Gap)
+        {
+          y += GroupGap;
+          continue;
+        }
+        var height = line.Title ? titleHeight : rowHeight;
+        var text = CreateText(container, template, line.Title ? "Title" : "Mod");
+        text.fontSize = line.Title ? TitleSize : RowSize;
+        text.text = line.Text;
+        if (line.Row is { } row)
+        {
+          text.color = RowColor;
+          text.overflowMode = TextOverflowModes.Ellipsis;
+          text.raycastTarget = true;
+          text.gameObject.AddComponent<ModRowView>().Row = row;
+        }
+        Place(text, from, to, padLeft, padRight, y, height);
+        y += height;
       }
+      listHeight = Math.Max(listHeight, y);
     }
 
-    var contentHeight = top + listHeight;
-    container.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, contentHeight);
+    container.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, listHeight);
     var view = container.gameObject.AddComponent<SaveModsView>();
-    view.Extra = Math.Max(0f, Inset + contentHeight + Inset - DetailHeight);
+    view.Extra = Math.Max(0f, Inset + listHeight + Inset - DetailHeight);
 
     if (entries == null)
-      return false;
+      return;
     var state = item.gameObject.AddComponent<SaveModsState>();
-    state.Missing = rows.Count(row => row.State is Slp2ModState.NotInstalled or Slp2ModState.NotEnabled);
-    state.Differ = rows.Count(row => row.State is Slp2ModState.Older or Slp2ModState.Newer);
-    var matches = state.Missing == 0 && state.Differ == 0;
-    if (!matches)
-      AddUseButton(item, deleteButton, entries);
-    return matches;
+    state.NotInstalled = rows.Count(row => row.State == Slp2ModState.NotInstalled);
+    state.NotEnabled = rows.Count(row => row.State == Slp2ModState.NotEnabled);
+    if (state.NotInstalled > 0 || state.NotEnabled > 0)
+      AddUseButton(item, deleteButton, entries, state);
   }
 
   private sealed class SaveModsState : MonoBehaviour
   {
-    public int Missing;
-    public int Differ;
+    public int NotInstalled;
+    public int NotEnabled;
+  }
+
+  private static float LineHeight(TextMeshProUGUI template, float size)
+  {
+    var probe = UnityEngine.Object.Instantiate(template, template.transform.parent);
+    probe.fontSize = size;
+    probe.lineSpacing = 0;
+    var height = probe.GetPreferredValues("Ag", 1000f, 0).y;
+    UnityEngine.Object.DestroyImmediate(probe.gameObject);
+    return height + RowSpacing;
+  }
+
+  private sealed class ModRowView : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerClickHandler
+  {
+    public Slp2ModRow Row;
+    private bool showing;
+
+    public void OnPointerEnter(PointerEventData eventData)
+    {
+      GetComponent<TMP_Text>().color = Color.white;
+      if (PanelToolTip.Instance == null)
+        return;
+      showing = true;
+      var status = Row.State switch
+      {
+        Slp2ModState.NotInstalled => "Not installed.",
+        Slp2ModState.NotEnabled => "Installed but not enabled.",
+        _ => "Loaded.",
+      };
+      PanelToolTip.Instance.SetUpTooltip(DisplayName(Row), $"{status}\nClick to open its Workshop page.");
+    }
+
+    public void OnPointerExit(PointerEventData eventData) => Hide();
+
+    private void OnDisable() => Hide();
+
+    public void OnPointerClick(PointerEventData eventData) => Steam.OpenWorkshopPage(Row.WorkshopHandle);
+
+    private void Hide()
+    {
+      GetComponent<TMP_Text>().color = RowColor;
+      if (!showing)
+        return;
+      showing = false;
+      PanelToolTip.Instance?.ClearToolTip();
+    }
   }
 
   [HarmonyPatch(typeof(WorldItem), nameof(WorldItem.Expand)), HarmonyPostfix]
-  private static void AddWorldSummary(WorldItem __instance, bool expand, TextMeshProUGUI ____infoText, Button ____loadLatestButton)
+  private static void AddWorldSummary(WorldItem __instance, bool expand, TextMeshProUGUI ____infoText)
   {
     try
     {
@@ -226,12 +284,12 @@ internal static class SaveModsPanel
         return;
       new GameObject(ObjectName, typeof(RectTransform)).transform.SetParent(____infoText.transform, false);
 
-      if (state.Missing > 0)
-        ____infoText.text += $", <color={Missing}>{state.Missing} missing mod{(state.Missing == 1 ? "" : "s")}</color>";
-      else if (state.Differ > 0)
-        ____infoText.text += $", <color={Warn}>{state.Differ} mod{(state.Differ == 1 ? "" : "s")} on another version</color>";
+      if (state.NotInstalled > 0)
+        ____infoText.text += $", <color={Missing}>{Plural(state.NotInstalled, "missing mod")}</color>";
+      else if (state.NotEnabled > 0)
+        ____infoText.text += $", <color={Disabled}>{Plural(state.NotEnabled, "mod")} not enabled</color>";
       else
-        AddMatchIcon(____loadLatestButton, "The latest save was made with exactly the mods you have loaded right now.");
+        ____infoText.text += $", <color={Ok}>all mods loaded</color>";
     }
     catch (Exception ex)
     {
@@ -240,28 +298,10 @@ internal static class SaveModsPanel
     }
   }
 
-  private static void AddMatchIcon(Button loadButton, string tooltip)
+  private sealed class HoverTooltip : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerClickHandler
   {
-    if (loadButton == null || loadButton.transform.Find(ObjectName + " Match") != null)
-      return;
-    var texture = ModImages.GetBuiltInTexture(ModImages.TrustedImage);
-    if (texture == null)
-      return;
-
-    var icon = new GameObject(ObjectName + " Match", typeof(RectTransform), typeof(RawImage), typeof(MatchIcon));
-    var rect = (RectTransform)icon.transform;
-    rect.SetParent(loadButton.transform, false);
-    rect.anchorMin = rect.anchorMax = new Vector2(0, 0.5f);
-    rect.pivot = new Vector2(1, 0.5f);
-    rect.anchoredPosition = new Vector2(-12, 0);
-    rect.sizeDelta = new Vector2(30, 30);
-    icon.GetComponent<RawImage>().texture = texture;
-    icon.GetComponent<MatchIcon>().Tooltip = tooltip;
-  }
-
-  private sealed class MatchIcon : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerClickHandler
-  {
-    public string Tooltip;
+    public string Title;
+    public string Body;
     private bool showing;
 
     public void OnPointerEnter(PointerEventData eventData)
@@ -269,15 +309,14 @@ internal static class SaveModsPanel
       if (PanelToolTip.Instance == null)
         return;
       showing = true;
-      PanelToolTip.Instance.SetUpTooltip("Mods match", Tooltip);
+      PanelToolTip.Instance.SetUpTooltip(Title, Body);
     }
 
     public void OnPointerExit(PointerEventData eventData) => Hide();
 
     private void OnDisable() => Hide();
 
-    // keeps the click from reaching the Load button
-    public void OnPointerClick(PointerEventData eventData) { }
+    public void OnPointerClick(PointerEventData eventData) => Hide();
 
     private void Hide()
     {
@@ -296,88 +335,101 @@ internal static class SaveModsPanel
     text.alignment = TextAlignmentOptions.TopLeft;
     text.enableWordWrapping = false;
     text.overflowMode = TextOverflowModes.Overflow;
+    text.lineSpacing = 0;
     text.richText = true;
     return text;
   }
 
-  // returns the height the text needs
-  private static float Place(TextMeshProUGUI text, float from, float to, float padLeft, float padRight, float y, float measureWidth)
+  private static void Place(TextMeshProUGUI text, float from, float to, float padLeft, float padRight, float y, float height)
   {
-    var height = text.GetPreferredValues(text.text, measureWidth, 0).y;
     var rect = text.rectTransform;
     rect.anchorMin = new Vector2(from, 1);
     rect.anchorMax = new Vector2(to, 1);
     rect.pivot = new Vector2(0, 1);
     rect.offsetMin = new Vector2(padLeft, -y - height);
     rect.offsetMax = new Vector2(-padRight, -y);
-    return height;
   }
 
-  private static string BuildHeader(List<Slp2ModRow> rows, bool unreadable)
-  {
-    if (unreadable)
-      return $"Mods\n<size=75%><color={Dim}>unreadable mod list</color></size>";
-    if (rows.Count == 0)
-      return $"Mods\n<size=75%><color={Dim}>no mods</color></size>";
-    return "Mods";
-  }
-
-  private readonly struct Line(string text, bool groupTitle)
+  private readonly struct Line(string text, Slp2ModRow? row = null, bool title = false, bool gap = false)
   {
     public readonly string Text = text;
-    public readonly bool GroupTitle = groupTitle;
+    public readonly Slp2ModRow? Row = row;
+    public readonly bool Title = title;
+    public readonly bool Gap = gap;
   }
 
-  private static readonly (string Title, string Color, Slp2ModState[] States)[] Groups =
+  private static readonly (string Title, string Color, Slp2ModState State)[] Groups =
   [
-    ("Missing", Missing, [Slp2ModState.NotInstalled, Slp2ModState.NotEnabled]),
-    ("Different version", Warn, [Slp2ModState.Older, Slp2ModState.Newer]),
-    ("Loaded", Ok, [Slp2ModState.Match]),
+    ("Not installed", Missing, Slp2ModState.NotInstalled),
+    ("Not enabled", Disabled, Slp2ModState.NotEnabled),
+    ("Loaded", Ok, Slp2ModState.Match),
   ];
 
-  private static List<Line> BuildLines(List<Slp2ModRow> rows)
+  private static List<Line> BuildLines(List<Slp2ModRow> rows, bool unreadable)
   {
+    if (unreadable)
+      return [new($"<color={Dim}>This save's mod list can't be read.</color>")];
+    if (rows.Count == 0)
+      return [new($"<color={Dim}>Made without mods.</color>")];
+
     var lines = new List<Line>();
     var left = MaxRows;
-    foreach (var (title, color, states) in Groups)
+    foreach (var (title, color, state) in Groups)
     {
-      var group = rows.Where(row => states.Contains(row.State)).ToList();
+      var group = rows.Where(row => row.State == state).ToList();
       if (group.Count == 0)
         continue;
-      // the gap counts as part of the title, so a column split keeps them together
       if (lines.Count > 0)
-        lines.Add(new("<size=50%> </size>", true));
-      lines.Add(new($"<size={TitleSize}><color={color}>{title}</color>  <color={Dim}>{group.Count}</color></size>", true));
+        lines.Add(new("", gap: true));
+      lines.Add(new($"<color={color}>{title}</color>  <color={Dim}>{group.Count}</color>", title: true));
       foreach (var row in group.Take(left))
-        lines.Add(new($"  {FormatRow(row)}", false));
+        lines.Add(new(Escape(LaunchPadTag.Replace(DisplayName(row), "")), row));
       if (group.Count > left)
-        lines.Add(new($"  <color={Dim}>+{group.Count - left} more</color>", false));
+        lines.Add(new($"<color={Dim}>+{group.Count - left} more</color>"));
       left = Math.Max(0, left - group.Count);
     }
     return lines;
   }
 
-  // a group title never ends a column
-  private static List<List<Line>> SplitColumns(List<Line> lines)
+  private static List<List<Line>> SplitColumns(List<Line> lines, float titleHeight, float rowHeight)
   {
-    var split = (lines.Count + 1) / 2;
-    while (split > 1 && lines[split - 1].GroupTitle)
+    float Height(Line line) => line.Gap ? GroupGap : line.Title ? titleHeight : rowHeight;
+    var total = lines.Sum(Height);
+    var half = total / 2;
+
+    var best = -1;
+    var bestTaller = float.MaxValue;
+    var above = 0f;
+    for (var i = 0; i < lines.Count; i++)
+    {
+      if (lines[i].Gap)
+      {
+        var taller = Math.Max(above, total - above - GroupGap);
+        if (taller < bestTaller)
+          (best, bestTaller) = (i, taller);
+      }
+      above += Height(lines[i]);
+    }
+    if (best >= 0 && bestTaller <= total * MaxGroupColumnShare)
+      return [lines.Take(best).ToList(), lines.Skip(best + 1).ToList()];
+
+    var split = 0;
+    for (var sum = 0f; split < lines.Count && sum + Height(lines[split]) / 2 <= half; split++)
+      sum += Height(lines[split]);
+    while (split > 1 && (lines[split - 1].Title || lines[split - 1].Gap))
       split--;
-    var second = lines.Skip(split).ToList();
-    if (second.Count > 1 && second[0].GroupTitle && second[1].GroupTitle)
-      second.RemoveAt(0);
+    var second = lines.Skip(split).SkipWhile(line => line.Gap).ToList();
     return [lines.Take(split).ToList(), second];
   }
 
-  private static string FormatRow(Slp2ModRow row)
-  {
-    var name = string.IsNullOrEmpty(row.Name) ? row.WorkshopHandle.ToString() : row.Name.Trim();
-    if (name.Length > MaxNameLength)
-      name = name[..(MaxNameLength - 3)].TrimEnd() + "...";
-    return Escape(name);
-  }
+  private static readonly Regex LaunchPadTag = new(@"\s*\[\s*StationeersLaunchPad\s*\]", RegexOptions.IgnoreCase);
 
-  private static void AddUseButton(SaveItem item, GameObject deleteButton, List<Slp2PackageCode.Entry> entries)
+  private static string DisplayName(Slp2ModRow row) =>
+    string.IsNullOrWhiteSpace(row.Name) ? row.WorkshopHandle.ToString() : row.Name.Trim();
+
+  private static string Plural(int count, string noun) => $"{count} {noun}{(count == 1 ? "" : "s")}";
+
+  private static void AddUseButton(SaveItem item, GameObject deleteButton, List<Slp2PackageCode.Entry> entries, SaveModsState state)
   {
     if (deleteButton == null)
       return;
@@ -394,23 +446,40 @@ internal static class SaveModsPanel
       foreach (var behaviour in label.GetComponents<MonoBehaviour>())
         if (behaviour is not TMP_Text)
           UnityEngine.Object.DestroyImmediate(behaviour);
-      label.text = "Use these mods";
+      label.text = state.NotInstalled > 0 ? $"Get {Plural(state.NotInstalled, "mod")}" : $"Enable {Plural(state.NotEnabled, "mod")}";
     }
 
     var button = copy.GetComponentInChildren<Button>();
     if (button == null)
       return;
     button.onClick.RemoveAllListeners();
-    button.onClick.AddListener(() => ConfirmUse(item.WorldItem?.StationName, entries));
+    button.onClick.AddListener(() => ConfirmUse(item.WorldItem?.StationName, entries, state));
+    var hover = button.gameObject.AddComponent<HoverTooltip>();
+    hover.Title = "Play with this save's mods";
+    hover.Body = "Switches to a pack with exactly the mods this save was made with and restarts the game. " +
+      "Your clientside mods stay.";
   }
 
-  private static void ConfirmUse(string worldName, List<Slp2PackageCode.Entry> entries)
+  private static void ConfirmUse(string worldName, List<Slp2PackageCode.Entry> entries, SaveModsState state)
   {
     var mods = entries.Where(entry => entry.WorkshopHandle > 1).ToList();
-    PromptPanel.Instance.ShowPrompt("Restart required",
-      $"SLP switches to a pack with this save's {mods.Count} mods and restarts the game. " +
-      "Missing Workshop mods are downloaded on the next start.",
+    var steps = new List<string>();
+    if (state.NotInstalled > 0)
+      steps.Add($"{Plural(state.NotInstalled, "mod")} will be downloaded from the Workshop on the next start.");
+    if (state.NotEnabled > 0)
+      steps.Add($"{Plural(state.NotEnabled, "installed mod")} will be enabled.");
+    PromptPanel.Instance.ShowPrompt("Restart with this save's mods",
+      $"SLP switches to a pack with the {Plural(mods.Count, "mod")} this save was made with and restarts the game. " +
+      string.Join(" ", steps),
       "Restart", () => UseMods(worldName, mods));
+  }
+
+  // runs from the confirm prompt's button, which closes that prompt after its listeners
+  private static async void ShowFailure(string message)
+  {
+    await UniTask.NextFrame();
+    PromptPanel.Instance.ShowPrompt("Couldn't switch mods", message + " The log has the details.", "OK", () => { },
+      hideCancelButton: true);
   }
 
   private static void UseMods(string worldName, List<Slp2PackageCode.Entry> mods)
@@ -436,6 +505,7 @@ internal static class SaveModsPanel
       if (pack == null)
       {
         Logger.Global.LogError("Could not create a pack from the save's mods");
+        ShowFailure("SLP couldn't create a pack from this save's mods.");
         return;
       }
 
@@ -447,6 +517,7 @@ internal static class SaveModsPanel
     {
       Logger.Global.LogError("Could not switch to the save's mods");
       Logger.Global.LogException(ex);
+      ShowFailure("Something went wrong while switching to this save's mods.");
     }
   }
 
