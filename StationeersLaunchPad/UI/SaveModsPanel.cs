@@ -459,23 +459,41 @@ internal static class SaveModsPanel
     button.onClick.AddListener(() => ConfirmUse(item.WorldItem?.StationName, entries, state));
     var hover = button.gameObject.AddComponent<HoverTooltip>();
     hover.Title = "Play with this save's mods";
-    hover.Body = "Switches to a pack with exactly the mods this save was made with and restarts the game. " +
-      "Your clientside mods stay.";
+    hover.Body = "Restarts the game with exactly the mods this save was made with, for one start. " +
+      "Your packs stay as they are, your clientside mods load too.";
   }
 
   private static void ConfirmUse(string worldName, List<Slp2PackageCode.Entry> entries, SaveModsState state)
   {
     var mods = entries.Where(entry => entry.WorkshopHandle > 1).ToList();
-    var steps = new List<string>();
+    var lines = new List<string>
+    {
+      MatchingPack(mods) is { } pack
+        ? $"Your pack {pack.Name} has exactly this save's mods. SLP switches to it and restarts the game."
+        : $"SLP restarts the game with the {Plural(mods.Count, "mod")} this save was made with, just for this start. "
+          + "Your packs stay as they are.",
+    };
     if (state.NotInstalled > 0)
-      steps.Add($"{Plural(state.NotInstalled, "mod")} will be downloaded from the Workshop on the next start.");
+      lines.Add($"{Plural(state.NotInstalled, "mod")} will be downloaded from the Workshop on the next start.");
     if (state.NotEnabled > 0)
-      steps.Add($"{Plural(state.NotEnabled, "installed mod")} will be enabled.");
-    PromptPanel.Instance.ShowPrompt("Restart with this save's mods",
-      $"SLP switches to a pack with the {Plural(mods.Count, "mod")} this save was made with and restarts the game. " +
-      string.Join(" ", steps),
+      lines.Add($"{Plural(state.NotEnabled, "installed mod")} will be enabled.");
+    PromptPanel.Instance.ShowPrompt("Restart with this save's mods", string.Join(" ", lines),
       "Restart", () => UseMods(worldName, mods));
   }
+
+  private static ProfileData MatchingPack(List<Slp2PackageCode.Entry> mods)
+  {
+    var handles = new HashSet<ulong>(mods.Select(mod => mod.WorkshopHandle));
+    return LaunchPadConfig.ProfileManager.UserPacks.FirstOrDefault(profile =>
+      profile.Mods.Count == handles.Count && profile.Mods.All(mod => handles.Contains(mod.WorkshopHandle)));
+  }
+
+  private static ProfileModEntry ToEntry(Slp2PackageCode.Entry mod) => new()
+  {
+    Name = mod.Name,
+    Source = ModSourceType.Workshop,
+    WorkshopHandle = mod.WorkshopHandle,
+  };
 
   // runs from the confirm prompt's button, which closes that prompt after its listeners
   private static async void ShowFailure(string message)
@@ -489,31 +507,13 @@ internal static class SaveModsPanel
   {
     try
     {
-      var manager = LaunchPadConfig.ProfileManager;
-      var handles = new HashSet<ulong>(mods.Select(mod => mod.WorkshopHandle));
-
-      var pack = manager.UserPacks.FirstOrDefault(profile =>
-        profile.Mods.Count == handles.Count && profile.Mods.All(mod => handles.Contains(mod.WorkshopHandle)));
-      if (pack == null)
+      if (MatchingPack(mods) is { } pack)
+        Configs.ModProfile.Value = pack.Name;
+      else if (!LaunchPadConfig.ProfileManager.SetNextStart(worldName, mods.Select(ToEntry)))
       {
-        var name = manager.UniqueName(worldName, "Save");
-        var created = manager.CreatePack(name, mods.Select(mod => new ProfileModEntry
-        {
-          Name = mod.Name,
-          Source = ModSourceType.Workshop,
-          WorkshopHandle = mod.WorkshopHandle,
-        }));
-        pack = created ? manager.FindProfile(name) : null;
-      }
-      if (pack == null)
-      {
-        Logger.Global.LogError("Could not create a pack from the save's mods");
-        ShowFailure("SLP couldn't create a pack from this save's mods.");
+        ShowFailure("SLP couldn't save this save's mods for the next start.");
         return;
       }
-
-      // takes effect on the next start
-      Configs.ModProfile.Value = pack.Name;
       ProcessUtil.RestartGame();
     }
     catch (Exception ex)
@@ -562,9 +562,10 @@ internal static class SaveModsPanel
           message.Append($"\n<color={Missing}>Not installed:</color> {Names(notInstalled)}");
         if (notEnabled.Count > 0)
           message.Append($"\n<color={Disabled}>Not enabled:</color> {Names(notEnabled)}");
-        message.Append("\n\nSLP can switch to a pack with this save's mods and restart the game.");
-
         var mods = entries.Where(entry => entry.WorkshopHandle > 1).ToList();
+        message.Append(MatchingPack(mods) is { } pack
+          ? $"\n\nYour pack {Escape(pack.Name)} has exactly this save's mods, SLP can switch to it and restart the game."
+          : "\n\nSLP can restart the game with this save's mods, just for one start. Your packs stay as they are.");
         var label = notInstalled.Count > 0 ? $"Get {Plural(notInstalled.Count, "mod")}" : $"Enable {Plural(notEnabled.Count, "mod")}";
         var worldName = loadingName;
         __instance.ShowRaw(Localization.GetInterface(titleKey), message.ToString(),

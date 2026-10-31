@@ -165,6 +165,17 @@ public static class LaunchWindow
       }));
     }
 
+    var manager = LaunchPadConfig.ProfileManager;
+    if (input && manager.IsOneStart(active))
+    {
+      var keepWidth = ImGui.CalcTextSize("Keep as pack").x + style.FramePadding.x * 4f;
+      buttons.Add((keepWidth, () =>
+      {
+        ProfilePanel.DrawKeepButton(manager, active.Name, new Vector2(keepWidth, height));
+        ImGuiHelper.ItemTooltip(ProfilePanel.OneStartText(manager), 400f);
+      }));
+    }
+
     if (input)
     {
       if (missing.Count == 0 && !switched)

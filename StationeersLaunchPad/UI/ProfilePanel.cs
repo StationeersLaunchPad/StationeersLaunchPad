@@ -91,11 +91,15 @@ public static class ProfilePanel
       ImGuiHelper.TextColored("Built in: the game without any mods, not even clientside ones.", LaunchPadTheme.TextSub);
     else if (manager.IsBuiltIn(active))
       ImGuiHelper.TextColored("Built in: the game with only your clientside mods.", LaunchPadTheme.TextSub);
+    else if (manager.IsOneStart(active))
+      ImGuiHelper.TextColored(OneStartText(manager), LaunchPadTheme.Info);
     ImGui.PopTextWrapPos();
 
     // built-in packs can't be renamed, copied or deleted
-    if (manager.IsBuiltIn(active))
+    if (manager.IsBuiltIn(active) || manager.IsOneStart(active))
     {
+      if (manager.IsOneStart(active))
+        DrawKeepButton(manager, active.Name);
       DrawMissingMods(stage, manager, active, modList);
       return changed;
     }
@@ -174,6 +178,23 @@ public static class ProfilePanel
 
     DrawMissingMods(stage, manager, active, modList);
     return changed;
+  }
+
+  public static string OneStartText(ProfileManager manager)
+  {
+    var next = string.IsNullOrEmpty(manager.ConfiguredProfileName) ? "your usual pack" : manager.ConfiguredProfileName;
+    return "A temporary pack with a save's mods, because you restarted with them from the load menu. "
+      + $"The next start loads {next} again, unless you keep this one.";
+  }
+
+  public static void DrawKeepButton(ProfileManager manager, string name, Vector2 size = default)
+  {
+    if (!ImGui.Button("Keep as pack", size))
+      return;
+    if (manager.KeepOneStart())
+      SetMessage($"Kept {name} as a pack", ProfileStatusKind.Saved);
+    else
+      SetMessage($"Could not keep {name} as a pack", ProfileStatusKind.Error);
   }
 
   private static void DrawMissingMods(LoadStage stage, ProfileManager manager, ProfileData pack, ModList modList)
