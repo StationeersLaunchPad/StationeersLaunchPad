@@ -240,7 +240,7 @@ public static class ManualLoadWindow
     var modsChanged = false;
     var activeProfile = profileManager.ActiveProfile;
     var missing = stage == LoadStage.Configuring && activeProfile != null
-      ? ProfileManager.GetMissingMods(activeProfile, modList)
+      ? profileManager.GetMissingMods(activeProfile, modList)
       : [];
     var workshopMissing = missing.Where(entry => entry.WorkshopHandle > 1).ToList();
 
@@ -706,7 +706,7 @@ public static class ManualLoadWindow
     var lineHeight = ImGui.GetTextLineHeight();
     var (rowHeight, rowPadding, thumbHeight, thumbWidth) = RowMetrics();
     var checkboxSize = ImGui.GetFrameHeight();
-    foreach (var entry in ProfileManager.GetMissingMods(active, modList))
+    foreach (var entry in profileManager.GetMissingMods(active, modList))
     {
       var rowRect = row.Rect;
       drawList.AddRectFilled(rowRect.Min, rowRect.Max, LaunchPadTheme.OverU32(LaunchPadTheme.Warn, idx++ % 2 == 1 ? 0.07f : 0.05f));

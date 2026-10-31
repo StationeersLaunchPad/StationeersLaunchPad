@@ -95,7 +95,10 @@ public static class ProfilePanel
 
     // built-in packs can't be renamed, copied or deleted
     if (manager.IsBuiltIn(active))
+    {
+      DrawMissingMods(stage, manager, active, modList);
       return changed;
+    }
 
     if (renameFor == active.Name)
     {
@@ -175,7 +178,7 @@ public static class ProfilePanel
 
   private static void DrawMissingMods(LoadStage stage, ProfileManager manager, ProfileData pack, ModList modList)
   {
-    var missing = ProfileManager.GetMissingMods(pack, modList);
+    var missing = manager.GetMissingMods(pack, modList);
     if (missing.Count == 0)
       return;
 

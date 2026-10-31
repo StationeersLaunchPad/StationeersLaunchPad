@@ -434,7 +434,10 @@ public class ProfileManager
   public List<ProfileModEntry> GetMissingMods(string profileName, ModList modList) =>
     GetMissingMods(FindProfile(profileName), modList);
 
-  public static List<ProfileModEntry> GetMissingMods(ProfileData profile, ModList modList)
+  public List<ProfileModEntry> GetMissingMods(ProfileData profile, ModList modList) =>
+    FindMissingMods(profile == vanillaPlus ? clientside : profile, modList);
+
+  private static List<ProfileModEntry> FindMissingMods(ProfileData profile, ModList modList)
   {
     if (profile == null)
       return [];

@@ -49,7 +49,7 @@ public static class LaunchWindow
       var active = manager.ActiveProfile;
       var showPacks = active != null
         && stage is LoadStage.Configuring or LoadStage.Loading or LoadStage.Loaded;
-      var missing = showPacks ? ProfileManager.GetMissingMods(active, modList) : [];
+      var missing = showPacks ? manager.GetMissingMods(active, modList) : [];
       if (missing.Count > 0)
         switched = true;
 

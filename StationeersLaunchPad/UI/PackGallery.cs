@@ -122,7 +122,7 @@ public static class PackGallery
     var hovered = ImGui.IsItemHovered();
     var isActive = pack == active;
     var isServer = ProfileManager.IsServerPack(pack);
-    var missing = ProfileManager.GetMissingMods(pack, modList).Count;
+    var missing = manager.GetMissingMods(pack, modList).Count;
 
     drawList.AddRectFilled(min, max, LaunchPadTheme.OverU32(Color.white, hovered ? 0.07f : 0.035f), 4f);
     var mods = manager.IsVanilla(pack) ? []
