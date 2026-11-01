@@ -244,7 +244,9 @@ public static class LaunchWindow
     var precise = Mathf.Max(0f, (float)wait.SecondsRemaining).ToString("0.0", CultureInfo.InvariantCulture);
     var pack = active?.Name ?? "mods";
 
+    var downloading = status == null && stage == LoadStage.Configuring ? ProfilePanel.DownloadStatus : null;
     var (text, color) = status != null ? (status, LaunchPadTheme.Text)
+      : downloading != null ? (downloading, LaunchPadTheme.Text)
       : stage switch
       {
         LoadStage.Updating => ("Checking for updates", LaunchPadTheme.TextSub),
@@ -264,6 +266,8 @@ public static class LaunchWindow
 
     if (status != null)
       RocketBar.Draw(1f, RocketBar.Rocket.Hold);
+    else if (downloading != null)
+      RocketBar.DrawLoop();
     else if (stage == LoadStage.Configuring)
       RocketBar.Draw(countdown ? Progress(wait) : 0f, countdown ? RocketBar.Rocket.Burn : RocketBar.Rocket.Pad);
     else if (stage == LoadStage.Loading)

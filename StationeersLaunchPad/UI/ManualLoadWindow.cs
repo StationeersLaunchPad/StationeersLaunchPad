@@ -244,8 +244,9 @@ public static class ManualLoadWindow
       : [];
     var workshopMissing = missing.Where(entry => entry.WorkshopHandle > 1).ToList();
 
-    var status = missing.Count > 0
-      ? $"{activeProfile.Name} needs {missing.Count} mod{(missing.Count == 1 ? "" : "s")} that {(missing.Count == 1 ? "isn't" : "aren't")} installed"
+    var downloading = ProfilePanel.DownloadStatus;
+    var status = downloading != null ? downloading
+      : missing.Count > 0 ? $"{activeProfile.Name} is missing {missing.Count} mod{(missing.Count == 1 ? "" : "s")}"
       : stage switch
       {
         LoadStage.Updating => "Checking for updates to StationeersLaunchPad",
@@ -257,13 +258,20 @@ public static class ManualLoadWindow
         LoadStage.Failed => "Mods failed to load. Game may not function properly",
         _ => "",
       };
-    var statusColor = missing.Count > 0 ? LaunchPadTheme.Warn
+    var statusColor = downloading != null ? LaunchPadTheme.Text
+      : missing.Count > 0 ? LaunchPadTheme.Warn
       : stage == LoadStage.Failed ? LaunchPadTheme.Err
       : LaunchPadTheme.Text;
 
+    var version = $"SLP {LaunchPadInfo.VERSION}";
+    var versionFits = ImGui.CalcTextSize(status).x + ImGui.CalcTextSize(version).x + ImGui.GetStyle().ItemSpacing.x * 4f
+      < ImGui.GetContentRegionAvail().x;
     ImGuiHelper.TextColored(status, statusColor);
-    ImGui.SameLine();
-    ImGuiHelper.TextRightDisabled($"SLP {LaunchPadInfo.VERSION}");
+    if (versionFits)
+    {
+      ImGui.SameLine();
+      ImGuiHelper.TextRightDisabled(version);
+    }
 
     if (missing.Count > 0)
     {
@@ -734,12 +742,20 @@ public static class ManualLoadWindow
       ImGuiHelper.TextColored(ProfilePanel.GetFallbackName(entry), LaunchPadTheme.TextSub);
       ImGui.SetCursorScreenPos(new Vector2(
         textCol.Min.x, textCol.Min.y + rowPadding + lineHeight + ImGui.GetStyle().ItemSpacing.y));
-      ImGuiHelper.TextColored(isWorkshop ? $"Workshop{ModInfoPanel.MetaSeparator}not installed"
-        : $"{entry.Source}{ModInfoPanel.MetaSeparator}not installed, add it to your mods folder", LaunchPadTheme.Warn);
+      var current = isWorkshop && ProfilePanel.CurrentDownload == entry.WorkshopHandle;
+      var queued = isWorkshop && !current && ProfilePanel.IsQueued(entry.WorkshopHandle);
+      var downloaded = isWorkshop && ProfilePanel.IsDownloaded(entry.WorkshopHandle);
+      ImGuiHelper.TextColored(
+        downloaded ? $"Workshop{ModInfoPanel.MetaSeparator}Downloaded, shows up once all current downloads are done"
+        : current ? $"Workshop{ModInfoPanel.MetaSeparator}downloading"
+        : queued ? $"Workshop{ModInfoPanel.MetaSeparator}waiting to download"
+        : isWorkshop ? $"Workshop{ModInfoPanel.MetaSeparator}not installed"
+        : $"{entry.Source}{ModInfoPanel.MetaSeparator}not installed, add it to your mods folder",
+        downloaded ? LaunchPadTheme.Ok : current || queued ? LaunchPadTheme.Info : LaunchPadTheme.Warn);
 
-      if (isWorkshop)
+      if (isWorkshop && !downloaded)
       {
-        var label = ProfilePanel.Busy ? ProfilePanel.BusyText : "Download";
+        var label = current ? "Downloading..." : queued ? "Queued" : "Download";
         var width = ImGui.CalcTextSize(label).x + ImGui.GetStyle().FramePadding.x * 2f;
         ImGui.SetCursorScreenPos(new Vector2(rowRect.Max.x - width - ImGui.GetStyle().ItemSpacing.x,
           rowRect.Min.y + (rowHeight - ImGui.GetFrameHeight()) / 2f));

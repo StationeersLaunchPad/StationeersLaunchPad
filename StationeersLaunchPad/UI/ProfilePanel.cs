@@ -25,10 +25,15 @@ public static class ProfilePanel
   private static string packageCode = "";
   private static bool importingPackage;
   private static readonly HashSet<ulong> subscriptions = [];
+  private static readonly HashSet<ulong> downloaded = [];
   private static ModList indexedModList;
   private static IReadOnlyDictionary<string, ModInfo> modIndex;
 
   public static bool Busy => subscriptions.Count > 0 || importingPackage;
+  public static string DownloadStatus { get; private set; }
+  public static ulong CurrentDownload { get; private set; }
+  public static bool IsQueued(ulong handle) => subscriptions.Contains(handle) && !downloaded.Contains(handle);
+  public static bool IsDownloaded(ulong handle) => downloaded.Contains(handle);
   public static string BusyText => importingPackage ? "Importing..." : "Downloading...";
 
   public static void ShowLoadBlocked(string profileName, int missingModCount)
@@ -401,32 +406,41 @@ public static class ProfilePanel
       SetMessage(Steam.NotRunningText, ProfileStatusKind.Error);
       return;
     }
-    var handles = entries.Select(entry => entry.WorkshopHandle).Where(subscriptions.Add).ToList();
-    if (handles.Count == 0)
+    var queue = entries.Where(entry => subscriptions.Add(entry.WorkshopHandle)).ToList();
+    if (queue.Count == 0)
       return;
     try
     {
       var done = 0;
-      foreach (var handle in handles)
+      foreach (var entry in queue)
       {
-        SetMessage($"Downloading Workshop item {handle}...", ProfileStatusKind.Info);
-        if (!await Steam.SubscribeAndDownload(handle))
+        var name = GetFallbackName(entry);
+        CurrentDownload = entry.WorkshopHandle;
+        DownloadStatus = queue.Count == 1 ? $"Downloading {name}" : $"Downloading {name} ({done + 1} of {queue.Count})";
+        SetMessage($"{DownloadStatus}...", ProfileStatusKind.Info);
+        if (!await Steam.SubscribeAndDownload(entry.WorkshopHandle))
         {
-          SetMessage($"Could not download Workshop item {handle}", ProfileStatusKind.Error);
+          SetMessage($"Could not download {name}", ProfileStatusKind.Error);
           break;
         }
+        downloaded.Add(entry.WorkshopHandle);
         done++;
       }
-      if (done == handles.Count)
-        SetMessage($"Downloaded {done} Workshop item{(done == 1 ? "" : "s")}", ProfileStatusKind.Saved);
+      if (done == queue.Count)
+        SetMessage($"Downloaded {done} mod{(done == 1 ? "" : "s")}", ProfileStatusKind.Saved);
       if (done > 0)
         // the active pack is applied again to the new mod list
         LaunchPadConfig.ReloadMods(preserveSelection: false);
     }
     finally
     {
-      foreach (var handle in handles)
-        subscriptions.Remove(handle);
+      DownloadStatus = null;
+      CurrentDownload = 0;
+      foreach (var entry in queue)
+      {
+        subscriptions.Remove(entry.WorkshopHandle);
+        downloaded.Remove(entry.WorkshopHandle);
+      }
     }
   }
 
