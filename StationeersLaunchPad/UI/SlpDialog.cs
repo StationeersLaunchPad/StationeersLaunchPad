@@ -178,10 +178,10 @@ public static class SlpDialog
     var width = (ImGui.GetContentRegionAvail().x - spacing * (buttons.Count - 1)) / buttons.Count;
     var size = new Vector2(width, ImGui.GetFrameHeight() * 1.3f);
     var clicked = -1;
-    for (var i = 0; i < buttons.Count; i++)
+    for (var i = buttons.Count - 1; i >= 0; i--)
     {
       var button = buttons[i];
-      if (i > 0)
+      if (i < buttons.Count - 1)
         ImGui.SameLine();
       var enabled = button.Enabled?.Invoke() ?? true;
       var label = $"{button.Label}##dialogbutton{i}";
