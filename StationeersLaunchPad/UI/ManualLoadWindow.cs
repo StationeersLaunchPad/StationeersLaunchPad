@@ -840,8 +840,8 @@ public static class ManualLoadWindow
     SlpDialog.Text("Just want to enable it? Tick the box at the start of its row instead.", LaunchPadTheme.Text);
     SlpDialog.Gap();
     SlpDialog.Text(needsServer
-      ? "Clientside mods load in every pack except Vanilla, also on servers that don't have them."
-      : "Clientside mods load in every pack except Vanilla, also on servers that don't have them. "
+      ? "Clientside mods load in every pack except Vanilla, also when connecting to servers that don't have them."
+      : "Clientside mods load in every pack except Vanilla, also when connecting to servers that don't have them. "
         + "Only for mods that run purely on your side, like UI tweaks or some QOL mods. Not sure? Check its description.",
       LaunchPadTheme.TextMuted);
     SlpDialog.Gap();
