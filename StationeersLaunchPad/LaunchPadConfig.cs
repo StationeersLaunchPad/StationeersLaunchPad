@@ -527,6 +527,25 @@ public static class LaunchPadConfig
     }
   }
 
+  private static async UniTaskVoid OfferServerOnly(List<ModInfo> mods)
+  {
+    var text = "These mods are made for dedicated servers and shouldn't run in your game:\n\n  "
+      + string.Join("\n  ", mods.Select(mod => mod.Name))
+      + "\n\nTurning them off only affects this start. To stop seeing this, take them out of your pack in the SLP menu.";
+
+    var choice = await SlpDialog.Show($"{mods.Count} server-only mod{(mods.Count == 1 ? "" : "s")}", text,
+      DialogTone.Normal,
+      new DialogButton("Turn off", primary: true),
+      new DialogButton("Load anyway", cancel: true));
+    if (choice == 0)
+    {
+      foreach (var mod in mods)
+        mod.Enabled = false;
+      NormalizeModList();
+    }
+    CurWait.Auto = AutoLoad;
+  }
+
   private static async UniTaskVoid OfferOutsideChanges(ProfileData profile, List<ModInfo> mods)
   {
     var text = "Your mods changed outside SLP, for example a new Workshop subscription or the game's mod menu.\n\n"
@@ -584,6 +603,12 @@ public static class LaunchPadConfig
     {
       CurWait.Auto = false;
       OfferOutsideChanges(profile, outside).Forget();
+    }
+    var serverOnly = modList.EnabledMods.Where(mod => mod.About?.ModSide == ModSide.Server).ToList();
+    if (serverOnly.Count > 0)
+    {
+      CurWait.Auto = false;
+      OfferServerOnly(serverOnly).Forget();
     }
     var depNotice = NormalizeModList();
 
