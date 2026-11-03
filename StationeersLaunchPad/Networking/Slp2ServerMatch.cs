@@ -2,8 +2,13 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using Assets.Scripts.Networking;
+using Assets.Scripts.Networking.Transports;
 using Cysharp.Threading.Tasks;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using UnityEngine.Networking;
 
 namespace StationeersLaunchPad.Networking;
 
@@ -55,18 +60,31 @@ internal static class Slp2ServerMatch
   {
     if (!IsMatchableName(serverName))
       return null;
+    List<GameSession> sessions;
     try
     {
-      await NetworkManager.GetGameSessionList();
+      sessions = await FetchSessions();
     }
     catch (Exception ex)
     {
       Logger.Global.LogWarning($"SLP2 server list unavailable: {ex.Message}");
       return null;
     }
-    var matches = NetworkManager.GameSessionList
+    var matches = sessions
       .Where(session => serverName.Equals(CleanName(session.Name), StringComparison.OrdinalIgnoreCase))
       .ToList();
     return matches.Count == 1 ? matches[0] : null;
+  }
+
+  private static async UniTask<List<GameSession>> FetchSessions()
+  {
+    using var request = new UnityWebRequest(NetConfig.Load().GetUrl(EndPoint.List), "POST");
+    request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(new ListRequest())));
+    request.downloadHandler = new DownloadHandlerBuffer();
+    request.SetRequestHeader("Content-Type", "application/json");
+    await request.SendWebRequest();
+    return JObject.Parse(request.downloadHandler.text).SelectToken("GameSessions") is JArray list
+      ? [.. list.Select(session => session.ToObject<GameSession>()).Where(session => session != null)]
+      : [];
   }
 }
