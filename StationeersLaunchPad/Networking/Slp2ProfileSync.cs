@@ -102,6 +102,8 @@ internal static class Slp2ProfileSync
       {
         targetAddress = target.LastAddress;
         targetPort = target.LastPort;
+        Logger.Global.LogWarning(
+          $"SLP2: '{target.ServerName}' isn't in the server list, trying its last address {targetAddress}:{targetPort}");
       }
       else
       {
