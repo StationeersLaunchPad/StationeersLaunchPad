@@ -115,12 +115,26 @@ internal static class ConfigPanel
         if (entry.Visible && DrawConfigEntry(entry))
           changed = true;
       }
+      if (configFile == Configs.Sorted && category.Category == "Server Packs")
+        DrawDeclinedServers();
       ImGui.PopID();
     }
 
     ImGui.PopID();
 
     return changed;
+  }
+
+  private static void DrawDeclinedServers()
+  {
+    var declined = Networking.Slp2ServerMatch.Declined();
+    if (declined.Count == 0)
+      return;
+    if (ImGui.Button($"Forget {declined.Count} declined server{(declined.Count == 1 ? "" : "s")}"))
+      Networking.Slp2ServerMatch.ForgetDeclined();
+    else
+      ImGuiHelper.ItemTooltip("These servers got a \"No thanks\" and won't offer their pack again:\n"
+        + string.Join("\n", declined.OrderBy(name => name, StringComparer.OrdinalIgnoreCase)));
   }
 
   private delegate bool DrawConfigEntryFunc(ConfigEntryWrapper wrapper, bool fill);

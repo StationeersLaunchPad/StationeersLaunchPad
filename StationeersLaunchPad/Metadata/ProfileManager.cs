@@ -30,18 +30,23 @@ public class ProfileManager
   public IEnumerable<ProfileData> UserPacks => profiles.Where(profile => !IsServerPack(profile));
   public IEnumerable<ProfileData> ServerPacks => profiles.Where(IsServerPack);
   public ProfileData Clientside => clientside;
+  public ProfileData OneStart { get; private set; }
   public bool IsInitialized { get; private set; }
-  public string ActiveProfileName => Configs.ModProfile.Value;
+  public string ConfiguredProfileName => Configs.ModProfile.Value;
+  public string ActiveProfileName => OneStart?.Name ?? ConfiguredProfileName;
   public ProfileData ActiveProfile => FindProfile(ActiveProfileName);
 
   public bool IsBuiltIn(ProfileData profile) => profile == vanilla || profile == vanillaPlus;
   public bool IsVanilla(ProfileData profile) => profile == vanilla;
+  public bool IsOneStart(ProfileData profile) => profile != null && profile == OneStart;
   public static bool IsServerPack(ProfileData profile) => !string.IsNullOrEmpty(profile?.ServerName);
-  public bool IsEditable(ProfileData profile) => profile != null && !IsServerPack(profile) && !IsBuiltIn(profile);
+  public bool IsEditable(ProfileData profile) =>
+    profile != null && !IsServerPack(profile) && !IsBuiltIn(profile) && !IsOneStart(profile);
   public bool ActiveEditable => IsEditable(ActiveProfile);
   public bool ClientsideActive => ActiveProfile != null && !IsVanilla(ActiveProfile);
 
   private static string ClientsidePath => Path.Join(LaunchPadPaths.SavePath, "clientside-mods.xml");
+  private static string OneStartPath => Path.Join(LaunchPadPaths.SavePath, "next-start-mods.xml");
 
   public void Initialize()
   {
@@ -53,7 +58,48 @@ public class ProfileManager
     profiles.RemoveAll(profile => IsReservedName(profile.Name));
     SortProfiles();
     clientside = LoadClientside();
+    OneStart = TakeOneStart();
     IsInitialized = true;
+  }
+
+  private ProfileData TakeOneStart()
+  {
+    if (!File.Exists(OneStartPath))
+      return null;
+    try
+    {
+      var data = XmlSerialization.Deserialize<ProfileData>(OneStartPath);
+      File.Delete(OneStartPath);
+      return string.IsNullOrWhiteSpace(data?.Name) || FindProfile(data.Name) != null ? null : data;
+    }
+    catch (Exception ex)
+    {
+      Logger.Global.LogWarning($"Could not read the mods for this start: {ex.Message}");
+      return null;
+    }
+  }
+
+  public bool SetNextStart(string name, IEnumerable<ProfileModEntry> mods)
+  {
+    var data = new ProfileData { Name = UniqueName(name, "Save"), Mods = [.. mods] };
+    if (data.SaveXml(OneStartPath))
+      return true;
+    Logger.Global.LogError($"Failed to save the mods for the next start to {OneStartPath}");
+    return false;
+  }
+
+  public bool KeepOneStart()
+  {
+    if (OneStart is not { } profile)
+      return false;
+    OneStart = null;
+    if (!AddPack(profile))
+    {
+      OneStart = profile;
+      return false;
+    }
+    Configs.ModProfile.Value = profile.Name;
+    return true;
   }
 
   public static bool IsReservedName(string name) =>
@@ -123,7 +169,8 @@ public class ProfileManager
   public bool RenamePack(string oldName, string newName)
   {
     var profile = FindProfile(oldName);
-    if (profile == null || IsBuiltIn(profile) || !ProfileStorage.IsValidName(newName) || IsReservedName(newName))
+    if (profile == null || IsBuiltIn(profile) || IsOneStart(profile) || !ProfileStorage.IsValidName(newName)
+      || IsReservedName(newName))
       return false;
     var other = FindProfile(newName);
     if (other != null && other != profile)
@@ -151,7 +198,7 @@ public class ProfileManager
   public bool DeletePack(string name, ModList modList)
   {
     var profile = FindProfile(name);
-    if (profile == null || IsBuiltIn(profile) || !ProfileStorage.Delete(profile.Name))
+    if (profile == null || IsBuiltIn(profile) || IsOneStart(profile) || !ProfileStorage.Delete(profile.Name))
       return false;
 
     var wasActive = profile == ActiveProfile;
@@ -172,7 +219,11 @@ public class ProfileManager
     var profile = FindProfile(profileName);
     if (profile == null)
       return false;
-    Configs.ModProfile.Value = profile.Name;
+    if (!IsOneStart(profile))
+    {
+      OneStart = null;
+      Configs.ModProfile.Value = profile.Name;
+    }
     Apply(modList);
     return true;
   }
@@ -434,7 +485,10 @@ public class ProfileManager
   public List<ProfileModEntry> GetMissingMods(string profileName, ModList modList) =>
     GetMissingMods(FindProfile(profileName), modList);
 
-  public static List<ProfileModEntry> GetMissingMods(ProfileData profile, ModList modList)
+  public List<ProfileModEntry> GetMissingMods(ProfileData profile, ModList modList) =>
+    FindMissingMods(profile == vanillaPlus ? clientside : profile, modList);
+
+  private static List<ProfileModEntry> FindMissingMods(ProfileData profile, ModList modList)
   {
     if (profile == null)
       return [];
@@ -472,8 +526,8 @@ public class ProfileManager
   {
     if (string.IsNullOrEmpty(profileName))
       return null;
-    return BuiltInPacks.Concat(profiles).FirstOrDefault(profile =>
-      profile.Name.Equals(profileName, StringComparison.OrdinalIgnoreCase));
+    return BuiltInPacks.Append(OneStart).Concat(profiles).FirstOrDefault(profile =>
+      profile != null && profile.Name.Equals(profileName, StringComparison.OrdinalIgnoreCase));
   }
 
   internal static ModInfo FindMod(ProfileModEntry entry, IEnumerable<ModInfo> mods) =>

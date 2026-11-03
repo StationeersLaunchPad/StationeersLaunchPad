@@ -44,13 +44,15 @@ internal static class Slp2ProfileSync
       if (decided)
         return join ? ($"{name}: validated, joining after load", ProfileStatusKind.Saved)
           : state == VerifyState.Fetched && Matches() ? ($"{name}: validated", ProfileStatusKind.Saved)
+          : state == VerifyState.Unreachable
+            ? ($"Not auto-joining the server {name}, {failReason} - loading the last known mod list", ProfileStatusKind.Unsaved)
           : ($"{name}: not joining after load", ProfileStatusKind.Unsaved);
       return state switch
       {
-        VerifyState.Pending => ($"Checking {name}...", ProfileStatusKind.Info),
+        VerifyState.Pending => ($"Checking the server {name}...", ProfileStatusKind.Info),
         VerifyState.Fetched when Matches() => ($"{name}: your mods match", ProfileStatusKind.Saved),
         VerifyState.Fetched => ($"{name} runs different mods", ProfileStatusKind.Unsaved),
-        VerifyState.Unreachable => ($"Couldn't check {name}: {failReason}", ProfileStatusKind.Error),
+        VerifyState.Unreachable => ($"Couldn't check the server {name}: {failReason}", ProfileStatusKind.Error),
         _ => null,
       };
     }
@@ -126,7 +128,7 @@ internal static class Slp2ProfileSync
         return;
       if (fetched == null)
       {
-        Fail("it didn't answer");
+        Fail("it didn't answer our probe");
         return;
       }
       // the address may now belong to a different server
@@ -145,7 +147,7 @@ internal static class Slp2ProfileSync
     {
       Logger.Global.LogWarning($"SLP2: checking '{target.ServerName}' failed");
       Logger.Global.LogException(ex);
-      Fail("something went wrong, see the log");
+      Fail("the check failed, see the log");
     }
   }
 
@@ -176,7 +178,7 @@ internal static class Slp2ProfileSync
   // shown in the status bar instead of the countdown while the check holds loading back
   internal static string GateStatus => !gating || profile == null ? null
     : mismatchVisible ? $"{profile.ServerName} runs different mods - choose how to continue"
-    : $"Checking {profile.ServerName}...";
+    : $"Checking the server {profile.ServerName}...";
 
   internal static async UniTask WaitForGate()
   {

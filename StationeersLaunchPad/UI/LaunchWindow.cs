@@ -49,7 +49,7 @@ public static class LaunchWindow
       var active = manager.ActiveProfile;
       var showPacks = active != null
         && stage is LoadStage.Configuring or LoadStage.Loading or LoadStage.Loaded;
-      var missing = showPacks ? ProfileManager.GetMissingMods(active, modList) : [];
+      var missing = showPacks ? manager.GetMissingMods(active, modList) : [];
       if (missing.Count > 0)
         switched = true;
 
@@ -165,6 +165,17 @@ public static class LaunchWindow
       }));
     }
 
+    var manager = LaunchPadConfig.ProfileManager;
+    if (input && manager.IsOneStart(active))
+    {
+      var keepWidth = ImGui.CalcTextSize("Keep as pack").x + style.FramePadding.x * 4f;
+      buttons.Add((keepWidth, () =>
+      {
+        ProfilePanel.DrawKeepButton(manager, active.Name, new Vector2(keepWidth, height));
+        ImGuiHelper.ItemTooltip(ProfilePanel.OneStartText(manager), 400f);
+      }));
+    }
+
     if (input)
     {
       if (missing.Count == 0 && !switched)
@@ -233,7 +244,9 @@ public static class LaunchWindow
     var precise = Mathf.Max(0f, (float)wait.SecondsRemaining).ToString("0.0", CultureInfo.InvariantCulture);
     var pack = active?.Name ?? "mods";
 
+    var downloading = status == null && stage == LoadStage.Configuring ? ProfilePanel.DownloadStatus : null;
     var (text, color) = status != null ? (status, LaunchPadTheme.Text)
+      : downloading != null ? (downloading, LaunchPadTheme.Text)
       : stage switch
       {
         LoadStage.Updating => ("Checking for updates", LaunchPadTheme.TextSub),
@@ -253,6 +266,8 @@ public static class LaunchWindow
 
     if (status != null)
       RocketBar.Draw(1f, RocketBar.Rocket.Hold);
+    else if (downloading != null)
+      RocketBar.DrawLoop();
     else if (stage == LoadStage.Configuring)
       RocketBar.Draw(countdown ? Progress(wait) : 0f, countdown ? RocketBar.Rocket.Burn : RocketBar.Rocket.Pad);
     else if (stage == LoadStage.Loading)

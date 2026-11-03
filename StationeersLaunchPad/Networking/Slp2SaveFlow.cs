@@ -24,7 +24,8 @@ internal static class Slp2SaveFlow
     var serverName = Slp2JoinMarker.ServerName;
     var address = Slp2JoinMarker.Address;
     var port = Slp2JoinMarker.Port;
-    if (!Slp2ServerMatch.IsMatchableName(serverName) || string.IsNullOrEmpty(address) || port == 0)
+    if (!Slp2ServerMatch.IsMatchableName(serverName) || Slp2ServerMatch.IsDeclined(serverName)
+      || string.IsNullOrEmpty(address) || port == 0)
       return;
 
     var profileManager = LaunchPadConfig.ProfileManager;
@@ -42,7 +43,9 @@ internal static class Slp2SaveFlow
       return;
 
     var choice = await Slp2SaveProfilePanel.Offer(result.ServerName, result.Entries);
-    if (choice == Slp2SaveChoice.None)
+    if (choice == Slp2SaveChoice.Declined)
+      Slp2ServerMatch.Decline(serverName);
+    if (choice is Slp2SaveChoice.None or Slp2SaveChoice.Declined)
       return;
     if (!profileManager.SaveServerProfileFromCode(result.ServerName, result.Code, result.Entries, address, port,
       activate: choice == Slp2SaveChoice.SaveAndActivate))

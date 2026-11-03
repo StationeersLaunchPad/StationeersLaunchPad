@@ -89,6 +89,7 @@ public static class LaunchPadConfig
   private static bool SkipNextAutoWaits;
   private static bool SteamDisabled;
   private static bool quickProfileOpen;
+  private static bool autoDownloading;
   private static bool preserveSelectionAfterReload = true;
 
   private static StageWait CurWait = new(0, false);
@@ -591,6 +592,11 @@ public static class LaunchPadConfig
     {
       Logger.Global.LogWarning(
         $"Pack '{profile.Name}' has {missingMods.Count} missing required mod(s)");
+      if (firstLoad && profileManager.IsOneStart(profile) && Steam.Running)
+      {
+        autoDownloading = true;
+        ProfilePanel.Download(missingMods);
+      }
       if (AutoLoad)
       {
         quickProfileOpen = true;
@@ -599,6 +605,11 @@ public static class LaunchPadConfig
       else
         ManualLoadWindow.OpenProfilesTab();
       return;
+    }
+    if (autoDownloading)
+    {
+      autoDownloading = false;
+      quickProfileOpen = false;
     }
 
     if (depNotice && Platform.PauseOnDepNotice)

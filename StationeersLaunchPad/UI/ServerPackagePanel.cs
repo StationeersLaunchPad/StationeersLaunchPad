@@ -25,7 +25,7 @@ public static class ServerPackagePanel
 
     var active = manager.ActiveProfile;
     var mods = manager.ServerPackageMods(modList).Where(mod => mod.Source != ModSourceType.Core).ToList();
-    var missing = active == null ? [] : ProfileManager.GetMissingMods(active, modList);
+    var missing = active == null ? [] : manager.GetMissingMods(active, modList);
     var leftOut = manager.ClientsideActive ? modList.AllMods.Where(manager.IsClientside).ToList() : [];
 
     ImGui.PushTextWrapPos(0f);

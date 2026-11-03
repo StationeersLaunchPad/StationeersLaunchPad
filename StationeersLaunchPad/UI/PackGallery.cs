@@ -80,6 +80,11 @@ public static class PackGallery
       if (DrawCard(manager, modList, pack, active, cardWidth, cardHeight))
         picked = pack;
     }
+    if (manager.OneStart is { } oneStart)
+    {
+      Gap(true);
+      DrawCard(manager, modList, oneStart, active, cardWidth, cardHeight);
+    }
     var divide = true;
     foreach (var pack in manager.UserPacks)
     {
@@ -122,7 +127,7 @@ public static class PackGallery
     var hovered = ImGui.IsItemHovered();
     var isActive = pack == active;
     var isServer = ProfileManager.IsServerPack(pack);
-    var missing = ProfileManager.GetMissingMods(pack, modList).Count;
+    var missing = manager.GetMissingMods(pack, modList).Count;
 
     drawList.AddRectFilled(min, max, LaunchPadTheme.OverU32(Color.white, hovered ? 0.07f : 0.035f), 4f);
     var mods = manager.IsVanilla(pack) ? []
@@ -148,9 +153,10 @@ public static class PackGallery
     var detail = manager.IsVanilla(pack) ? "no mods"
       : pack.Name == ProfileManager.VanillaPlusName ? $"{ProfileManager.ModCount(manager.Clientside)} clientside"
       : isServer ? $"server, {count} mods"
+      : manager.IsOneStart(pack) ? "this start only"
       : $"{count} mod{(count == 1 ? "" : "s")}";
     var detailPos = textPos + new Vector2(0f, lineHeight + style.ItemSpacing.y);
-    var right = missing > 0 ? $"{missing} missing" : isActive ? "active" : "";
+    var right = missing > 0 ? $"{missing} missing" : isActive && !manager.IsOneStart(pack) ? "active" : "";
     // the detail gives way to the right text instead of running into it
     var detailMax = max.x - 6f - (right.Length > 0 ? ImGui.CalcTextSize(right).x + 6f : 0f);
     if (isServer && detailPos.x + ImGui.CalcTextSize(detail).x > detailMax)
@@ -168,6 +174,7 @@ public static class PackGallery
         manager.IsVanilla(pack) ? "Vanilla: the game without any mods, not even clientside ones."
         : pack.Name == ProfileManager.VanillaPlusName ? "Vanilla+: the game with only your clientside mods."
         : isServer ? $"{pack.Name}: the mods of {pack.ServerName}, plus your clientside mods."
+        : manager.IsOneStart(pack) ? ProfilePanel.OneStartText(manager)
         : isActive ? $"{pack.Name} is the active pack." : $"Switch to {pack.Name}.",
         400f);
     ImGui.PopID();

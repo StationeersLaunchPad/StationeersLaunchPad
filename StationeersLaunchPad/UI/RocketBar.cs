@@ -89,6 +89,20 @@ public static class RocketBar
     DrawShip(drawList, center, 0f, h, rocket);
   }
 
+  public static void DrawLoop()
+  {
+    var (min, max) = Bar();
+    var drawList = ImGui.GetWindowDrawList();
+    var h = RocketHeight;
+    var half = h * Aspect / 2f;
+    var t = Mathf.Repeat(UnityEngine.Time.unscaledTime / 1.8f, 1f);
+    var center = new Vector2(Mathf.Lerp(min.x - half, max.x + half, t), (min.y + max.y) / 2f);
+    var top = center.y - RowHeight / 2f;
+    drawList.PushClipRect(new Vector2(min.x, top), new Vector2(max.x, top + RowHeight), true);
+    DrawShip(drawList, center, 0f, h, Rocket.Burn);
+    drawList.PopClipRect();
+  }
+
   // the full bar with the rocket lying at its end, progress stands it up and takes it off the top of the screen
   public static void DrawLiftoff(float progress, Rocket rocket)
   {

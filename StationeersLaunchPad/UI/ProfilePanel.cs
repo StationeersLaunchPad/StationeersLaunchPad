@@ -25,10 +25,15 @@ public static class ProfilePanel
   private static string packageCode = "";
   private static bool importingPackage;
   private static readonly HashSet<ulong> subscriptions = [];
+  private static readonly HashSet<ulong> downloaded = [];
   private static ModList indexedModList;
   private static IReadOnlyDictionary<string, ModInfo> modIndex;
 
   public static bool Busy => subscriptions.Count > 0 || importingPackage;
+  public static string DownloadStatus { get; private set; }
+  public static ulong CurrentDownload { get; private set; }
+  public static bool IsQueued(ulong handle) => subscriptions.Contains(handle) && !downloaded.Contains(handle);
+  public static bool IsDownloaded(ulong handle) => downloaded.Contains(handle);
   public static string BusyText => importingPackage ? "Importing..." : "Downloading...";
 
   public static void ShowLoadBlocked(string profileName, int missingModCount)
@@ -91,11 +96,18 @@ public static class ProfilePanel
       ImGuiHelper.TextColored("Built in: the game without any mods, not even clientside ones.", LaunchPadTheme.TextSub);
     else if (manager.IsBuiltIn(active))
       ImGuiHelper.TextColored("Built in: the game with only your clientside mods.", LaunchPadTheme.TextSub);
+    else if (manager.IsOneStart(active))
+      ImGuiHelper.TextColored(OneStartText(manager), LaunchPadTheme.Info);
     ImGui.PopTextWrapPos();
 
     // built-in packs can't be renamed, copied or deleted
-    if (manager.IsBuiltIn(active))
+    if (manager.IsBuiltIn(active) || manager.IsOneStart(active))
+    {
+      if (manager.IsOneStart(active))
+        DrawKeepButton(manager, active.Name);
+      DrawMissingMods(stage, manager, active, modList);
       return changed;
+    }
 
     if (renameFor == active.Name)
     {
@@ -173,9 +185,26 @@ public static class ProfilePanel
     return changed;
   }
 
+  public static string OneStartText(ProfileManager manager)
+  {
+    var next = string.IsNullOrEmpty(manager.ConfiguredProfileName) ? "your usual pack" : manager.ConfiguredProfileName;
+    return "A temporary pack with a save's mods, because you restarted with them from the load menu. "
+      + $"The next start loads {next} again, unless you keep this one.";
+  }
+
+  public static void DrawKeepButton(ProfileManager manager, string name, Vector2 size = default)
+  {
+    if (!ImGui.Button("Keep as pack", size))
+      return;
+    if (manager.KeepOneStart())
+      SetMessage($"Kept {name} as a pack", ProfileStatusKind.Saved);
+    else
+      SetMessage($"Could not keep {name} as a pack", ProfileStatusKind.Error);
+  }
+
   private static void DrawMissingMods(LoadStage stage, ProfileManager manager, ProfileData pack, ModList modList)
   {
-    var missing = ProfileManager.GetMissingMods(pack, modList);
+    var missing = manager.GetMissingMods(pack, modList);
     if (missing.Count == 0)
       return;
 
@@ -377,32 +406,41 @@ public static class ProfilePanel
       SetMessage(Steam.NotRunningText, ProfileStatusKind.Error);
       return;
     }
-    var handles = entries.Select(entry => entry.WorkshopHandle).Where(subscriptions.Add).ToList();
-    if (handles.Count == 0)
+    var queue = entries.Where(entry => subscriptions.Add(entry.WorkshopHandle)).ToList();
+    if (queue.Count == 0)
       return;
     try
     {
       var done = 0;
-      foreach (var handle in handles)
+      foreach (var entry in queue)
       {
-        SetMessage($"Downloading Workshop item {handle}...", ProfileStatusKind.Info);
-        if (!await Steam.SubscribeAndDownload(handle))
+        var name = GetFallbackName(entry);
+        CurrentDownload = entry.WorkshopHandle;
+        DownloadStatus = queue.Count == 1 ? $"Downloading {name}" : $"Downloading {name} ({done + 1} of {queue.Count})";
+        SetMessage($"{DownloadStatus}...", ProfileStatusKind.Info);
+        if (!await Steam.SubscribeAndDownload(entry.WorkshopHandle))
         {
-          SetMessage($"Could not download Workshop item {handle}", ProfileStatusKind.Error);
+          SetMessage($"Could not download {name}", ProfileStatusKind.Error);
           break;
         }
+        downloaded.Add(entry.WorkshopHandle);
         done++;
       }
-      if (done == handles.Count)
-        SetMessage($"Downloaded {done} Workshop item{(done == 1 ? "" : "s")}", ProfileStatusKind.Saved);
+      if (done == queue.Count)
+        SetMessage($"Downloaded {done} mod{(done == 1 ? "" : "s")}", ProfileStatusKind.Saved);
       if (done > 0)
         // the active pack is applied again to the new mod list
         LaunchPadConfig.ReloadMods(preserveSelection: false);
     }
     finally
     {
-      foreach (var handle in handles)
-        subscriptions.Remove(handle);
+      DownloadStatus = null;
+      CurrentDownload = 0;
+      foreach (var entry in queue)
+      {
+        subscriptions.Remove(entry.WorkshopHandle);
+        downloaded.Remove(entry.WorkshopHandle);
+      }
     }
   }
 

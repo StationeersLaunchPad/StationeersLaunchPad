@@ -68,6 +68,7 @@ public static class Configs
   public static ConfigEntry<bool> ServerPacksEnabled;
   public static ConfigEntry<bool> ServerPacksAutoConnect;
   public static ConfigEntry<bool> ShareModList;
+  public static ConfigEntry<string> DeclinedServers;
 
   public static ConfigEntry<bool> NewsCheckOnStart;
   public static ConfigEntry<string> NewsFeedUrl;
@@ -339,6 +340,13 @@ public static class Configs
       true,
       new ConfigDescription(
         "When hosting or running a dedicated server, send the mod list to joining SLP players so they can save it as a pack."
+      )
+    );
+    DeclinedServers = config.Bind(
+      new ConfigDefinition("Internal", "DeclinedServers"),
+      "",
+      new ConfigDescription(
+        "Servers whose pack offer got a \"No thanks\", one per line. Automatically managed, reset it in the Server Packs settings."
       )
     );
     LinuxPathPatch = config.Bind(
