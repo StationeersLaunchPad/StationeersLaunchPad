@@ -27,7 +27,8 @@ public static class Slp2Handshake
       return null;
 
     // players can only get workshop mods, a list with anything else can't be loaded
-    var mods = LaunchPadConfig.ModList.EnabledMods.Where(mod => mod.Source != ModSourceType.Core).ToList();
+    var mods = LaunchPadConfig.ModList.EnabledMods.Where(mod => mod.Source != ModSourceType.Core
+      && mod.About?.ModSide is not (ModSide.Server or ModSide.Client)).ToList();
     var local = mods.FirstOrDefault(mod => mod.WorkshopHandle <= 1);
     if (local != null)
     {
